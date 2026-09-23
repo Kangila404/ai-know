@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: ai-know
+
+  jpa:
+    open-in-view: false

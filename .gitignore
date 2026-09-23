@@ -1,0 +1,11 @@
+# Secrets and environment-specific configuration
+**/.env
+**/.env.*
+!**/.env.example
+
+# IntelliJ IDEA project files
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
