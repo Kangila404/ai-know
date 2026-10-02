@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -48,18 +49,37 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private UserRole userRole;
 
+    public static User createSocialUser(String nickname) {
+        User user = new User();
+
+        user.userId = UUID.randomUUID().toString();
+
+        user.nickname = (nickname == null || nickname.isBlank())
+            ? "새 사용자"
+            : nickname.trim();
+
+        user.isOnboardingCompleted = false;
+        user.userRole = UserRole.USER;
+
+        return user;
+    }
+
     public void updateNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
-            throw new IllegalArgumentException("닉네임은 비어 있거나 공백만으로 구성될 수 없습니다.");
+            throw new IllegalArgumentException("닉네임은 필수입니다.");
         }
 
         String normalizedNickname = nickname.trim();
 
-        if (this.nickname.equals(normalizedNickname)) {
-            throw new IllegalArgumentException("현재 사용 중인 닉네임과 같습니다.");
+        if (normalizedNickname.length() > 20) {
+            throw new IllegalArgumentException("닉네임은 20자 이하여야 합니다.");
         }
 
         this.nickname = normalizedNickname;
+    }
+
+    public void recordLogin() {
+        this.lastLogined_at = LocalDateTime.now();
     }
 
 }

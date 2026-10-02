@@ -4,3 +4,31 @@ spring:
 
   jpa:
     open-in-view: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
+            scope:
+              - openid
+              - profile
+
+server:
+  servlet:
+    session:
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        name: JSESSIONID
+        http-only: true
+        secure: true
+        same-site: lax
+
+app:
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+
+  login-success-url: ${LOGIN_SUCCESS_URL:/api/v1/users}

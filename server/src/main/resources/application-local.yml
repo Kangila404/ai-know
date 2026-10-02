@@ -21,3 +21,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
