@@ -18,6 +18,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.aiknow.server.common.entity.BaseEntity;
+import org.aiknow.server.user.exception.UserErrorCode;
+import org.aiknow.server.user.exception.UserException;
 
 @Entity
 @Table(name = "users")
@@ -66,13 +68,13 @@ public class User extends BaseEntity {
 
     public void updateNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) {
-            throw new IllegalArgumentException("닉네임은 필수입니다.");
+            throw new UserException(UserErrorCode.NICKNAME_REQUIRED);
         }
 
         String normalizedNickname = nickname.trim();
 
         if (normalizedNickname.length() > 20) {
-            throw new IllegalArgumentException("닉네임은 20자 이하여야 합니다.");
+            throw new UserException(UserErrorCode.NICKNAME_TOO_LONG);
         }
 
         this.nickname = normalizedNickname;

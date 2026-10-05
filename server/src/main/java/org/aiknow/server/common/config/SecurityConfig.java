@@ -1,8 +1,11 @@
 package org.aiknow.server.common.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.aiknow.server.auth.handler.OAuth2LoginSuccessHandler;
 import org.aiknow.server.auth.service.SessionAuthenticationService;
+import org.aiknow.server.common.exception.CommonErrorCode;
+import org.aiknow.server.common.exception.ErrorResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,10 +24,16 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper().findAndRegisterModules();
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http,
         OAuth2LoginSuccessHandler successHandler,
-        SessionAuthenticationService sessionAuthenticationService
+        SessionAuthenticationService sessionAuthenticationService,
+        ObjectMapper objectMapper
     ) throws Exception {
 
         http
@@ -75,11 +84,21 @@ public class SecurityConfig {
                     response.setStatus(HttpStatus.UNAUTHORIZED.value())
                 )
                 .accessDeniedHandler((request, response, ex) ->
-                    response.setStatus(HttpStatus.FORBIDDEN.value())
+                    writeErrorResponse(response, CommonErrorCode.FORBIDDEN, objectMapper)
                 )
             );
 
         return http.build();
+    }
+
+    private void writeErrorResponse(
+        jakarta.servlet.http.HttpServletResponse response,
+        CommonErrorCode errorCode,
+        ObjectMapper objectMapper
+    ) throws java.io.IOException {
+        response.setStatus(errorCode.getStatus().value());
+        response.setContentType("application/json;charset=UTF-8");
+        objectMapper.writeValue(response.getWriter(), ErrorResponse.of(errorCode));
     }
 
     @Bean
