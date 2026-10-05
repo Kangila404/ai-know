@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import org.aiknow.server.user.domain.User;
 
 @Entity
-@Table(name = "like")
+@Table(name = "likes")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Getter
