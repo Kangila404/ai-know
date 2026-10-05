@@ -3,15 +3,15 @@ package org.aiknow.server.cardNews.domain;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 @Entity
 @Table(name = "card_slide")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-public class CardSlide {
+@Getter
+public class CardSlides {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
