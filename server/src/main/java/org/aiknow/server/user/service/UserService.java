@@ -7,6 +7,8 @@ import org.aiknow.server.user.domain.User;
 import org.aiknow.server.user.dto.req.UpdateNicknameRequest;
 import org.aiknow.server.user.dto.res.UpdateNicknameResponse;
 import org.aiknow.server.user.dto.res.UserMeResponse;
+import org.aiknow.server.user.exception.UserErrorCode;
+import org.aiknow.server.user.exception.UserException;
 import org.aiknow.server.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +44,7 @@ public class UserService {
 
     User findUserByUserIdOrThrow(String userId){
         return userRepository.findByUserId(userId)
-            .orElseThrow(()-> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+            .orElseThrow(()-> new UserException(UserErrorCode.USER_NOT_FOUND));
     }
 
 }

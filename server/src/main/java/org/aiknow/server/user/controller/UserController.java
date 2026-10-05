@@ -1,6 +1,7 @@
 package org.aiknow.server.user.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.aiknow.server.user.dto.req.UpdateNicknameRequest;
 import org.aiknow.server.user.dto.res.UpdateNicknameResponse;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 
@@ -34,7 +37,8 @@ public class UserController {
     @PatchMapping("/nickname")
     public ResponseEntity<UpdateNicknameResponse> updateNickname(
         @AuthenticationPrincipal String userId,
-        UpdateNicknameRequest request
+        @RequestHeader("X-CSRF-TOKEN") String csrfToken,
+        @Valid @RequestBody UpdateNicknameRequest request
     ){
         UpdateNicknameResponse response = userService.updateNickname(userId, request);
         return ResponseEntity.ok(response);
