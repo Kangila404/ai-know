@@ -109,7 +109,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(List.of(frontendOrigin));
         configuration.setAllowedMethods(
-            List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS")
+            List.of("GET", "PUT", "POST", "PATCH", "DELETE", "OPTIONS")
         );
         configuration.setAllowedHeaders(
             List.of("Content-Type", "X-CSRF-TOKEN")
