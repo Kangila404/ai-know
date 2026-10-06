@@ -1,6 +1,7 @@
 package org.aiknow.server.cardNews.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aiknow.server.cardNews.domain.*;
 import org.aiknow.server.cardNews.dto.res.CardNewsResponse;
 import org.aiknow.server.cardNews.dto.res.CardSlideResponse;
@@ -13,18 +14,19 @@ import org.aiknow.server.cardNews.repository.LikeRepository;
 import org.aiknow.server.user.domain.User;
 import org.aiknow.server.user.repository.UserRepository;
 import org.springframework.data.domain.Pageable;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CardNewsService {
     private final CardNewsRepository cardNewsRepository;
-    private final CardSlideRepository cardSlidesRepository;
+    private final CardSlideRepository cardSlideRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final LikeRepository likeRepository;
@@ -41,7 +43,8 @@ public class CardNewsService {
             }
             // 2. 승인된 특정 카테고리 카드뉴스
             cardNewsList = cardNewsRepository
-                    .findApprovedAndCategoryId(pageable, categoryId);
+                     .findByCategoryIdAndInspectionStatus(InspectionStatus.APPROVED, categoryId, pageable);
+
         }
         else {
 
@@ -79,7 +82,7 @@ public class CardNewsService {
 
     @Transactional(readOnly = true)
     public List<CardSlideResponse> getCardSlides(Long cardNewsId){
-        List<CardSlide> cardSlidesList = cardSlidesRepository.findCardSlidesBycardNewsId(cardNewsId);
+        List<CardSlide> cardSlidesList = cardSlideRepository.findCardSlidesBycardNewsId(cardNewsId);
         List<CardSlideResponse> responses = cardSlidesList.stream().map(
                 CardSlideResponse::from
         ).toList();

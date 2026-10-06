@@ -23,6 +23,7 @@ import java.util.List;
 @RequestMapping("/api/v1/cardNews")
 @RequiredArgsConstructor
 public class CardNewsController {
+
     private final CardNewsService cardNewsService;
 
     @GetMapping

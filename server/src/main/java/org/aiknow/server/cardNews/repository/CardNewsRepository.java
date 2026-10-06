@@ -6,11 +6,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
     List<CardNews> findByInspectionStatus(InspectionStatus inspectionStatus, Pageable pageable);
     default List<CardNews> findApproved(Pageable pageable){
@@ -27,11 +29,20 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
                                  @Param("inspectionStatus") InspectionStatus inspectionStatus,
                                  Pageable pageable);
 
-    List<CardNews> findByCategoryIdAndInspectionStatus(InspectionStatus inspectionStatus,Long categoryId, Pageable pageable);
 
-    default List<CardNews> findApprovedAndCategoryId(Pageable pageable,Long categoryId){
-        return findByCategoryIdAndInspectionStatus(InspectionStatus.APPROVED, categoryId, pageable );
-    }
+    @Query("""
+    SELECT cn
+    FROM CardNews cn
+    JOIN cn.cardNewsCategory cnc
+    WHERE cnc.category.id = :categoryId and
+    cn.inspectionStatus =:inspectionStatus
+     order by cn.publicationDate desc, cn.id desc
+    """)
+    List<CardNews> findByCategoryIdAndInspectionStatus(
+            @Param("inspectionStatus") InspectionStatus inspectionStatus,
+            @Param("categoryId") Long categoryId,
+            Pageable pageable
+    );
     @Query("""
         SELECT c
         FROM Like l
@@ -47,10 +58,6 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
             @Param("inspectionStatus") InspectionStatus inspectionStatus,
             Pageable pageable
     );
-
-
-    List<CardNews> findByUserIdAndInspectionStatusAndIsLikedIsTrue(Long userId,InspectionStatus inspectionStatus,Pageable pageable);
-
 
     Optional<CardNews> findCardNewsByPublicationDate(LocalDate today, InspectionStatus inspectionStatus);
 

@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.aiknow.server.common.entity.BaseEntity;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ import java.util.List;
 @Table(name = "card_news")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-public class CardNews {
+public class CardNews extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

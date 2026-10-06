@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import org.aiknow.server.common.entity.BaseEntity;
 
 import java.util.List;
 
@@ -11,7 +12,7 @@ import java.util.List;
 @Table(name = "card_news_category")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-public class CardNewsCategory {
+public class CardNewsCategory extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
      private Long id;
