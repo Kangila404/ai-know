@@ -59,6 +59,7 @@ public class SecurityConfig {
                     "/login/oauth2/code/**",
                     "/api/v1/auth/csrf"
                 ).permitAll()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()
             )

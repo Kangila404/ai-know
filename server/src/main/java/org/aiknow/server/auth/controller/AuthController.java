@@ -1,5 +1,6 @@
 package org.aiknow.server.auth.controller;
 
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,7 @@ public class AuthController {
     private final SessionAuthenticationService sessionAuthenticationService;
 
     @GetMapping("/csrf")
-    public ResponseEntity<CsrfToken> getCsrfToken(CsrfToken csrfToken) {
+    public ResponseEntity<CsrfToken> getCsrfToken(@Parameter(hidden = true) CsrfToken csrfToken) {
         return ResponseEntity.ok(csrfToken);
     }
 

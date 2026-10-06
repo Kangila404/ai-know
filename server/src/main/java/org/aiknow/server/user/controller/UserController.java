@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.aiknow.server.user.dto.req.UpdateNicknameRequest;
 import org.aiknow.server.user.dto.res.UpdateNicknameResponse;
+import org.aiknow.server.user.dto.res.UpdateProfileResponse;
 import org.aiknow.server.user.dto.res.UserMeResponse;
 import org.aiknow.server.user.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -52,6 +54,14 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/profile/{profile_id}")
+    public ResponseEntity<UpdateProfileResponse> updateProfile(
+        @AuthenticationPrincipal String userId,
+        @PathVariable("profile_id") Long profileId
+    ){
+        UpdateProfileResponse response = userService.updateProfile(userId, profileId);
+        return ResponseEntity.ok(response);
+    }
 
 
 }

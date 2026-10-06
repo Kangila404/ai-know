@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.aiknow.server.common.entity.BaseEntity;
+import org.aiknow.server.profile.domain.ProfileImg;
 import org.aiknow.server.user.exception.UserErrorCode;
 import org.aiknow.server.user.exception.UserException;
 
@@ -82,6 +83,10 @@ public class User extends BaseEntity {
 
     public void recordLogin() {
         this.lastLogined_at = LocalDateTime.now();
+    }
+
+    public void updateProfileImg(ProfileImg profileImg) {
+        this.profileImg = profileImg;
     }
 
 }
