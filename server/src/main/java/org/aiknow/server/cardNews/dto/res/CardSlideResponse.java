@@ -1,8 +1,8 @@
 package org.aiknow.server.cardNews.dto.res;
 
-import org.aiknow.server.cardNews.domain.CardSlides;
+import org.aiknow.server.cardNews.domain.CardSlide;
 
-public record CardSlidesResponse(
+public record CardSlideResponse(
         Long id ,
         String title ,
         String imgUrl,
@@ -10,8 +10,8 @@ public record CardSlidesResponse(
         Integer sequence
 
 ){
-    public static CardSlidesResponse from(CardSlides cardSlides){
-        return new CardSlidesResponse(
+    public static CardSlideResponse from(CardSlide cardSlides){
+        return new CardSlideResponse(
                 cardSlides.getId(),
                 cardSlides.getTitle(),
                 cardSlides.getImgUrl(),
@@ -19,4 +19,5 @@ public record CardSlidesResponse(
                 cardSlides.getSequence()
         );
     }
+
 }

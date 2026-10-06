@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Getter
-public class CardSlides {
+public class CardSlide {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

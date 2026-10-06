@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import org.aiknow.server.user.domain.User;
 
 @Entity
-@Table(name = "likes")
+@Table(name = "like")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Getter
@@ -27,12 +27,13 @@ public class Like {
     private User user;
 
 
-    @Column(name = "is_liked", nullable = false)
-    private Boolean isLiked;
-
-    public void updateLike() {
-        this.isLiked = !this.isLiked;
+    private Like(User user, CardNews cardNews) {
+        this.user = user;
+        this.cardNews = cardNews;
     }
 
+    public static Like of(User user, CardNews cardNews) {
+        return new Like(user, cardNews);
+    }
 
 }

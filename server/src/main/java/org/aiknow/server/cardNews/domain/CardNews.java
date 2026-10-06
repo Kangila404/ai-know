@@ -25,7 +25,7 @@ public class CardNews {
     private List<CardNewsCategory> cardNewsCategory=new ArrayList<>();
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "cardNews",cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<CardSlides> cardSlides=new ArrayList<>();
+    private List<CardSlide> cardSlides=new ArrayList<>();
 
     @Column(length = 20, nullable = false)
     private String title;

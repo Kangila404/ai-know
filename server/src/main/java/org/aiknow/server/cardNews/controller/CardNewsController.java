@@ -1,13 +1,16 @@
 package org.aiknow.server.cardNews.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.aiknow.server.cardNews.dto.req.UpdateLikeRequest;
 import org.aiknow.server.cardNews.dto.res.CardNewsResponse;
-import org.aiknow.server.cardNews.dto.res.CardSlidesResponse;
+import org.aiknow.server.cardNews.dto.res.CardSlideResponse;
 import org.aiknow.server.cardNews.dto.res.CategoryResponse;
+import org.aiknow.server.cardNews.dto.res.UpdateLikeResponse;
 import org.aiknow.server.cardNews.service.CardNewsService;
-import org.aiknow.server.user.dto.res.UpdateNicknameResponse;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,13 +27,14 @@ public class CardNewsController {
 
     @GetMapping
     public ResponseEntity<List<CardNewsResponse>> getCardNews(
-            @PageableDefault(page = 0, size = 10, sort = "publicationDate")
+            @PageableDefault(page = 0, size = 10, sort = "publicationDate",
+                    direction = Sort.Direction.DESC)
             Pageable pageable,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam() boolean isOnlyLiked,
-            @RequestParam(required = false) Long userId
+            @RequestParam(required = false) String userId,
+            @RequestParam(defaultValue = "false") boolean isOnlyLiked
             ){
-        List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,isOnlyLiked,userId);
+        List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked);
         return ResponseEntity.ok(response);
     }
 
@@ -42,10 +46,10 @@ public class CardNewsController {
 
 
     @GetMapping("/cardSlides")
-    public ResponseEntity<List<CardSlidesResponse>> getCardSlides(
+    public ResponseEntity<List<CardSlideResponse>> getCardSlides(
             Long cardNewsId
     ){
-        List<CardSlidesResponse> response = cardNewsService.getCardSlides(cardNewsId);
+        List<CardSlideResponse> response = cardNewsService.getCardSlides(cardNewsId);
         return ResponseEntity.ok(response);
     }
 
@@ -56,12 +60,13 @@ public class CardNewsController {
     }
 
 
-    @PatchMapping("/like")
-    public ResponseEntity<Boolean> updateLike(
+    @PatchMapping("/{cardNewsId}/like")
+    public ResponseEntity<UpdateLikeResponse> updateLike(
             String userId,
-            Long cardNewsId
+            Long cardNewsId,
+            @Valid @RequestBody UpdateLikeRequest request
     ){
-        Boolean response = cardNewsService.updateLike(userId, cardNewsId);
+        UpdateLikeResponse response = cardNewsService.updateLike(userId, cardNewsId, request.liked());
         return ResponseEntity.ok(response);
     }
 
