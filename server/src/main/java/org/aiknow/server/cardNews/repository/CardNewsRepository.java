@@ -17,17 +17,17 @@ import java.util.Optional;
 
 @Repository
 public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
+    org.springframework.data.domain.Page<CardNews> findByPublicationStatus(PublicationStatus status, Pageable pageable);
     List<CardNews> findByInspectionStatusAndPublicationStatus(InspectionStatus inspectionStatus, PublicationStatus publicationStatus, Pageable pageable);
     default List<CardNews> findApproved(Pageable pageable){
         return findByInspectionStatusAndPublicationStatus(InspectionStatus.APPROVED, PublicationStatus.PUBLISHED, pageable);
     }
     @Query("""
     SELECT c
-    FROM Like l
-    JOIN l.cardNews c
-    WHERE l.user.id =:userId and c.inspectionStatus = :inspectionStatus
+    FROM CardNews c
+    WHERE c.inspectionStatus = :inspectionStatus
+      and exists (select 1 from Likes l where l.cardNews = c and l.user.id = :userId)
       and c.publicationStatus = org.aiknow.server.cardNews.domain.PublicationStatus.PUBLISHED
-    ORDER BY c.id DESC
 """)
     List<CardNews> findUserLiked(@Param("userId") Long userId,
                                  @Param("inspectionStatus") InspectionStatus inspectionStatus,
@@ -41,7 +41,6 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
     WHERE cnc.category.id = :categoryId and
     cn.inspectionStatus =:inspectionStatus
     and cn.publicationStatus = org.aiknow.server.cardNews.domain.PublicationStatus.PUBLISHED
-     order by cn.publicationDate desc, cn.id desc
     """)
     List<CardNews> findByCategoryIdAndInspectionStatus(
             @Param("inspectionStatus") InspectionStatus inspectionStatus,
@@ -50,10 +49,9 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
     );
     @Query("""
         SELECT c
-        FROM Like l
-        JOIN l.cardNews c
+        FROM CardNews c
         JOIN c.cardNewsCategory cnc
-        WHERE l.user.id = :userId
+        WHERE exists (select 1 from Likes l where l.cardNews = c and l.user.id = :userId)
           and cnc.category.id = :categoryId
           and c.inspectionStatus = :inspectionStatus
           and c.publicationStatus = org.aiknow.server.cardNews.domain.PublicationStatus.PUBLISHED
@@ -87,6 +85,7 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
         select c from CardNews c
         where c.inspectionStatus = org.aiknow.server.cardNews.domain.InspectionStatus.APPROVED
           and c.contentType = org.aiknow.server.cardNews.domain.ContentType.AI_THEORY
+          and c.publicationStatus <> org.aiknow.server.cardNews.domain.PublicationStatus.HIDDEN
           and c.approvedAt < :cutoff
         order by case when c.firstUsedAt is null then 0 else 1 end,
           c.lastUsedAt asc, c.approvedAt desc, c.id desc

@@ -4,6 +4,13 @@ spring:
 
   jpa:
     open-in-view: false
+  flyway:
+    enabled: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
   batch:
     job:
@@ -35,6 +42,23 @@ server:
         same-site: lax
 
 app:
+  social:
+    providers:
+      google:
+        enabled: ${GOOGLE_NATIVE_LOGIN_ENABLED:false}
+        audiences: ${GOOGLE_NATIVE_CLIENT_IDS:}
+      kakao:
+        enabled: ${KAKAO_LOGIN_ENABLED:false}
+        audiences: ${KAKAO_CLIENT_IDS:}
+      apple:
+        enabled: ${APPLE_LOGIN_ENABLED:false}
+        audiences: ${APPLE_CLIENT_IDS:}
+  media:
+    mode: ${MEDIA_STORAGE_MODE:mounted}
+    enabled: ${MEDIA_STORAGE_ENABLED:false}
+    root: ${MEDIA_ROOT:}
+    public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
+    volume-id: ${MEDIA_VOLUME_ID:}
   ingestion:
     token: ${N8N_INGEST_TOKEN:}
   news-delivery:

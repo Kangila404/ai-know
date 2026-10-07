@@ -42,7 +42,8 @@ public class NewsDeliveryLedger {
         var edition = editions.findForUpdate(delivery.getDeliveryDate()).orElse(null);
         var article = news.findForUpdate(delivery.getCardNewsId()).orElse(null);
         if (edition == null || !delivery.getCardNewsId().equals(edition.getCardNewsId())
-            || article == null || article.getInspectionStatus() != InspectionStatus.APPROVED) {
+            || article == null || article.getInspectionStatus() != InspectionStatus.APPROVED
+            || article.getPublicationStatus() == org.aiknow.server.cardNews.domain.PublicationStatus.HIDDEN) {
             delivery.cancel();
             return Optional.empty();
         }

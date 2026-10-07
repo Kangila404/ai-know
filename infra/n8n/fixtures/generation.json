@@ -1,0 +1,24 @@
+{
+  "state": {
+    "current": {"sourceTitle": "Synthetic integration fixture: website access for automated assistants"},
+    "docs": [{
+      "id": "source-1",
+      "title": "Synthetic integration fixture: website access for automated assistants",
+      "text": "This is fictional test material, not a report about a real company or product. An automated assistant can help a user navigate a website, but the website may require a human to approve an action before it continues. The example team is designing a permission screen that explains which action the assistant wants to take. The user can decline the request and the assistant must stop without changing the account. The team also records the result of an action so that a failed connection does not cause the same action to run again. The design does not claim measured performance or accuracy. Reviewers still need to compare every proposed action with the user's original request and the website's rules. The illustration is a conceptual diagram and does not represent an actual product interface."
+    }]
+  },
+  "draft": {
+    "status": "ready", "reason": "",
+    "title": "자동 비서의 웹 작업에는 사용자 확인이 필요해요",
+    "summary": "가상의 테스트 사례에서는 자동 비서가 웹사이트를 탐색하더라도 실행 전에 사용자에게 확인을 받도록 설계합니다. 사용자가 거절하면 작업을 중단하고, 실행 결과를 기록해 연결 실패로 같은 작업이 반복되지 않도록 합니다.",
+    "plan": {"coreMessage": "가상 사례를 통해 자동 비서의 권한 확인을 설명합니다.", "readerNeeds": "작업 승인과 중복 실행 방지를 이해합니다.", "sequenceReason": "권한 확인부터 실행 결과 기록까지 순서대로 설명합니다."},
+    "evidence": [{"sourceId":"source-1","quote":"The user can decline the request and the assistant must stop without changing the account."}],
+    "slides": [
+      {"sequence":1,"title":"자동 비서와 웹사이트","content":"자동 비서는 웹사이트 탐색을 도울 수 있지만 작업을 이어가기 전에 사람의 승인이 필요할 수 있습니다.","sourceIds":["source-1"],"evidence":[{"sourceId":"source-1","quote":"An automated assistant can help a user navigate a website, but the website may require a human to approve an action before it continues."}],"visual":{"type":"illustration","description":"웹 탐색을 표현하는 개념 이미지","dataJson":null,"assetKey":"web_assistant","searchQuery":"computer network | online communication","generationPrompt":"Abstract computer network, no text, no logos"}},
+      {"sequence":2,"title":"요청을 이해하고 승인","content":"권한 화면은 자동 비서가 수행하려는 작업을 설명하도록 설계합니다.","sourceIds":["source-1"],"evidence":[{"sourceId":"source-1","quote":"The example team is designing a permission screen that explains which action the assistant wants to take."}],"visual":{"type":"text","description":"승인 흐름 설명","dataJson":null,"assetKey":null,"searchQuery":null,"generationPrompt":null}},
+      {"sequence":3,"title":"거절하면 작업 중단","content":"사용자가 거절하면 계정을 변경하지 않고 작업을 멈춰야 합니다.","sourceIds":["source-1"],"evidence":[{"sourceId":"source-1","quote":"The user can decline the request and the assistant must stop without changing the account."}],"visual":{"type":"text","description":"작업 중단 조건 설명","dataJson":null,"assetKey":null,"searchQuery":null,"generationPrompt":null}},
+      {"sequence":4,"title":"실행 결과 기록","content":"연결 실패로 같은 작업이 반복되지 않도록 작업 결과를 기록합니다.","sourceIds":["source-1"],"evidence":[{"sourceId":"source-1","quote":"The team also records the result of an action so that a failed connection does not cause the same action to run again."}],"visual":{"type":"text","description":"중복 실행 방지 설명","dataJson":null,"assetKey":null,"searchQuery":null,"generationPrompt":null}},
+      {"sequence":5,"title":"성능 수치는 별도 검증","content":"이 가상 설계는 측정된 성능이나 정확도를 주장하지 않습니다. 요청과 사이트 규칙을 대조하는 검토가 필요합니다.","sourceIds":["source-1"],"evidence":[{"sourceId":"source-1","quote":"The design does not claim measured performance or accuracy."}],"visual":{"type":"text","description":"가상 사례의 한계 설명","dataJson":null,"assetKey":null,"searchQuery":null,"generationPrompt":null}}
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+// Isolated H2/local-storage server for verify-generation.mjs. Never load real .env credentials.
+allprojects {
+    afterEvaluate {
+        tasks.register('runWorkflowIntegrationServer', JavaExec) {
+            dependsOn testClasses
+            classpath = sourceSets.test.runtimeClasspath
+            mainClass = 'org.aiknow.server.ServerApplication'
+            args '--spring.profiles.active=local,test', '--server.port=18081',
+                '--spring.datasource.url=jdbc:h2:mem:workflow_integration;MODE=MySQL;DB_CLOSE_DELAY=-1',
+                '--app.ingestion.token=local-image-smoke-test-token-32-characters',
+                '--app.media.enabled=true', '--app.media.mode=local',
+                '--app.media.root=' + layout.buildDirectory.dir('workflow-integration-media').get().asFile.absolutePath,
+                '--app.media.public-base-url=http://localhost:18081/media/generated',
+                '--app.news-delivery.enabled=false', '--app.news-delivery.fcm-enabled=false',
+                '--app.social.providers.google.enabled=false', '--app.social.providers.kakao.enabled=false',
+                '--app.social.providers.apple.enabled=false', '--spring.flyway.enabled=false',
+                '--spring.batch.jdbc.initialize-schema=embedded', '--logging.level.root=WARN',
+                '--logging.level.org.springframework=WARN', '--logging.level.org.hibernate=WARN', '--spring.jpa.show-sql=false'
+        }
+    }
+}

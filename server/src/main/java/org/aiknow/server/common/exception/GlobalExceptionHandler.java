@@ -46,7 +46,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
 
-        log.warn("Handled Spring MVC exception: status={}, message={}", status, ex.getMessage());
+        log.warn("Handled Spring MVC exception: status={}, type={}", status, ex.getClass().getSimpleName());
 
         ErrorResponse errorResponse = ErrorResponse.of(status.value(), status.name(), status.getReasonPhrase());
         return ResponseEntity.status(status).headers(headers).body(errorResponse);

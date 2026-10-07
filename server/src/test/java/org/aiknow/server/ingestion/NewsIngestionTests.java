@@ -38,7 +38,7 @@ class NewsIngestionTests {
     @Autowired ObjectMapper mapper;
     @Autowired UserRepository users;
     @Autowired CardNewsRepository news;
-    @Autowired LikeRepository likes;
+    @Autowired LikesRepository likes;
     @Autowired NewsSubmissionRepository submissions;
     @Autowired NewsSubmissionService service;
     @Autowired SessionAuthenticationService sessions;
@@ -49,6 +49,7 @@ class NewsIngestionTests {
     @Autowired NewsDeliveryRepository deliveries;
     @Autowired DeviceTokenRepository tokens;
     @Autowired NotificationSettingRepository settings;
+    @Autowired org.aiknow.server.editorial.EditorialService editorial;
     @MockitoBean Clock clock;
     private final Instant approvalTime = Instant.parse("2026-10-06T00:00:00Z");
     private final LocalDate deliveryDate = LocalDate.of(2026, 10, 7);
@@ -218,5 +219,27 @@ class NewsIngestionTests {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
             .andExpect(jsonPath("$.paths['/internal/v1/card-news/import'].post.security[0].ingestionAuth").exists())
             .andExpect(jsonPath("$.paths['/internal/v1/card-news/import'].post.parameters").doesNotExist());
+    }
+
+    @Test
+    void hidingAfterFirstSendCancelsRemainingDeliveryAndRestoreDoesNotResendIt() {
+        long articleId = service.approve(service.receive(draft()).id(),
+            new NewsSubmissionService.Approve(ContentType.NEWS, List.of()), admin.getUserId()).cardNewsId();
+        var sendTime = deliveryDate.atTime(9, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant();
+        when(clock.instant()).thenReturn(sendTime); editions.ensure(deliveryDate, sendTime);
+        var setting = NotificationSetting.createDefault(admin.getId()); setting.updateAllowed(true); settings.save(setting);
+        tokens.save(DeviceToken.register(admin.getId(), "hide-ios", DeviceType.IOS, LocalDateTime.now()));
+        tokens.save(DeviceToken.register(admin.getId(), "hide-android", DeviceType.ANDROID, LocalDateTime.now()));
+        planner.plan(setting.getId(), deliveryDate, LocalTime.of(9,0), sendTime);
+        var pending = deliveries.findAll(); assertThat(pending).hasSize(2);
+        assertThat(ledger.claim(pending.getFirst().getId(), sendTime)).isPresent();
+        var current = editorial.getArticle(articleId);
+        var hidden = editorial.visibility(articleId, false,
+            new org.aiknow.server.editorial.EditorialService.Action(current.version(), "내용 점검"), admin.getUserId());
+        assertThat(ledger.claim(pending.getLast().getId(), sendTime)).isEmpty();
+        editorial.visibility(articleId, true,
+            new org.aiknow.server.editorial.EditorialService.Action(hidden.version(), "점검 완료"), admin.getUserId());
+        assertThat(ledger.claim(pending.getLast().getId(), sendTime.plusSeconds(60))).isEmpty();
+        assertThat(news.findById(articleId).orElseThrow().getFirstUsedAt()).isEqualTo(sendTime);
     }
 }

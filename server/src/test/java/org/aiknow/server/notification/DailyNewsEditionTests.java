@@ -27,7 +27,7 @@ class DailyNewsEditionTests {
     @Autowired NewsDeliveryRepository deliveries;
     @Autowired CardNewsRepository news;
     @Autowired org.aiknow.server.cardNews.service.CardNewsService publicNews;
-    @Autowired LikeRepository likes;
+    @Autowired LikesRepository likes;
     @Autowired UserRepository users;
     @Autowired NotificationSettingRepository settings;
     @Autowired DeviceTokenRepository tokens;

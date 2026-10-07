@@ -11,7 +11,7 @@ import org.aiknow.server.cardNews.dto.res.UpdateLikeResponse;
 import org.aiknow.server.cardNews.service.CardNewsService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -29,13 +29,13 @@ public class CardNewsController {
 
     @GetMapping
     public ResponseEntity<List<CardNewsResponse>> getCardNews(
-            @PageableDefault(page = 0, size = 10, sort = "publicationDate",
-                    direction = Sort.Direction.DESC)
-            Pageable pageable,
+            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(0) int page,
+            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) int size,
             @RequestParam(required = false) Long categoryId,
             @AuthenticationPrincipal String userId,
             @RequestParam(defaultValue = "false") boolean isOnlyLiked
             ){
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("publicationDate"), Sort.Order.desc("id")));
         List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked);
         return ResponseEntity.ok(response);
     }

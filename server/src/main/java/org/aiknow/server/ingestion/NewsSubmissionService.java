@@ -28,16 +28,19 @@ public class NewsSubmissionService {
     private final UserRepository users;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final org.aiknow.server.storage.ImageStorage imageStorage;
+    private final org.aiknow.server.editorial.EditorialAuditService editorialAudit;
 
     public record Receipt(Long id, InspectionStatus status, Long cardNewsId) {
         static Receipt from(NewsSubmission s) { return new Receipt(s.getId(), s.getStatus(), s.getCardNewsId()); }
     }
-    public record Review(Long id, InspectionStatus status, NewsImportRequest draft, Long cardNewsId,
+    public record Review(Long id, long version, InspectionStatus status, NewsImportRequest draft, Long cardNewsId,
         Long reviewedBy, java.time.Instant reviewedAt, String reviewNote, PublicationStatus publicationStatus, ContentType contentType) {}
     public record Approve(@NotNull ContentType contentType, @Size(max = 10) List<@NotNull @Positive Long> categoryIds) {}
     public record Reject(@NotBlank @Size(max = 2000) String reason) {}
 
     public Receipt receive(NewsImportRequest request) {
+        validateImages(request);
         String payload;
         try { payload = mapper.writeValueAsString(request); }
         catch (JsonProcessingException e) { throw new IllegalStateException("Cannot serialize news submission", e); }
@@ -49,6 +52,20 @@ public class NewsSubmissionService {
         catch (DataIntegrityViolationException e) {
             return submissions.findBySourceHash(sourceHash).map(s -> duplicate(s, payloadHash)).orElseThrow(() -> e);
         }
+    }
+
+    public void validateImages(NewsImportRequest request) {
+        validateImageUrl(request.titleImage());
+        request.slides().forEach(slide -> validateImageUrl(slide.image()));
+    }
+    private void validateImageUrl(NewsImportRequest.Image image) {
+        if (image == null) return;
+        var uri = java.net.URI.create(image.url());
+        boolean https = "https".equals(uri.getScheme()) && uri.getHost() != null
+            && uri.getUserInfo() == null;
+        if (!https && !(image.origin() == NewsImportRequest.ImageOrigin.GENERATED
+            && imageStorage.acceptsLocalGeneratedUrl(image.url())))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image URL must use HTTPS; local generated images must use the configured media URL");
     }
 
     private Receipt duplicate(NewsSubmission existing, String hash) {
@@ -66,7 +83,7 @@ public class NewsSubmissionService {
     public Review get(Long id) {
         var s = submissions.findById(id).orElseThrow(this::notFound);
         var article = s.getCardNewsId() == null ? null : news.findById(s.getCardNewsId()).orElse(null);
-        return new Review(s.getId(), s.getStatus(), read(s), s.getCardNewsId(), s.getReviewedBy(), s.getReviewedAt(), s.getReviewNote(),
+        return new Review(s.getId(), s.getVersion(), s.getStatus(), read(s), s.getCardNewsId(), s.getReviewedBy(), s.getReviewedAt(), s.getReviewNote(),
             article == null ? null : article.getPublicationStatus(), article == null ? null : article.getContentType());
     }
 
@@ -81,6 +98,7 @@ public class NewsSubmissionService {
         var article = prepareApproved(read(submission), request.contentType(), selected);
         news.saveAndFlush(article);
         submission.approve(article.getId(), reviewerId(reviewer), clock.instant());
+        editorialAudit.record("SUBMISSION", id, "APPROVE", reviewer, "관리자 승인", null, Receipt.from(submission));
         return Receipt.from(submission);
     }
 
@@ -89,6 +107,7 @@ public class NewsSubmissionService {
         var submission = submissions.findForUpdate(id).orElseThrow(this::notFound);
         requirePending(submission);
         submission.reject(request.reason().strip(), reviewerId(reviewer), clock.instant());
+        editorialAudit.record("SUBMISSION", id, "REJECT", reviewer, request.reason(), null, Receipt.from(submission));
         return Receipt.from(submission);
     }
 
@@ -100,7 +119,7 @@ public class NewsSubmissionService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 검수가 완료된 초안입니다.");
     }
     private NewsImportRequest read(NewsSubmission s) {
-        try { return mapper.readValue(s.getPayload(), NewsImportRequest.class); }
+        try { return mapper.readValue(s.getEditedPayload() == null ? s.getPayload() : s.getEditedPayload(), NewsImportRequest.class); }
         catch (JsonProcessingException e) { throw new IllegalStateException("Stored news submission is invalid", e); }
     }
     private CardNews prepareApproved(NewsImportRequest draft, ContentType contentType, List<Category> selected) {

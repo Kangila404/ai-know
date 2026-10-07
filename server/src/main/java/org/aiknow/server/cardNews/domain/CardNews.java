@@ -24,6 +24,7 @@ public class CardNews extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Version private long version;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "cardNews",cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default private List<CardNewsCategory> cardNewsCategory=new ArrayList<>();
@@ -63,12 +64,35 @@ public class CardNews extends BaseEntity {
     private java.time.Instant lastUsedAt;
 
     public void publishForDelivery(LocalDate date, java.time.Instant now) {
+        if (publicationStatus == PublicationStatus.HIDDEN) throw new IllegalStateException("Hidden content cannot be delivered");
         if (publicationStatus == PublicationStatus.READY) {
             publicationStatus = PublicationStatus.PUBLISHED;
             publicationDate = date;
             firstUsedAt = now;
         }
         lastUsedAt = now;
+    }
+
+    public void setEditorialVisibility(boolean visible) {
+        if (publicationStatus == PublicationStatus.READY) throw new IllegalStateException("Unpublished content cannot be republished");
+        publicationStatus = visible ? PublicationStatus.PUBLISHED : PublicationStatus.HIDDEN;
+    }
+
+    public void editContent(org.aiknow.server.ingestion.NewsImportRequest draft) {
+        title = draft.title(); summary = draft.summary();
+        keyPoints.clear(); keyPoints.addAll(draft.keyPoints() == null ? List.of() : draft.keyPoints());
+        var image = draft.titleImage();
+        titleImgUrl = image == null ? null : image.url();
+        titleImageSourceUrl = image == null ? null : image.sourceUrl();
+        titleImageCredit = image == null ? null : image.credit();
+        titleImageOrigin = image == null ? null : image.origin().name();
+        cardSlides.clear();
+        for (var slide : draft.slides()) {
+            var visual = slide.image();
+            cardSlides.add(CardSlide.builder().cardNews(this).sequence(slide.sequence()).title(slide.title()).content(slide.content())
+                .layout(slide.layout()).imgUrl(visual == null ? null : visual.url()).imageSourceUrl(visual == null ? null : visual.sourceUrl())
+                .imageCredit(visual == null ? null : visual.credit()).imageOrigin(visual == null ? null : visual.origin().name()).build());
+        }
     }
 
     @Column(length = 500) private String sourceTitle;

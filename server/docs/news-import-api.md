@@ -58,6 +58,10 @@
 
 일반 카드뉴스 API에는 원문 및 이미지 출처, `contentType`, 최초 `publicationDate`가 추가된다. 기존 `titleImgUrl`, 슬라이드 `imgUrl`은 유지한다. 좋아요와 목록은 로그인한 사용자 기준이다.
 
+초안 편집·반려 후 재검수·게시글 수정·비공개/복구는 [운영 편집 API](editorial-operations.md)를 사용한다.
+수정 요청에는 조회한 `version`과 사유가 필요하다. 원본 수집 payload를 유지하므로 편집 뒤 n8n이 같은 원본을 재전송해도 중복 생성하지 않는다.
+운영 DB 구성은 [Flyway 마이그레이션](migrations.md)을 기준으로 한다.
+
 ## 공지사항 API
 
 | 메서드 | 경로 | 요청 |

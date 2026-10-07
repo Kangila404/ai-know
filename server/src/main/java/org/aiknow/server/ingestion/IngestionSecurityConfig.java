@@ -36,7 +36,9 @@ public class IngestionSecurityConfig {
             .logout(AbstractHttpConfigurer::disable)
             .addFilterBefore(new TokenFilter(token), AnonymousAuthenticationFilter.class)
             .authorizeHttpRequests(a -> a
-                .requestMatchers(HttpMethod.POST, "/internal/v1/card-news/import").hasRole("INGEST")
+                .requestMatchers(HttpMethod.GET, "/internal/v1/images/storage").hasRole("INGEST")
+                .requestMatchers(HttpMethod.POST, "/internal/v1/card-news/import", "/internal/v1/images").hasRole("INGEST")
+                .requestMatchers(HttpMethod.POST, "/internal/v1/generation/existing", "/internal/v1/generation/claim", "/internal/v1/generation/response").hasRole("INGEST")
                 .anyRequest().denyAll())
             .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> res.setStatus(401))
                 .accessDeniedHandler((req, res, ex) -> res.setStatus(403)))

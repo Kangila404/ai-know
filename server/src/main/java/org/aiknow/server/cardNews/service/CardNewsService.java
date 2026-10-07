@@ -10,7 +10,7 @@ import org.aiknow.server.cardNews.dto.res.UpdateLikeResponse;
 import org.aiknow.server.cardNews.repository.CardNewsRepository;
 import org.aiknow.server.cardNews.repository.CardSlideRepository;
 import org.aiknow.server.cardNews.repository.CategoryRepository;
-import org.aiknow.server.cardNews.repository.LikeRepository;
+import org.aiknow.server.cardNews.repository.LikesRepository;
 import org.aiknow.server.user.domain.User;
 import org.aiknow.server.user.repository.UserRepository;
 import org.springframework.data.domain.Pageable;
@@ -33,7 +33,7 @@ public class CardNewsService {
     private final CardSlideRepository cardSlideRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
-    private final LikeRepository likeRepository;
+    private final LikesRepository likeRepository;
     private final Clock clock;
     private final NewsDeliveryProperties deliveryProperties;
     private final org.aiknow.server.notification.batch.DailyNewsEditionRepository editions;
@@ -116,9 +116,9 @@ public class CardNewsService {
     public UpdateLikeResponse updateLike(String userId, Long cardNewsId, boolean liked){
         User user = findUserByUserIdOrThrow(userId);
         CardNews cardNews = approvedNews(cardNewsId);
-        Optional<Like> like = likeRepository.findByUserAndCardNews(user, cardNews);
+        Optional<Likes> like = likeRepository.findByUserAndCardNews(user, cardNews);
         if (liked && like.isEmpty()) {
-            likeRepository.save(Like.of(user, cardNews));
+            likeRepository.save(Likes.of(user, cardNews));
         }
 
         if (!liked && like.isPresent()) {

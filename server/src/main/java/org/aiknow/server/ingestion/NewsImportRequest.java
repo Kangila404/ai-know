@@ -21,7 +21,7 @@ public record NewsImportRequest(
     public enum ImageOrigin { SOURCE, GENERATED }
 
     public record Image(
-        @NotBlank @Size(max = 2048) @URL(protocol = "https") String url,
+        @NotBlank @Size(max = 2048) @URL String url,
         @NotNull ImageOrigin origin,
         @Size(max = 2048) @URL(protocol = "https") String sourceUrl,
         @Size(max = 500) String credit

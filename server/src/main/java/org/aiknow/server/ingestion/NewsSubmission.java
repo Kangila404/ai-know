@@ -13,6 +13,8 @@ import org.aiknow.server.common.entity.BaseEntity;
     indexes = @Index(name = "idx_submission_status", columnList = "status,id"))
 public class NewsSubmission extends BaseEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Version private long version;
+    @Lob @Column(columnDefinition = "MEDIUMTEXT") private String editedPayload;
     @Column(name = "source_hash", nullable = false, length = 64) private String sourceHash;
     @Column(nullable = false, length = 64) private String payloadHash;
     @Column(nullable = false, length = 2048) private String sourceUrl;
@@ -37,4 +39,6 @@ public class NewsSubmission extends BaseEntity {
     public void reject(String reason, Long reviewer, Instant now) {
         status = InspectionStatus.DENIED; reviewNote = reason; reviewedBy = reviewer; reviewedAt = now;
     }
+    public void edit(String payload) { editedPayload = payload; }
+    public void reopen() { status = InspectionStatus.PENDING; reviewedBy = null; reviewedAt = null; reviewNote = null; }
 }

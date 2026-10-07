@@ -29,7 +29,8 @@ public class NewsDeliveryPlanner {
         var edition = editions.findById(date).orElse(null);
         if (edition == null || edition.getCardNewsId() == null) return;
         var article = news.findById(edition.getCardNewsId()).orElse(null);
-        if (article == null || article.getInspectionStatus() != InspectionStatus.APPROVED) return;
+        if (article == null || article.getInspectionStatus() != InspectionStatus.APPROVED
+            || article.getPublicationStatus() == org.aiknow.server.cardNews.domain.PublicationStatus.HIDDEN) return;
         for (var token : tokens.findByUserIdAndActiveTrue(setting.getUserId())) {
             if (!deliveries.existsByUserIdAndDeviceTokenIdAndDeliveryDate(setting.getUserId(), token.getId(), date)) {
                 deliveries.save(NewsDelivery.pending(setting.getUserId(), token.getId(), article.getId(), date, now));
