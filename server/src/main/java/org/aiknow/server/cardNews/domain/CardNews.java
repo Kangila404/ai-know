@@ -4,16 +4,19 @@ package org.aiknow.server.cardNews.domain;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.aiknow.server.common.entity.BaseEntity;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-
+@Getter
 @Entity
 @Table(name = "card_news")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-public class CardNews {
+public class CardNews extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,4 +31,23 @@ public class CardNews {
     @Column(length = 20, nullable = false)
     private String title;
 
+    @Column(name = "title_img_url")
+    private String titleImgUrl;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "card_news_key_points",
+            joinColumns = @JoinColumn(name = "card_news_id")
+    )
+    @Column(name = "key_points", nullable = false)
+    private List<String> keyPoints = new ArrayList<>();
+
+
+    @Column(name = "publication_date", nullable = false)
+    private LocalDate publicationDate;
+
+
+    @Column(name = "inspection_status")
+    @Enumerated(EnumType.STRING)
+    private InspectionStatus inspectionStatus;
 }
