@@ -10,7 +10,7 @@ import org.aiknow.server.cardNews.dto.res.UpdateLikeResponse;
 import org.aiknow.server.cardNews.repository.CardNewsRepository;
 import org.aiknow.server.cardNews.repository.CardSlideRepository;
 import org.aiknow.server.cardNews.repository.CategoryRepository;
-import org.aiknow.server.cardNews.repository.LikeRepository;
+import org.aiknow.server.cardNews.repository.LikesRepository;
 import org.aiknow.server.user.domain.User;
 import org.aiknow.server.user.repository.UserRepository;
 import org.springframework.data.domain.Pageable;
@@ -29,7 +29,7 @@ public class CardNewsService {
     private final CardSlideRepository cardSlideRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
-    private final LikeRepository likeRepository;
+    private final LikesRepository likeRepository;
     @Transactional(readOnly = true)
     public List<CardNewsResponse> getCardNews(Pageable pageable,Long categoryId,String userId,boolean isOnlyLiked){
 
@@ -40,10 +40,11 @@ public class CardNewsService {
             if (categoryId == null) {
                 // 1. 승인된 전체 카드뉴스
                 cardNewsList = cardNewsRepository.findApproved(pageable);
-            }
+            }else{
             // 2. 승인된 특정 카테고리 카드뉴스
             cardNewsList = cardNewsRepository
                      .findByCategoryIdAndInspectionStatus(InspectionStatus.APPROVED, categoryId, pageable);
+            }
 
         }
         else {
@@ -56,13 +57,14 @@ public class CardNewsService {
                         pageable
                 );
             }
+            else{
             // 4. 유저가 좋아요한 특정 카테고리의 승인 카드뉴스
             cardNewsList = cardNewsRepository.findUserLikedAndCategoryId(
                     user.getId(),
                     categoryId,
                     InspectionStatus.APPROVED,
                     pageable
-            );
+            );}
         }
 
         List<CardNewsResponse> responses = cardNewsList.stream().map(
@@ -105,9 +107,9 @@ public class CardNewsService {
         User user = findUserByUserIdOrThrow(userId);
         CardNews cardNews = cardNewsRepository.findById(cardNewsId)
                 .orElseThrow(() -> new IllegalArgumentException("카드 뉴스를 찾을 수 없습니다."));
-        Optional<Like> like = likeRepository.findByUserAndCardNews(user, cardNews);
+        Optional<Likes> like = likeRepository.findByUserAndCardNews(user, cardNews);
         if (liked && like.isEmpty()) {
-            likeRepository.save(Like.of(user, cardNews));
+            likeRepository.save(Likes.of(user, cardNews));
         }
 
         if (!liked && like.isPresent()) {

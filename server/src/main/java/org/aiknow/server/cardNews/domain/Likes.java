@@ -14,7 +14,7 @@ import org.aiknow.server.user.domain.User;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Getter
-public class Like extends BaseEntity {
+public class Likes extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -28,13 +28,13 @@ public class Like extends BaseEntity {
     private User user;
 
 
-    private Like(User user, CardNews cardNews) {
+    private Likes(User user, CardNews cardNews) {
         this.user = user;
         this.cardNews = cardNews;
     }
 
-    public static Like of(User user, CardNews cardNews) {
-        return new Like(user, cardNews);
+    public static Likes of(User user, CardNews cardNews) {
+        return new Likes(user, cardNews);
     }
 
 }

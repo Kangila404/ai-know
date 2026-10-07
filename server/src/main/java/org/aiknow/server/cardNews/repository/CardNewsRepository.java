@@ -20,11 +20,15 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
     }
     @Query("""
     SELECT c
-    FROM Like l
-    JOIN l.cardNews c
-    WHERE l.user.id =:userId and c.inspectionStatus = :inspectionStatus
-    ORDER BY c.id DESC
-""")
+    FROM CardNews c
+    WHERE c.inspectionStatus = :inspectionStatus
+      AND EXISTS (
+          SELECT 1
+          FROM Likes l
+          WHERE l.cardNews = c
+            AND l.user.id = :userId
+      )
+    """)
     List<CardNews> findUserLiked(@Param("userId") Long userId,
                                  @Param("inspectionStatus") InspectionStatus inspectionStatus,
                                  Pageable pageable);
@@ -36,7 +40,6 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
     JOIN cn.cardNewsCategory cnc
     WHERE cnc.category.id = :categoryId and
     cn.inspectionStatus =:inspectionStatus
-     order by cn.publicationDate desc, cn.id desc
     """)
     List<CardNews> findByCategoryIdAndInspectionStatus(
             @Param("inspectionStatus") InspectionStatus inspectionStatus,
@@ -44,14 +47,18 @@ public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
             Pageable pageable
     );
     @Query("""
-        SELECT c
-        FROM Like l
-        JOIN l.cardNews c
-        JOIN c.cardNewsCategory cnc
-        WHERE l.user.id = :userId
-          and cnc.category.id = :categoryId
-          and c.inspectionStatus = :inspectionStatus
-        """)
+    SELECT c
+    FROM CardNews c
+    JOIN c.cardNewsCategory cnc
+    WHERE c.inspectionStatus = :inspectionStatus
+      AND cnc.category.id = :categoryId
+      AND EXISTS (
+          SELECT 1
+          FROM Likes l
+          WHERE l.cardNews = c
+            AND l.user.id = :userId
+      )
+    """)
     List<CardNews> findUserLikedAndCategoryId(
             @Param("userId") Long userId,
             @Param("categoryId") Long categoryId,

@@ -9,10 +9,12 @@ import org.aiknow.server.cardNews.dto.res.CardSlideResponse;
 import org.aiknow.server.cardNews.dto.res.CategoryResponse;
 import org.aiknow.server.cardNews.dto.res.UpdateLikeResponse;
 import org.aiknow.server.cardNews.service.CardNewsService;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,13 +30,20 @@ public class CardNewsController {
 
     @GetMapping
     public ResponseEntity<List<CardNewsResponse>> getCardNews(
-            @PageableDefault(page = 0, size = 10, sort = "publicationDate",
-                    direction = Sort.Direction.DESC)
-            Pageable pageable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String userId,
+            @AuthenticationPrincipal String userId,
             @RequestParam(defaultValue = "false") boolean isOnlyLiked
             ){
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.desc("publicationDate"),
+                        Sort.Order.desc("id")
+                )
+        );
         List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked);
         return ResponseEntity.ok(response);
     }
@@ -61,10 +70,10 @@ public class CardNewsController {
     }
 
 
-    @PatchMapping("/{cardNewsId}/like")
+    @PatchMapping("/{cardNews_id}/like")
     public ResponseEntity<UpdateLikeResponse> updateLike(
-            String userId,
-            Long cardNewsId,
+            @AuthenticationPrincipal String userId,
+            @PathVariable("cardNews_id") Long cardNewsId,
             @Valid @RequestBody UpdateLikeRequest request
     ){
         UpdateLikeResponse response = cardNewsService.updateLike(userId, cardNewsId, request.liked());
