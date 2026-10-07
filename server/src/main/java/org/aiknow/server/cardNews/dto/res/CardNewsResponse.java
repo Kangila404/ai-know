@@ -17,10 +17,12 @@ public record CardNewsResponse(
         String titleImageSourceUrl,
         String titleImageCredit,
         org.aiknow.server.cardNews.domain.ContentType contentType,
-        java.time.LocalDate publicationDate
+        java.time.LocalDate publicationDate,
+        List<CategoryResponse> categories, boolean liked, boolean read
 
 ){
-    public static CardNewsResponse from(CardNews cardNews){
+    public static CardNewsResponse from(CardNews cardNews){ return from(cardNews, false, false); }
+    public static CardNewsResponse from(CardNews cardNews, boolean liked, boolean read){
         return new CardNewsResponse(
                 cardNews.getId(),
                 cardNews.getTitle(),
@@ -28,7 +30,8 @@ public record CardNewsResponse(
                 List.copyOf(cardNews.getKeyPoints()),
                 cardNews.getSummary(), cardNews.getSourceTitle(), cardNews.getSourceUrl(), cardNews.getSourcePublishedAt(),
                 cardNews.getTitleImageOrigin(), cardNews.getTitleImageSourceUrl(), cardNews.getTitleImageCredit(),
-                cardNews.getContentType(), cardNews.getPublicationDate()
+                cardNews.getContentType(), cardNews.getPublicationDate(),
+                cardNews.getCardNewsCategory().stream().map(c -> CategoryResponse.from(c.getCategory())).toList(), liked, read
         );
     }
 }

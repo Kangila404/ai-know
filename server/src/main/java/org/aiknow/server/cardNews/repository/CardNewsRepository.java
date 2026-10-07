@@ -17,6 +17,17 @@ import java.util.Optional;
 
 @Repository
 public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
+    @Query("""
+        select c from CardNews c
+        where c.inspectionStatus = org.aiknow.server.cardNews.domain.InspectionStatus.APPROVED
+          and c.publicationStatus = org.aiknow.server.cardNews.domain.PublicationStatus.PUBLISHED
+          and (:categoryId is null or exists (select 1 from CardNewsCategory cc where cc.cardNews = c and cc.category.id = :categoryId))
+          and (:likedOnly = false or exists (select 1 from Likes l where l.cardNews = c and l.user.id = :userId))
+          and (:query = '' or locate(:query, lower(c.title)) > 0 or locate(:query, lower(c.summary)) > 0
+            or exists (select 1 from CardNewsCategory cc where cc.cardNews = c and locate(:query, lower(cc.category.name)) > 0))
+        """)
+    List<CardNews> searchPublished(Long userId, Long categoryId, boolean likedOnly, String query, Pageable pageable);
+
     org.springframework.data.domain.Page<CardNews> findByPublicationStatus(PublicationStatus status, Pageable pageable);
     List<CardNews> findByInspectionStatusAndPublicationStatus(InspectionStatus inspectionStatus, PublicationStatus publicationStatus, Pageable pageable);
     default List<CardNews> findApproved(Pageable pageable){

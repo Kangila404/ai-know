@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface NotificationSettingRepository extends JpaRepository<NotificationSetting, Long> {
+    void deleteAllByUserId(Long userId);
+
     Optional<NotificationSetting> findByUserId(Long userId);
 
     @Query("select s.id from NotificationSetting s where s.id > :afterId and s.isAllowed = true and s.settingTime <= :time order by s.id")

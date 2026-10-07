@@ -27,6 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final org.aiknow.server.auth.service.SessionAuthenticationService sessions;
+
+    @PatchMapping("/onboarding")
+    public UserMeResponse completeOnboarding(@AuthenticationPrincipal String userId) {
+        return userService.completeOnboarding(userId);
+    }
 
     @GetMapping
     public ResponseEntity<UserMeResponse> getUser(
@@ -46,11 +52,14 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/users/me")
+    @DeleteMapping({"/me", "/users/me"})
     public ResponseEntity<Void> withdraw(
-        @AuthenticationPrincipal String userId
+        @AuthenticationPrincipal String userId,
+        jakarta.servlet.http.HttpServletRequest request,
+        jakarta.servlet.http.HttpServletResponse response
     ) {
         userService.withdraw(userId);
+        sessions.logout(request, response);
         return ResponseEntity.noContent().build();
     }
 

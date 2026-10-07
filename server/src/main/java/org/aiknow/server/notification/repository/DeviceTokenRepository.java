@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> {
+    void deleteAllByUserId(Long userId);
+
     Optional<DeviceToken> findByToken(String token);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

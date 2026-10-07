@@ -33,16 +33,27 @@ public class CardNewsController {
             @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) int size,
             @RequestParam(required = false) Long categoryId,
             @AuthenticationPrincipal String userId,
-            @RequestParam(defaultValue = "false") boolean isOnlyLiked
+            @RequestParam(defaultValue = "false") boolean isOnlyLiked,
+            @RequestParam(defaultValue = "") @jakarta.validation.constraints.Size(max=200) String query
             ){
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("publicationDate"), Sort.Order.desc("id")));
-        List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked);
+        List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked,query);
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}")
+    public CardNewsResponse getCard(@PathVariable Long id, @AuthenticationPrincipal String userId) {
+        return cardNewsService.getCard(id, userId);
+    }
+    @PutMapping("/{id}/read")
+    public ResponseEntity<Void> markRead(@PathVariable Long id, @AuthenticationPrincipal String userId) {
+        cardNewsService.markRead(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/today")
-    public ResponseEntity<CardNewsResponse> getTodayCardNews(){
-        CardNewsResponse response = cardNewsService.getTodayCardNews();
+    public ResponseEntity<CardNewsResponse> getTodayCardNews(@AuthenticationPrincipal String userId){
+        CardNewsResponse response = cardNewsService.getTodayCardNews(userId);
         return ResponseEntity.ok(response);
     }
 

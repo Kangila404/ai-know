@@ -8,6 +8,7 @@ import org.aiknow.server.common.entity.BaseEntity;
 
 import java.util.List;
 
+@lombok.Getter
 @Entity
 @Table(name = "card_news_category")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
