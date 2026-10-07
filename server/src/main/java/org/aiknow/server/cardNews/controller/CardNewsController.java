@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -32,7 +33,7 @@ public class CardNewsController {
                     direction = Sort.Direction.DESC)
             Pageable pageable,
             @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String userId,
+            @AuthenticationPrincipal String userId,
             @RequestParam(defaultValue = "false") boolean isOnlyLiked
             ){
         List<CardNewsResponse> response = cardNewsService.getCardNews(pageable,categoryId,userId,isOnlyLiked);
@@ -48,7 +49,7 @@ public class CardNewsController {
 
     @GetMapping("/cardSlides")
     public ResponseEntity<List<CardSlideResponse>> getCardSlides(
-            Long cardNewsId
+            @RequestParam Long cardNewsId
     ){
         List<CardSlideResponse> response = cardNewsService.getCardSlides(cardNewsId);
         return ResponseEntity.ok(response);
@@ -63,8 +64,8 @@ public class CardNewsController {
 
     @PatchMapping("/{cardNewsId}/like")
     public ResponseEntity<UpdateLikeResponse> updateLike(
-            String userId,
-            Long cardNewsId,
+            @AuthenticationPrincipal String userId,
+            @PathVariable Long cardNewsId,
             @Valid @RequestBody UpdateLikeRequest request
     ){
         UpdateLikeResponse response = cardNewsService.updateLike(userId, cardNewsId, request.liked());

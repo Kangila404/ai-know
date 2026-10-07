@@ -19,10 +19,13 @@ public class NewsDeliveryWorker {
     private final NewsDeliveryPlanner planner;
     private final NewsDeliveryLedger ledger;
     private final PushSender sender;
+    private final DailyNewsEditionService editions;
 
     public void plan() {
         var now = clock.instant();
         var local = now.atZone(properties.zone());
+        var edition = editions.ensure(local.toLocalDate(), now);
+        if (edition.getCardNewsId() == null) return;
         long cursor = 0;
         while (true) {
             var ids = settings.findDueIds(cursor, local.toLocalTime(), PageRequest.of(0, properties.pageSize()));

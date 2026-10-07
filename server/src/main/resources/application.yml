@@ -35,6 +35,8 @@ server:
         same-site: lax
 
 app:
+  ingestion:
+    token: ${N8N_INGEST_TOKEN:}
   news-delivery:
     enabled: ${NEWS_BATCH_ENABLED:false}
     zone: ${NEWS_TIME_ZONE:Asia/Seoul}

@@ -19,17 +19,20 @@ public class NewsDeliveryPlanner {
     private final CardNewsRepository news;
     private final UserRepository users;
     private final NewsDeliveryRepository deliveries;
+    private final DailyNewsEditionRepository editions;
 
     @Transactional
     public void plan(Long settingId, LocalDate date, LocalTime time, Instant now) {
         var setting = settings.findForUpdate(settingId).orElse(null);
         if (setting == null || !setting.isAllowed() || setting.getSettingTime().isAfter(time)
             || !users.existsById(setting.getUserId())) return;
-        var article = news.findFirstByPublicationDateAndInspectionStatusOrderByIdDesc(date, InspectionStatus.APPROVED);
-        if (article.isEmpty()) return;
+        var edition = editions.findById(date).orElse(null);
+        if (edition == null || edition.getCardNewsId() == null) return;
+        var article = news.findById(edition.getCardNewsId()).orElse(null);
+        if (article == null || article.getInspectionStatus() != InspectionStatus.APPROVED) return;
         for (var token : tokens.findByUserIdAndActiveTrue(setting.getUserId())) {
             if (!deliveries.existsByUserIdAndDeviceTokenIdAndDeliveryDate(setting.getUserId(), token.getId(), date)) {
-                deliveries.save(NewsDelivery.pending(setting.getUserId(), token.getId(), article.get().getId(), date, now));
+                deliveries.save(NewsDelivery.pending(setting.getUserId(), token.getId(), article.getId(), date, now));
             }
         }
     }

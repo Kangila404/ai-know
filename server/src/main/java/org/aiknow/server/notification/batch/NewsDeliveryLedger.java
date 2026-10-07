@@ -19,6 +19,7 @@ public class NewsDeliveryLedger {
     private final CardNewsRepository news;
     private final UserRepository users;
     private final NewsDeliveryProperties properties;
+    private final DailyNewsEditionRepository editions;
 
     @Transactional
     public Optional<PushSender.Message> claim(Long id, Instant now) {
@@ -26,12 +27,10 @@ public class NewsDeliveryLedger {
         if (delivery == null || !delivery.claim(now, properties.lease(), properties.maxAttempts())) return Optional.empty();
         var token = tokens.findById(delivery.getDeviceTokenId()).orElse(null);
         var setting = settings.findByUserId(delivery.getUserId()).orElse(null);
-        var article = news.findById(delivery.getCardNewsId()).orElse(null);
         var localNow = now.atZone(properties.zone());
         if (token == null || !token.isActive() || !token.getUserId().equals(delivery.getUserId())
             || !users.existsById(delivery.getUserId()) || setting == null || !setting.isAllowed()
-            || !localNow.toLocalDate().equals(delivery.getDeliveryDate())
-            || article == null || article.getInspectionStatus() != InspectionStatus.APPROVED) {
+            || !localNow.toLocalDate().equals(delivery.getDeliveryDate())) {
             delivery.cancel();
             return Optional.empty();
         }
@@ -39,6 +38,18 @@ public class NewsDeliveryLedger {
         if (setting.getSettingTime().isAfter(localNow.toLocalTime())) {
             delivery.defer(delivery.getDeliveryDate().atTime(setting.getSettingTime()).atZone(properties.zone()).toInstant());
             return Optional.empty();
+        }
+        var edition = editions.findForUpdate(delivery.getDeliveryDate()).orElse(null);
+        var article = news.findForUpdate(delivery.getCardNewsId()).orElse(null);
+        if (edition == null || !delivery.getCardNewsId().equals(edition.getCardNewsId())
+            || article == null || article.getInspectionStatus() != InspectionStatus.APPROVED) {
+            delivery.cancel();
+            return Optional.empty();
+        }
+        // Publish once when the day's first valid send starts. Keep the day's assignment after publication.
+        if (edition.getStartedAt() == null) {
+            article.publishForDelivery(delivery.getDeliveryDate(), now);
+            edition.start(now);
         }
         return Optional.of(new PushSender.Message(delivery.getId(), delivery.getAttempts(), token.getToken(),
             token.getPlatform(), article.getId(), article.getTitle()));

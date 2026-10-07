@@ -7,7 +7,11 @@ public record CardSlideResponse(
         String title ,
         String imgUrl,
         String content,
-        Integer sequence
+        Integer sequence,
+        String layout,
+        String imageOrigin,
+        String imageSourceUrl,
+        String imageCredit
 
 ){
     public static CardSlideResponse from(CardSlide cardSlides){
@@ -16,7 +20,8 @@ public record CardSlideResponse(
                 cardSlides.getTitle(),
                 cardSlides.getImgUrl(),
                 cardSlides.getContent(),
-                cardSlides.getSequence()
+                cardSlides.getSequence(),
+                cardSlides.getLayout(), cardSlides.getImageOrigin(), cardSlides.getImageSourceUrl(), cardSlides.getImageCredit()
         );
     }
 

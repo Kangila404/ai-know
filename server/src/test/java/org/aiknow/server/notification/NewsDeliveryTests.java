@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import java.time.*;
-import java.util.ArrayList;
 import org.aiknow.server.cardNews.domain.*;
 import org.aiknow.server.cardNews.repository.CardNewsRepository;
 import org.aiknow.server.notification.batch.*;
@@ -29,6 +28,7 @@ class NewsDeliveryTests {
     @Autowired NewsDeliveryWorker worker;
     @Autowired NewsDeliveryLedger ledger;
     @Autowired NewsDeliveryRepository deliveries;
+    @Autowired DailyNewsEditionRepository editions;
     @Autowired NotificationSettingRepository settings;
     @Autowired DeviceTokenRepository tokens;
     @Autowired CardNewsRepository news;
@@ -43,7 +43,7 @@ class NewsDeliveryTests {
 
     @BeforeEach
     void setUp() {
-        deliveries.deleteAll(); tokens.deleteAll(); settings.deleteAll(); news.deleteAll(); users.deleteAll();
+        deliveries.deleteAll(); editions.deleteAll(); tokens.deleteAll(); settings.deleteAll(); news.deleteAll(); users.deleteAll();
         user = users.save(User.createSocialUser("배치 사용자"));
         setting = NotificationSetting.createDefault(user.getId()); setting.updateAllowed(true);
         setting = settings.save(setting);
@@ -54,8 +54,7 @@ class NewsDeliveryTests {
     }
 
     private void article(InspectionStatus status) {
-        news.save(new CardNews(null, new ArrayList<>(), new ArrayList<>(), "오늘 뉴스", null,
-            new ArrayList<>(), LocalDate.of(2026, 10, 7), status));
+        news.save(CardNews.builder().title("어제 승인한 뉴스").approvedAt(now.minusSeconds(86400)).inspectionStatus(status).build());
     }
 
     @Test
@@ -69,13 +68,14 @@ class NewsDeliveryTests {
     }
 
     @Test
-    void skipsEarlyTimeAndUnapprovedNewsThenCatchesUp() {
-        article(InspectionStatus.PENDING); worker.plan(); assertThat(deliveries.count()).isZero();
+    void skipsEarlyTimeAndCatchesUpThenHonorsOptOut() {
+        article(InspectionStatus.PENDING);
         article(InspectionStatus.APPROVED);
         when(clock.instant()).thenReturn(now.minusSeconds(1)); worker.plan(); assertThat(deliveries.count()).isZero();
         when(clock.instant()).thenReturn(now.plusSeconds(3600)); worker.plan(); assertThat(deliveries.count()).isEqualTo(2);
         setting.updateAllowed(false); settings.save(setting); worker.dispatch();
         verifyNoInteractions(sender);
+        assertThat(news.findAll()).noneMatch(n -> n.getPublicationStatus() == PublicationStatus.PUBLISHED);
     }
 
     @Test
