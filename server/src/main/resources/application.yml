@@ -5,6 +5,12 @@ spring:
   jpa:
     open-in-view: false
 
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: ${BATCH_SCHEMA_INIT:embedded}
+
   security:
     oauth2:
       client:
@@ -29,6 +35,15 @@ server:
         same-site: lax
 
 app:
+  news-delivery:
+    enabled: ${NEWS_BATCH_ENABLED:false}
+    zone: ${NEWS_TIME_ZONE:Asia/Seoul}
+    cron: ${NEWS_BATCH_CRON:0 * * * * *}
+    page-size: ${NEWS_BATCH_PAGE_SIZE:100}
+    max-attempts: ${NEWS_MAX_ATTEMPTS:5}
+    lease: ${NEWS_DELIVERY_LEASE:PT5M}
+    fcm-enabled: ${FCM_ENABLED:false}
+    credentials-path: ${FCM_CREDENTIALS_PATH:}
   frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
 
   login-success-url: ${LOGIN_SUCCESS_URL:/api/v1/users}

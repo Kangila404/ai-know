@@ -19,7 +19,8 @@ import org.aiknow.server.common.entity.BaseEntity;
 @Getter
 @Entity
 @Table(name = "device_token", uniqueConstraints =
-    @UniqueConstraint(name = "uk_device_installation", columnNames = {"platform", "installation_id"}))
+    @UniqueConstraint(name = "uk_device_installation", columnNames = {"platform", "installation_id"}),
+    indexes = @jakarta.persistence.Index(name = "idx_device_user_active", columnList = "user_id,active"))
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DeviceToken extends BaseEntity {

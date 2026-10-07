@@ -14,6 +14,7 @@ import java.util.Optional;
 
 @Repository
 public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
+    Optional<CardNews> findFirstByPublicationDateAndInspectionStatusOrderByIdDesc(LocalDate date, InspectionStatus status);
     List<CardNews> findByInspectionStatus(InspectionStatus inspectionStatus, Pageable pageable);
     default List<CardNews> findApproved(Pageable pageable){
         return findByInspectionStatus(InspectionStatus.APPROVED, pageable);
