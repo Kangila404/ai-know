@@ -16,7 +16,7 @@ public record CardNewsResponse(
                 cardNews.getId(),
                 cardNews.getTitle(),
                 cardNews.getTitleImgUrl(),
-                cardNews.getKeyPoints()
+                List.copyOf(cardNews.getKeyPoints())
         );
     }
 }
