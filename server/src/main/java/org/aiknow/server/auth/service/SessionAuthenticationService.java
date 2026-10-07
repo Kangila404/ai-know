@@ -34,6 +34,7 @@ public class SessionAuthenticationService {
         HttpServletResponse response
     ) {
         Authentication authentication = createAuthentication(userId);
+        if (request.getSession(false) != null) request.changeSessionId();
 
         SecurityContext context =
             SecurityContextHolder.createEmptyContext();

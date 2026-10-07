@@ -71,15 +71,16 @@ public class NotificationService {
 
         String token = validateAndNormalizedToken(request.token());
         DeviceType platform = DeviceType.from(request.platform());
+        String installationId = normalizeInstallationId(request.installationId());
 
         try {
-            return deviceTokenRegistrationService.upsert(user.getId(), token, platform);
+            return register(user.getId(), token, platform, installationId);
         } catch (DataIntegrityViolationException exception) {
             // 다른 요청이 같은 토큰을 먼저 등록한 경우에만 한 번 재시도한다.
-            if (deviceTokenRepository.findByToken(token).isEmpty()) {
+            if (installationId == null && deviceTokenRepository.findByToken(token).isEmpty()) {
                 throw exception;
             }
-            return deviceTokenRegistrationService.upsert(user.getId(), token, platform);
+            return register(user.getId(), token, platform, installationId);
         }
     }
 
@@ -99,6 +100,22 @@ public class NotificationService {
             .ifPresent(DeviceToken::deactivate);
     }
     // ======= 메서드 ======= //
+    private DeviceTokenResponse register(Long userId, String token, DeviceType platform, String installationId) {
+        return installationId == null
+            ? deviceTokenRegistrationService.upsert(userId, token, platform)
+            : deviceTokenRegistrationService.upsert(userId, token, platform, installationId);
+    }
+
+    private String normalizeInstallationId(String value) {
+        if (value == null) return null;
+        try {
+            String normalized = java.util.UUID.fromString(value).toString();
+            if (!normalized.equalsIgnoreCase(value)) throw new IllegalArgumentException();
+            return normalized;
+        } catch (IllegalArgumentException exception) {
+            throw new NotificationException(NotificationErrorCode.INVALID_DEVICE_TOKEN);
+        }
+    }
     private User findUserByUserId(String userId){
         return userRepository.findByUserId(userId)
             .orElseThrow(()-> new UserException(UserErrorCode.USER_NOT_FOUND));

@@ -20,7 +20,9 @@ public class SwaggerConfig {
 
     @Bean
     public OpenApiCustomizer csrfHeaderCustomizer() {
-        return openApi -> openApi.getPaths().values().forEach(path ->
+        return openApi -> openApi.getPaths().entrySet().stream()
+            .filter(entry -> !entry.getKey().startsWith("/internal/"))
+            .map(java.util.Map.Entry::getValue).forEach(path ->
             path.readOperationsMap().forEach((method, operation) -> {
                 if (Set.of("GET", "HEAD", "OPTIONS", "TRACE").contains(method.name())) {
                     return;
@@ -58,6 +60,7 @@ public class SwaggerConfig {
             )
             .components(new Components()
                 .addSecuritySchemes(SECURITY_SCHEME_NAME, securityScheme)
+                .addSecuritySchemes("ingestionAuth", new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer"))
             )
             .addSecurityItem(securityRequirement);
     }

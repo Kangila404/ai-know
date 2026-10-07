@@ -11,7 +11,12 @@ public record UpsertDeviceTokenRequest(
     String token,
 
     @NotBlank
-    String platform
-) {
+    String platform,
 
+    // UUID generated once per app installation. Optional for legacy clients.
+    String installationId
+) {
+    public UpsertDeviceTokenRequest(String token, String platform) {
+        this(token, platform, null);
+    }
 }

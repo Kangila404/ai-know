@@ -48,6 +48,10 @@ public class SecurityConfig {
             .requestCache(AbstractHttpConfigurer::disable)
 
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/social/providers").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/social/*/challenge", "/api/v1/auth/social/*").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/media/generated/*").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.HEAD, "/media/generated/*").permitAll()
                 .requestMatchers(
                     "/health-check",
                     "/actuator/health",

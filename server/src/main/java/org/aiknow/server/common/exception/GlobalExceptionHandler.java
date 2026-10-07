@@ -15,6 +15,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrentUpdate(Exception e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ErrorResponse.of(409, "CONFLICT", "다른 요청이 먼저 변경했습니다. 새로 조회 후 다시 시도하세요."));
+    }
+
 
     @ExceptionHandler(AiknowException.class)
     public ResponseEntity<ErrorResponse> handleAiknowException(AiknowException e){
@@ -40,7 +46,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
 
-        log.warn("Handled Spring MVC exception: status={}, message={}", status, ex.getMessage());
+        log.warn("Handled Spring MVC exception: status={}, type={}", status, ex.getClass().getSimpleName());
 
         ErrorResponse errorResponse = ErrorResponse.of(status.value(), status.name(), status.getReasonPhrase());
         return ResponseEntity.status(status).headers(headers).body(errorResponse);

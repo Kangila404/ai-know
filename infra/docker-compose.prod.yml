@@ -1,0 +1,121 @@
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME}
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:?Set MYSQL_IMAGE}
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ:?Set TZ}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping -h localhost -u root --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  server:
+    image: ${SERVER_IMAGE:?Set SERVER_IMAGE to an immutable release tag or digest}
+    env_file:
+      - ${SERVER_ENV_FILE:?Set SERVER_ENV_FILE to the complete Spring env file}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: ${DB_URL:?Set DB_URL}
+      DB_USERNAME: ${MYSQL_USER:?Set MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD}
+      MEDIA_ROOT: ${MEDIA_ROOT:?Set MEDIA_ROOT}
+      MEDIA_PUBLIC_BASE_URL: ${AIKNOW_MEDIA_PUBLIC_BASE_URL:?Set AIKNOW_MEDIA_PUBLIC_BASE_URL}
+    volumes:
+      - type: bind
+        source: ${SERVER_SECRETS_PATH:?Set SERVER_SECRETS_PATH}
+        target: /run/secrets
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MEDIA_HOST_PATH:?Set MEDIA_HOST_PATH}
+        target: ${MEDIA_ROOT:?Set MEDIA_ROOT}
+        bind:
+          create_host_path: false
+    depends_on:
+      mysql:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+  proxy:
+    image: ${NGINX_IMAGE:?Set NGINX_IMAGE}
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
+      NGINX_ENVSUBST_FILTER: API_DOMAIN
+    ports:
+      - '${HTTP_BIND_ADDRESS}:${HTTP_PORT}:80'
+      - '${HTTP_BIND_ADDRESS}:${HTTPS_PORT}:443'
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - type: bind
+        source: ${TLS_CERT_PATH:?Set TLS_CERT_PATH to the directory containing fullchain.pem and privkey.pem}
+        target: /etc/nginx/tls
+        read_only: true
+        bind:
+          create_host_path: false
+      - acme-webroot:/var/www/acme:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  n8n:
+    image: ${N8N_IMAGE:?Set N8N_IMAGE}
+    environment:
+      TZ: ${TZ:?Set TZ}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?Set GENERIC_TIMEZONE}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:?Set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:?Set N8N_SECURE_COOKIE}
+      EXECUTIONS_DATA_PRUNE: ${EXECUTIONS_DATA_PRUNE:?Set EXECUTIONS_DATA_PRUNE}
+      EXECUTIONS_DATA_MAX_AGE: ${EXECUTIONS_DATA_MAX_AGE:?Set EXECUTIONS_DATA_MAX_AGE}
+    ports:
+      - '${N8N_BIND_ADDRESS}:${N8N_PORT}:5678'
+    volumes:
+      - n8n-data:/home/node/.n8n
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  n8n-workflows:
+    profiles: [tools]
+    image: ${N8N_IMAGE:?Set N8N_IMAGE}
+    entrypoint: [node, /opt/aiknow/deploy-workflow.mjs]
+    command: [check, ai-know-news-draft.json]
+    environment:
+      TZ: ${TZ:?Set TZ}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?Set GENERIC_TIMEZONE}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:?Set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS}
+      AIKNOW_ENV: ${AIKNOW_ENV:?Set AIKNOW_ENV}
+      AIKNOW_SERVER_BASE_URL: ${AIKNOW_SERVER_BASE_URL:?Set AIKNOW_SERVER_BASE_URL}
+      AIKNOW_MEDIA_PUBLIC_BASE_URL: ${AIKNOW_MEDIA_PUBLIC_BASE_URL:?Set AIKNOW_MEDIA_PUBLIC_BASE_URL}
+      AIKNOW_DRY_RUN: ${AIKNOW_DRY_RUN:?Set AIKNOW_DRY_RUN}
+      AIKNOW_ALLOW_IMAGE_GENERATION: ${AIKNOW_ALLOW_IMAGE_GENERATION:?Set AIKNOW_ALLOW_IMAGE_GENERATION}
+      AIKNOW_MAX_IMAGE_GENERATIONS: ${AIKNOW_MAX_IMAGE_GENERATIONS:?Set AIKNOW_MAX_IMAGE_GENERATIONS}
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n:/opt/aiknow:ro
+    restart: 'no'
+
+volumes:
+  mysql-data:
+  n8n-data:
+  acme-webroot:

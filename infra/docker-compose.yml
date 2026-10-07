@@ -1,18 +1,17 @@
 name: aiknow
 
 services:
-
   mysql:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:?Set MYSQL_IMAGE in infra/.env}
     container_name: aiknow-mysql
     ports:
       - "${MYSQL_PORT}:3306"
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      TZ: Asia/Seoul
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?Set MYSQL_DATABASE in infra/.env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in infra/.env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in infra/.env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in infra/.env}
+      TZ: ${TZ:?Set TZ in infra/.env}
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -26,5 +25,128 @@ services:
       retries: 10
     restart: unless-stopped
 
+  n8n:
+    image: ${N8N_IMAGE:?Set N8N_IMAGE in infra/.env}
+    container_name: aiknow-n8n
+    ports:
+      - "${N8N_BIND_ADDRESS}:${N8N_PORT}:5678"
+    environment:
+      TZ: ${TZ:?Set TZ in infra/.env}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?Set GENERIC_TIMEZONE in infra/.env}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:?Set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS in infra/.env}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY in infra/.env}
+      N8N_INSTANCE_AI_SANDBOX_ENABLED: ${N8N_INSTANCE_AI_SANDBOX_ENABLED:?Set N8N_INSTANCE_AI_SANDBOX_ENABLED in infra/.env}
+      N8N_INSTANCE_AI_SANDBOX_PROVIDER: ${N8N_INSTANCE_AI_SANDBOX_PROVIDER:?Set N8N_INSTANCE_AI_SANDBOX_PROVIDER in infra/.env}
+      N8N_SANDBOX_SERVICE_URL: ${N8N_SANDBOX_SERVICE_URL:?Set N8N_SANDBOX_SERVICE_URL in infra/.env}
+      N8N_SANDBOX_SERVICE_API_KEY: ${N8N_SANDBOX_SERVICE_API_KEY:?Set N8N_SANDBOX_SERVICE_API_KEY in infra/.env}
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  # Explicit deployment tool. Normal `up -d` never starts this service.
+  n8n-workflows:
+    profiles: [tools]
+    image: ${N8N_IMAGE:?Set N8N_IMAGE in infra/.env}
+    entrypoint: ["node", "/opt/aiknow/deploy-workflow.mjs"]
+    command: ["check", "ai-know-news-draft.json"]
+    environment:
+      AIKNOW_ENV: ${AIKNOW_ENV:?Set AIKNOW_ENV in the infra env file}
+      AIKNOW_SERVER_BASE_URL: ${AIKNOW_SERVER_BASE_URL:?Set AIKNOW_SERVER_BASE_URL in the infra env file}
+      AIKNOW_MEDIA_PUBLIC_BASE_URL: ${AIKNOW_MEDIA_PUBLIC_BASE_URL:?Set AIKNOW_MEDIA_PUBLIC_BASE_URL in the infra env file}
+      AIKNOW_DRY_RUN: ${AIKNOW_DRY_RUN:?Set AIKNOW_DRY_RUN in the infra env file}
+      AIKNOW_ALLOW_IMAGE_GENERATION: ${AIKNOW_ALLOW_IMAGE_GENERATION:?Set AIKNOW_ALLOW_IMAGE_GENERATION in the infra env file}
+      AIKNOW_MAX_IMAGE_GENERATIONS: ${AIKNOW_MAX_IMAGE_GENERATIONS:?Set AIKNOW_MAX_IMAGE_GENERATIONS in the infra env file}
+      TZ: ${TZ:?Set TZ in infra/.env}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:?Set GENERIC_TIMEZONE in infra/.env}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:?Set N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS in infra/.env}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY in infra/.env}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/opt/aiknow:ro
+    restart: "no"
+
+  # Generates internal mTLS certificates once; existing certificates are reused.
+  sandbox-certs:
+    image: ${SANDBOX_API_IMAGE:?Set SANDBOX_API_IMAGE in infra/.env}
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        bootstrap-mtls.sh --out-dir /tls --api-san sandbox-api
+        --control-san-prefix sandbox-runner --runners 1 &&
+        chown -R sandbox-api:sandbox-api /tls/api &&
+        chmod 600 /tls/ca.key /tls/api/*.key /tls/runner/*.key
+    volumes:
+      - sandbox-tls:/tls
+    restart: "no"
+
+  # Internal only: do not publish sandbox ports or pass the whole .env file.
+  sandbox-api:
+    image: ${SANDBOX_API_IMAGE:?Set SANDBOX_API_IMAGE in infra/.env}
+    depends_on:
+      sandbox-certs:
+        condition: service_completed_successfully
+    environment:
+      SANDBOX_API_KEYS: ${SANDBOX_API_KEYS:?Set SANDBOX_API_KEYS in infra/.env}
+      SANDBOX_API_RUNNER_REGISTRATION_TOKEN: ${SANDBOX_API_RUNNER_REGISTRATION_TOKEN:?Set SANDBOX_API_RUNNER_REGISTRATION_TOKEN in infra/.env}
+      SANDBOX_API_RUNNER_API_KEY: ${SANDBOX_API_RUNNER_API_KEY:?Set SANDBOX_API_RUNNER_API_KEY in infra/.env}
+      SANDBOX_API_GRPC_TLS_CERT_FILE: ${SANDBOX_API_GRPC_TLS_CERT_FILE:?Set SANDBOX_API_GRPC_TLS_CERT_FILE in infra/.env}
+      SANDBOX_API_GRPC_TLS_KEY_FILE: ${SANDBOX_API_GRPC_TLS_KEY_FILE:?Set SANDBOX_API_GRPC_TLS_KEY_FILE in infra/.env}
+      SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE: ${SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE:?Set SANDBOX_API_GRPC_TLS_CLIENT_CA_FILE in infra/.env}
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE: ${SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE:?Set SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CA_FILE in infra/.env}
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: ${SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE:?Set SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_CERT_FILE in infra/.env}
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: ${SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE:?Set SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_KEY_FILE in infra/.env}
+      SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME: ${SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME:?Set SANDBOX_API_RUNNER_CONTROL_GRPC_TLS_SERVER_NAME in infra/.env}
+    volumes:
+      - sandbox-tls:/tls:ro
+      - sandbox-api-data:/var/lib/n8n-sandbox-api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # The local sandbox runner requires privileged Docker-in-Docker.
+  sandbox-runner-1:
+    image: ${SANDBOX_RUNNER_IMAGE:?Set SANDBOX_RUNNER_IMAGE in infra/.env}
+    privileged: true
+    # Runtime PID/socket files must not survive a stop or reboot.
+    tmpfs:
+      - /run
+    depends_on:
+      sandbox-api:
+        condition: service_healthy
+    environment:
+      SANDBOX_RUNNER_API_KEYS: ${SANDBOX_RUNNER_API_KEYS:?Set SANDBOX_RUNNER_API_KEYS in infra/.env}
+      SANDBOX_RUNNER_REGISTRATION_TOKEN: ${SANDBOX_RUNNER_REGISTRATION_TOKEN:?Set SANDBOX_RUNNER_REGISTRATION_TOKEN in infra/.env}
+      SANDBOX_RUNNER_API_GRPC_ADDR: ${SANDBOX_RUNNER_API_GRPC_ADDR:?Set SANDBOX_RUNNER_API_GRPC_ADDR in infra/.env}
+      SANDBOX_RUNNER_HTTP_BASE_URL: ${SANDBOX_RUNNER_HTTP_BASE_URL:?Set SANDBOX_RUNNER_HTTP_BASE_URL in infra/.env}
+      SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR: ${SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR:?Set SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR in infra/.env}
+      SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR: ${SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR:?Set SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR in infra/.env}
+      SANDBOX_RUNNER_ID: ${SANDBOX_RUNNER_ID:?Set SANDBOX_RUNNER_ID in infra/.env}
+      SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE: ${SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE:?Set SANDBOX_RUNNER_DOCKER_SANDBOX_IMAGE in infra/.env}
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE: ${SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE:?Set SANDBOX_RUNNER_REGISTRATION_GRPC_CA_FILE in infra/.env}
+      SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE: ${SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE:?Set SANDBOX_RUNNER_REGISTRATION_GRPC_CERT_FILE in infra/.env}
+      SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE: ${SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE:?Set SANDBOX_RUNNER_REGISTRATION_GRPC_KEY_FILE in infra/.env}
+      SANDBOX_RUNNER_REGISTRATION_GRPC_SERVER_NAME: ${SANDBOX_RUNNER_REGISTRATION_GRPC_SERVER_NAME:?Set SANDBOX_RUNNER_REGISTRATION_GRPC_SERVER_NAME in infra/.env}
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE: ${SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE:?Set SANDBOX_RUNNER_CONTROL_GRPC_TLS_CERT_FILE in infra/.env}
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE: ${SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE:?Set SANDBOX_RUNNER_CONTROL_GRPC_TLS_KEY_FILE in infra/.env}
+      SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE: ${SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE:?Set SANDBOX_RUNNER_CONTROL_GRPC_TLS_CLIENT_CA_FILE in infra/.env}
+    volumes:
+      - sandbox-tls:/tls:ro
+      - sandbox-docker-data:/var/lib/docker
+      - sandbox-runner-data:/var/sandboxes
+    restart: unless-stopped
+
 volumes:
   mysql-data:
+  n8n_data:
+  sandbox-tls:
+  sandbox-api-data:
+  sandbox-docker-data:
+  sandbox-runner-data:

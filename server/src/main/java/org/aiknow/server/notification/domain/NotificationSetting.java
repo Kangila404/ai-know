@@ -20,7 +20,8 @@ import org.aiknow.server.user.domain.User;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Entity
-@Table(name = "notification_setting")
+@Table(name = "notification_setting", indexes = @jakarta.persistence.Index(
+    name = "idx_notification_due", columnList = "is_allowed,setting_time,id"))
 public class NotificationSetting extends BaseEntity {
 
     @Id

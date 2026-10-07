@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -17,7 +18,9 @@ import org.aiknow.server.common.entity.BaseEntity;
 
 @Getter
 @Entity
-@Table(name = "device_token")
+@Table(name = "device_token", uniqueConstraints =
+    @UniqueConstraint(name = "uk_device_installation", columnNames = {"platform", "installation_id"}),
+    indexes = @jakarta.persistence.Index(name = "idx_device_user_active", columnList = "user_id,active"))
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DeviceToken extends BaseEntity {
@@ -39,6 +42,9 @@ public class DeviceToken extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DeviceType platform;
+
+    @Column(name = "installation_id", length = 36)
+    private String installationId;
 
     @Column(nullable = false)
     private boolean active;
@@ -67,6 +73,13 @@ public class DeviceToken extends BaseEntity {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    public void updateRegistration(Long userId, String token, DeviceType platform,
+                                   String installationId, LocalDateTime now) {
+        reactivate(userId, platform, now);
+        this.token = token;
+        if (installationId != null) this.installationId = installationId;
     }
 
 

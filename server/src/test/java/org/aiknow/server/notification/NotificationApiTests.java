@@ -63,6 +63,35 @@ class NotificationApiTests {
     }
 
     @Test
+    void rotatesTokensPerInstallationAndTransfersAccountOwnership() throws Exception {
+        String installation = "19c9f4f2-9ee4-4389-bb69-038853593c73";
+        service.upsertDeviceToken(user.getUserId(), new UpsertDeviceTokenRequest("old", "IOS", installation));
+        Long id = tokens.findByToken("old").orElseThrow().getId();
+        User anotherUser = users.save(User.createSocialUser("다른 계정"));
+        service.upsertDeviceToken(anotherUser.getUserId(), new UpsertDeviceTokenRequest("new", "IOS", installation));
+        assertThat(tokens.findByToken("old")).isEmpty();
+        assertThat(tokens.findByToken("new").orElseThrow().getId()).isEqualTo(id);
+        assertThat(tokens.findByToken("new").orElseThrow().getUserId()).isEqualTo(anotherUser.getId());
+        service.upsertDeviceToken(anotherUser.getUserId(), new UpsertDeviceTokenRequest(
+            "android", "ANDROID", "7a774af0-3736-47d6-800f-3b08566d3a54"));
+        assertThat(tokens.findByUserIdAndActiveTrue(anotherUser.getId())).hasSize(2);
+        mvc.perform(put("/api/v1/device-tokens").with(signedIn(user)).with(csrf())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"token\":\"test\",\"platform\":\"IOS\",\"installationId\":\"invalid\"}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void concurrentInstallationRotationLeavesOneActiveRegistration() throws Exception {
+        String installation = "ebc60b17-daf8-4c34-af76-8b5743104519";
+        runConcurrently(List.of(
+            () -> service.upsertDeviceToken(user.getUserId(), new UpsertDeviceTokenRequest("token-a", "ANDROID", installation)),
+            () -> service.upsertDeviceToken(user.getUserId(), new UpsertDeviceTokenRequest("token-b", "ANDROID", installation))
+        ));
+        assertThat(tokens.findByUserIdAndActiveTrue(user.getId())).hasSize(1);
+    }
+
+    @Test
     void createsDefaultSettingAndPersistsPartialUpdates() throws Exception {
         mvc.perform(get("/api/v1/notification-setting").with(signedIn(user)))
             .andExpect(status().isOk())
