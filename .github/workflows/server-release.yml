@@ -16,9 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     outputs:
-      image: ${{ steps.image.outputs.image }}
       revision: ${{ steps.image.outputs.revision }}
     steps:
       - uses: actions/checkout@v4
@@ -26,17 +24,18 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - id: image
         env:
-          REPOSITORY: ${{ github.repository }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
         run: |
+          [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || { echo 'Set DOCKERHUB_USERNAME to your Docker Hub namespace.' >&2; exit 1; }
           revision=$(git rev-parse HEAD)
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/${REPOSITORY,,}/server:$revision" >> "$GITHUB_OUTPUT"
+          echo "image=docker.io/$DOCKERHUB_USERNAME/aiknow-server:$revision" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
           context: server
@@ -48,6 +47,7 @@ jobs:
     if: vars.DEPLOY_ENABLED == 'true'
     environment: production
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,21 +57,36 @@ jobs:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          ssh-keygen -y -P '' -f ~/.ssh/id_ed25519 > /dev/null
+      - name: Connect to NAS through Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: github-actions-aiknow-cd
+          ping: ${{ secrets.DEPLOY_HOST }}
       - name: Transfer the verified release and deploy
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          IMAGE: ${{ needs.publish.outputs.image }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME }}
           REVISION: ${{ needs.publish.outputs.revision }}
         run: |
+          set -Eeuo pipefail
           [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_USER" =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
-          [[ "$REVISION" =~ ^[a-f0-9]{40}$ && "$IMAGE" =~ ^ghcr.io/[a-z0-9._/-]+:([a-f0-9]{40})$ ]] || exit 1
+          [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || exit 1
+          # Build locally instead of passing a secret-containing image name through job outputs.
+          IMAGE="docker.io/$DOCKERHUB_USERNAME/aiknow-server:$REVISION"
+          [[ "$REVISION" =~ ^[a-f0-9]{40}$ && "$IMAGE" =~ ^docker\.io/[a-z0-9][a-z0-9_-]*/aiknow-server:([a-f0-9]{40})$ ]] || exit 1
+          [[ "${IMAGE##*:}" == "$REVISION" ]] || exit 1
+          opts=(-i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'test -s /opt/aiknow/infra.env && test -s /opt/aiknow/server.env && test -w /opt/aiknow && docker info > /dev/null'
           # Expand the validated local revision/image into the remote command intentionally.
           # shellcheck disable=SC2029
-          git archive --format=tar "$REVISION" | ssh "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /opt/aiknow/releases/$REVISION && tar -xf - -C /opt/aiknow/releases/$REVISION"
+          git archive --format=tar "$REVISION" | ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /opt/aiknow/releases/$REVISION && tar -xf - -C /opt/aiknow/releases/$REVISION"
           # shellcheck disable=SC2029
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "sh /opt/aiknow/releases/$REVISION/infra/deploy-server.sh /opt/aiknow/infra.env '$IMAGE'"
+          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "sh /opt/aiknow/releases/$REVISION/infra/deploy-server.sh /opt/aiknow/infra.env '$IMAGE'"

@@ -57,6 +57,15 @@ MySQL과 샌드박스는 정지하지 않습니다. 배포 중에는 n8n 화면�
 해당 노드에 연결하세요. API 키는 JSON이나 Git에 넣지 않습니다.
 이후 배포에서는 같은 ID·종류의 노드에 연결된 서버 Credential을 유지합니다.
 
+운영 Compose의 `apply`는 실행 중인 `server`에서 `N8N_INGEST_TOKEN`을 읽어
+`AI_KNOW Ingestion (env managed)` Header Auth를 자동 생성·갱신합니다.
+서버 env 파일에 토큰을 한 번 설정하면 내부 API 노드의 인증정보를 UI에서 따로 연결할 필요가 없습니다.
+OpenAI Credential은 별도로 연결합니다. `check`는 인증정보를 쓰지 않으며, 토큰만 갱신할 때는
+이미 연결된 워크플로의 게시 상태를 유지합니다. 최초 연결이나 연결 복구 시에는 초안으로 가져옵니다.
+서버 env 변경은 서버 컨테이너를 재생성한 뒤 `apply`해야 적용됩니다.
+로컬처럼 Compose에 `server`가 없으면 기존 동작을 유지합니다. 선택적으로 배포 프로세스의
+`N8N_INGEST_TOKEN` 환경변수를 전달하면 같은 자동 연결을 사용할 수 있습니다.
+
 가져온 워크플로는 **게시되지 않은 초안**입니다. JSON 한 개에 환경별 `.env` 값을 적용해서 가져오며 오전 9시 트리거는 비활성화되어 있습니다.
 로컬 예제는 `dryRun: false`, `allowImageGeneration: true`, 생성 최대 1장입니다. 배포 예제는 점검 모드로 시작합니다.
 수집만 점검하려면 `AIKNOW_DRY_RUN=true`로 바꾸고 `apply`하세요. `false`로 수동 실행하면 OpenAI 호출 비용이 발생합니다.

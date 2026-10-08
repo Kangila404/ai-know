@@ -3,7 +3,10 @@ set -eu
 env_file=${1:?Pass the absolute production Compose env file}
 image=${2:?Pass the immutable server image}
 case "$env_file" in /*) ;; *) echo 'Use an absolute env file path.' >&2; exit 2;; esac
-case "$image" in ghcr.io/*/server:*) ;; *) echo 'Use the released GHCR server image.' >&2; exit 2;; esac
+if ! printf '%s\n' "$image" | LC_ALL=C grep -Eq '^docker\.io/[a-z0-9][a-z0-9_-]*/aiknow-server:[a-f0-9]{40}$'; then
+    echo 'Use the released Docker Hub aiknow-server image with a full commit SHA tag.' >&2
+    exit 2
+fi
 infra_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 state_dir=$(dirname -- "$env_file")
 export SERVER_IMAGE="$image"
