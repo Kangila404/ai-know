@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { configureWorkflow } from './workflow-environment.mjs';
+import { ingestionCredential, bindIngestionCredential, sameCredentialBindings, syncIngestionCredential } from './ingestion-credential.mjs';
 
 const sourceDirectory = '/opt/aiknow/workflows';
 const stateDirectory = '/home/node/.n8n/aiknow-deploy';
@@ -98,10 +99,10 @@ function runCli(args, { allowEmpty = false } = {}) {
   return diagnostics;
 }
 
-function exportAll(tempDirectory) {
+function exportAll(tempDirectory, cli = runCli) {
   const output = path.join(tempDirectory, 'workflows.json');
   fs.rmSync(output, { force: true });
-  const diagnostics = runCli(['export:workflow', '--all', `--output=${output}`], { allowEmpty: true });
+  const diagnostics = cli(['export:workflow', '--all', `--output=${output}`], { allowEmpty: true });
   // n8n 2.42 reports an empty instance as an export error instead of writing [].
   if (!fs.existsSync(output) && diagnostics.includes('No workflows found with specified filters')) return [];
   // Some CLI failure handlers exit with code zero, so require and validate the actual output.
@@ -115,42 +116,63 @@ function saveJson(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
 }
 
-export function main(args = process.argv.slice(2)) {
+export function main(args = process.argv.slice(2), runtime = {}) {
+  const env = runtime.env ?? process.env;
+  const cli = runtime.cli ?? runCli;
+  const sources = runtime.sourceDirectory ?? sourceDirectory;
+  const state = runtime.stateDirectory ?? stateDirectory;
   const [action = 'check', filename = 'ai-know-news-draft.json', ...flags] = args;
   if (!['check', 'apply'].includes(action) || !/^[a-zA-Z0-9_-]+\.json$/.test(filename)
       || flags.some(flag => flag !== '--replace')) throw new Error('Usage: check|apply <filename.json> [--replace]');
-  const source = configureWorkflow(JSON.parse(fs.readFileSync(path.join(sourceDirectory, filename), 'utf8').replace(/^\uFEFF/, '')), process.env);
+  const source = configureWorkflow(JSON.parse(fs.readFileSync(path.join(sources, filename), 'utf8').replace(/^\uFEFF/, '')), env);
   validate(source);
+  if (action === 'apply' && env.AIKNOW_ENV === 'prod' && !env.N8N_INGEST_TOKEN) {
+    throw new Error('Use deploy.sh/deploy.ps1 apply with the running production server to provision N8N_INGEST_TOKEN.');
+  }
+  const credential = action === 'apply' && env.N8N_INGEST_TOKEN
+    ? ingestionCredential(source.id, env.N8N_INGEST_TOKEN) : null;
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'aiknow-workflow-'));
   try {
-    const current = exportAll(tempDirectory).find(workflow => workflow.id === source.id);
-    const recordPath = path.join(stateDirectory, `${filename}.state.json`);
+    const current = exportAll(tempDirectory, cli).find(workflow => workflow.id === source.id);
+    const recordPath = path.join(state, `${filename}.state.json`);
     const record = fs.existsSync(recordPath) ? JSON.parse(fs.readFileSync(recordPath, 'utf8')) : null;
     const outcome = decision(source, current, record, flags.includes('--replace'));
     console.log(`${outcome.toUpperCase()}: ${filename} (workflow ${source.id})`);
-    if (action === 'check' || outcome === 'unchanged') return;
-    fs.mkdirSync(stateDirectory, { recursive: true, mode: 0o700 });
+    if (action === 'check') return;
+    let payload = importPayload(outcome === 'import' ? source : current, current);
+    if (credential) {
+      payload = bindIngestionCredential(payload, env.AIKNOW_SERVER_BASE_URL, credential);
+      syncIngestionCredential(credential, current, tempDirectory, cli);
+      console.log('Ingestion credential synchronized from the server environment.');
+    }
+    const bindingChanged = credential && current && !sameCredentialBindings(payload, current);
+    if (outcome === 'unchanged' && !bindingChanged) return;
+    fs.mkdirSync(state, { recursive: true, mode: 0o700 });
     let deployed = current;
-    if (outcome === 'import') {
+    if (outcome === 'import' || bindingChanged) {
       if (current) {
-        const backupDirectory = path.join(stateDirectory, 'backups');
+        const backupDirectory = path.join(state, 'backups');
         fs.mkdirSync(backupDirectory, { recursive: true, mode: 0o700 });
         const backup = path.join(backupDirectory, `${source.id}-${Date.now()}.json`);
         saveJson(backup, [current]);
         console.log(`Previous workflow backed up to ${backup}`);
       }
       const input = path.join(tempDirectory, 'import.json');
-      saveJson(input, [importPayload(source, current)]);
-      runCli(['import:workflow', `--input=${input}`, '--activeState=false']);
-      deployed = exportAll(tempDirectory).find(workflow => workflow.id === source.id);
-      if (!deployed || fingerprint(deployed) !== fingerprint(source) || deployed.active || deployed.activeVersionId) {
+      saveJson(input, [payload]);
+      const ownerProject = current?.shared?.find(entry => entry.role === 'workflow:owner')?.projectId;
+      cli(['import:workflow', `--input=${input}`, '--activeState=false', ...(ownerProject ? [`--projectId=${ownerProject}`] : [])]);
+      deployed = exportAll(tempDirectory, cli).find(workflow => workflow.id === source.id);
+      if (!deployed || fingerprint(deployed) !== fingerprint(payload) || deployed.active || deployed.activeVersionId
+        || (credential && !sameCredentialBindings(payload, deployed))) {
         throw new Error('Import verification failed. Deployment state was not advanced. Review the backup before retrying.');
       }
       if (JSON.stringify(sorted(deployed.staticData ?? null)) !== JSON.stringify(sorted(current?.staticData ?? null))) {
         throw new Error('Workflow history verification failed. Deployment state was not advanced.');
       }
-      console.log('Imported as an unpublished draft. Check credentials and publish in n8n when ready.');
+      console.log('Imported as an unpublished draft. Check OpenAI credentials and publish in n8n when ready.');
     }
+    // A binding-only update must not silently adopt unrelated UI edits as a new baseline.
+    if (outcome === 'unchanged') return;
     const nextRecord = { workflowId: source.id, sourceHash: fingerprint(source), liveHash: fingerprint(deployed), appliedAt: new Date().toISOString() };
     const pending = `${recordPath}.tmp`;
     saveJson(pending, nextRecord);

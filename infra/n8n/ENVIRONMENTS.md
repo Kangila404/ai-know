@@ -83,7 +83,8 @@ DB/OAuth/암호화 키를 채우고 예시 도메인·경로를 실제 값으로
 3. `prod` 프로필과 `mounted` 모드, 실제 경로와 HTTPS 공개 URL로 Spring을 실행합니다.
    `.env`는 Spring이 자동 로드하지 않으므로 서비스 매니저/컨테이너로 환경변수를 주입합니다.
    운영 DB는 Flyway로 마이그레이션하고 `ddl-auto=validate`로 검증합니다. 기존 데이터가 있는 DB는 [도입 절차](../../server/docs/migrations.md)가 필요합니다.
-4. 배포 호스트의 n8n Credential을 연결하고 지정한 env 파일로 워크플로를 적용합니다.
+4. n8n Owner 설정 후 지정한 env 파일로 워크플로를 적용합니다. 내부 API Credential은 실행 중인
+   `server`의 `N8N_INGEST_TOKEN`으로 자동 연결합니다. OpenAI Credential은 별도로 연결합니다.
 
 ```sh
 AIKNOW_INFRA_ENV_FILE="$PWD/infra/.env.prod" AIKNOW_COMPOSE_FILE="$PWD/infra/docker-compose.prod.yml" sh infra/n8n/deploy.sh check
