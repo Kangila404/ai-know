@@ -69,4 +69,66 @@ class MobileSocialLoginTests {
         verify(verifier, times(1)).verify(any(), anyString());
         mvc.perform(get("/api/v1/users").session(session)).andExpect(status().isUnauthorized());
     }
+    @Test void googleLoginMaintainsSessionForProfileAndPushRegistration() throws Exception {
+        var session = new MockHttpSession();
+        String oldSessionId = session.getId(), anonymousCsrf = csrf(session);
+        var challengeResult = mvc.perform(post("/api/v1/auth/social/GOOGLE/challenge").session(session)
+            .header("X-CSRF-TOKEN", anonymousCsrf))
+            .andExpect(status().isOk()).andReturn();
+        String nonce = mapper.readTree(challengeResult.getResponse().getContentAsString()).path("nonce").asText();
+        when(verifier.verify(SocialProvider.GOOGLE, "google-id-token")).thenReturn(token(nonce));
+        var loginResult = mvc.perform(post("/api/v1/auth/social/GOOGLE").session(session)
+            .header("X-CSRF-TOKEN", anonymousCsrf).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"idToken\":\"google-id-token\",\"nickname\":\"Google 사용자\"}"))
+            .andExpect(status().isOk()).andReturn();
+        assertThat(session.getId()).isNotEqualTo(oldSessionId);
+        var login = mapper.readTree(loginResult.getResponse().getContentAsString());
+        String freshCsrf = login.path("csrfToken").asText();
+        assertThat(login.path("csrfHeaderName").asText()).isEqualTo("X-CSRF-TOKEN");
+        mvc.perform(get("/api/v1/users").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.nickname").value("Google 사용자"));
+        String registration = "{\"token\":\"test-google-fcm-token\",\"platform\":\"IOS\",\"installationId\":\"b1f8ebbf-c4b8-457d-b072-92ed50806d8d\"}";
+        mvc.perform(put("/api/v1/device-tokens").session(session).header("X-CSRF-TOKEN", anonymousCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content(registration)).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/device-tokens").session(session).header("X-CSRF-TOKEN", freshCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content(registration)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/social/GOOGLE").session(session).header("X-CSRF-TOKEN", freshCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"google-id-token\"}"))
+            .andExpect(status().isUnauthorized());
+        verify(verifier, times(1)).verify(SocialProvider.GOOGLE, "google-id-token");
+        mvc.perform(post("/api/v1/auth/logout").session(session).header("X-CSRF-TOKEN", freshCsrf))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test void appleLoginMaintainsSessionForProfileAndPushRegistration() throws Exception {
+        var session = new MockHttpSession();
+        String oldSessionId = session.getId(), anonymousCsrf = csrf(session);
+        var challengeResult = mvc.perform(post("/api/v1/auth/social/APPLE/challenge").session(session)
+            .header("X-CSRF-TOKEN", anonymousCsrf))
+            .andExpect(status().isOk()).andReturn();
+        String nonce = mapper.readTree(challengeResult.getResponse().getContentAsString()).path("nonce").asText();
+        when(verifier.verify(SocialProvider.APPLE, "apple-id-token")).thenReturn(token(nonce));
+        var loginResult = mvc.perform(post("/api/v1/auth/social/APPLE").session(session)
+            .header("X-CSRF-TOKEN", anonymousCsrf).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"idToken\":\"apple-id-token\",\"nickname\":\"Apple 사용자\"}"))
+            .andExpect(status().isOk()).andReturn();
+        assertThat(session.getId()).isNotEqualTo(oldSessionId);
+        var login = mapper.readTree(loginResult.getResponse().getContentAsString());
+        String freshCsrf = login.path("csrfToken").asText();
+        assertThat(login.path("csrfHeaderName").asText()).isEqualTo("X-CSRF-TOKEN");
+        mvc.perform(get("/api/v1/users").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.nickname").value("Apple 사용자"));
+        String registration = "{\"token\":\"test-apple-fcm-token\",\"platform\":\"IOS\",\"installationId\":\"f5963e49-5461-4769-a5d8-2533d7e22a64\"}";
+        mvc.perform(put("/api/v1/device-tokens").session(session).header("X-CSRF-TOKEN", anonymousCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content(registration)).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/device-tokens").session(session).header("X-CSRF-TOKEN", freshCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content(registration)).andExpect(status().isOk());
+        mvc.perform(post("/api/v1/auth/social/APPLE").session(session).header("X-CSRF-TOKEN", freshCsrf)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"idToken\":\"apple-id-token\"}"))
+            .andExpect(status().isUnauthorized());
+        verify(verifier, times(1)).verify(SocialProvider.APPLE, "apple-id-token");
+        mvc.perform(post("/api/v1/auth/logout").session(session).header("X-CSRF-TOKEN", freshCsrf))
+            .andExpect(status().isNoContent());
+    }
+
 }

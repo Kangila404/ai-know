@@ -37,7 +37,7 @@ class MySQLMigrationTests {
             .baselineOnMigrate(false).cleanDisabled(true);
     }
     @Test void newDatabaseMigratesOnceAndHibernateValidatesAllEntities() {
-        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
+        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(flyway.migrate().migrationsExecuted).isZero(); flyway.validate();
         try (var context = new SpringApplicationBuilder(ServerApplication.class).profiles("test").run(
             "--server.port=0", "--spring.datasource.url=" + url, "--spring.datasource.username=" + user,
@@ -54,7 +54,7 @@ class MySQLMigrationTests {
         }
         assertThatThrownBy(() -> config().load().migrate()).isInstanceOf(FlywayException.class);
         var adopted = config().baselineVersion("1").load(); adopted.baseline();
-        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(3);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement();
              var rs = s.executeQuery("SELECT nickname FROM users WHERE user_id='migration-fixture'")) {
             assertThat(rs.next()).isTrue(); assertThat(rs.getString(1)).isEqualTo("preserved");

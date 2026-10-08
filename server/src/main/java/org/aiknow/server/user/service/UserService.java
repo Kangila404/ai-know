@@ -26,6 +26,19 @@ public class UserService {
     private final AuthAccountRepository authAccountRepository;
     private final ProfileImgRepository profileImgRepository;
 
+    private final org.aiknow.server.cardNews.repository.LikesRepository likes;
+    private final org.aiknow.server.cardNews.repository.CardReadRepository reads;
+    private final org.aiknow.server.notification.repository.DeviceTokenRepository devices;
+    private final org.aiknow.server.notification.repository.NotificationSettingRepository settings;
+    private final org.aiknow.server.notification.batch.NewsDeliveryRepository deliveries;
+
+    @Transactional
+    public UserMeResponse completeOnboarding(String userId) {
+        User user = findUserByUserIdOrThrow(userId);
+        user.completeOnboarding();
+        return UserMeResponse.from(user);
+    }
+
     @Transactional(readOnly = true)
     public UserMeResponse getUser(String userId){
         User user = findUserByUserIdOrThrow(userId);
@@ -42,6 +55,11 @@ public class UserService {
     @Transactional
     public void withdraw(String userId){
         User user = findUserByUserIdOrThrow(userId);
+        likes.deleteAllByUser(user);
+        reads.deleteAllByUserId(user.getId());
+        deliveries.deleteAllByUserId(user.getId());
+        devices.deleteAllByUserId(user.getId());
+        settings.deleteAllByUserId(user.getId());
         authAccountRepository.deleteAllByUser(user);
         authAccountRepository.flush();
         userRepository.delete(user);

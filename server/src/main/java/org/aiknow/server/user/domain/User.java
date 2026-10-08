@@ -81,6 +81,8 @@ public class User extends BaseEntity {
         this.nickname = normalizedNickname;
     }
 
+    public void completeOnboarding() { this.isOnboardingCompleted = true; }
+
     public void recordLogin() {
         this.lastLogined_at = LocalDateTime.now();
     }
