@@ -77,16 +77,20 @@ jobs:
           REVISION: ${{ needs.publish.outputs.revision }}
         run: |
           set -Eeuo pipefail
-          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$DEPLOY_USER" =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
-          [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || exit 1
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ ]] || { echo 'DEPLOY_HOST must be a hostname or IPv4 address without scheme or port.' >&2; exit 1; }
+          [[ "$DEPLOY_USER" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo 'DEPLOY_USER contains an invalid character.' >&2; exit 1; }
+          [[ "$DOCKERHUB_USERNAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || { echo 'DOCKERHUB_USERNAME is invalid.' >&2; exit 1; }
           # Build locally instead of passing a secret-containing image name through job outputs.
           IMAGE="docker.io/$DOCKERHUB_USERNAME/aiknow-server:$REVISION"
-          [[ "$REVISION" =~ ^[a-f0-9]{40}$ && "$IMAGE" =~ ^docker\.io/[a-z0-9][a-z0-9_-]*/aiknow-server:([a-f0-9]{40})$ ]] || exit 1
-          [[ "${IMAGE##*:}" == "$REVISION" ]] || exit 1
+          [[ "$REVISION" =~ ^[a-f0-9]{40}$ && "$IMAGE" =~ ^docker\.io/[a-z0-9][a-z0-9_-]*/aiknow-server:([a-f0-9]{40})$ ]] || { echo 'Release revision or image tag is invalid.' >&2; exit 1; }
+          [[ "${IMAGE##*:}" == "$REVISION" ]] || { echo 'Image tag does not match the release revision.' >&2; exit 1; }
           opts=(-i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
-          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'test -s /opt/aiknow/infra.env && test -s /opt/aiknow/server.env && test -w /opt/aiknow && docker info > /dev/null'
+          echo 'Checking NAS deployment prerequisites through SSH...'
+          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'sh -s' < infra/check-deploy-host.sh
+          echo 'Transferring release files...'
           # Expand the validated local revision/image into the remote command intentionally.
           # shellcheck disable=SC2029
           git archive --format=tar "$REVISION" | ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /opt/aiknow/releases/$REVISION && tar -xf - -C /opt/aiknow/releases/$REVISION"
           # shellcheck disable=SC2029
+          echo 'Starting the NAS deployment script...'
           ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "sh /opt/aiknow/releases/$REVISION/infra/deploy-server.sh /opt/aiknow/infra.env '$IMAGE'"
