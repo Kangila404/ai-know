@@ -55,24 +55,44 @@ services:
 
   proxy:
     image: ${NGINX_IMAGE:?Set NGINX_IMAGE}
+    command: [sh, /opt/aiknow/nginx/start.sh]
     environment:
       API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
-      NGINX_ENVSUBST_FILTER: API_DOMAIN
     ports:
       - '${HTTP_BIND_ADDRESS}:${HTTP_PORT}:80'
       - '${HTTP_BIND_ADDRESS}:${HTTPS_PORT}:443'
     volumes:
-      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - type: bind
-        source: ${TLS_CERT_PATH:?Set TLS_CERT_PATH to the directory containing fullchain.pem and privkey.pem}
-        target: /etc/nginx/tls
-        read_only: true
-        bind:
-          create_host_path: false
+      - ./nginx:/opt/aiknow/nginx:ro
+      - letsencrypt:/etc/letsencrypt:ro
       - acme-webroot:/var/www/acme:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8081/live']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  certbot:
+    image: ${CERTBOT_IMAGE:-certbot/certbot:v5.8.0}
+    entrypoint: [sh, /opt/aiknow/acme/certbot.sh]
+    command: [renew-loop]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ACME_AGREE_TOS: ${ACME_AGREE_TOS:-false}
+    volumes:
+      - ./acme:/opt/aiknow/acme:ro
+      - letsencrypt:/etc/letsencrypt
+      - acme-webroot:/var/www/acme
     depends_on:
-      server:
+      proxy:
         condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'test -n "$$(find /tmp/renew-ok -mmin -1500 2>/dev/null)"']
+      interval: 1m
+      timeout: 5s
+      retries: 3
+      start_period: 5m
     restart: unless-stopped
 
   n8n:
@@ -119,3 +139,4 @@ volumes:
   mysql-data:
   n8n-data:
   acme-webroot:
+  letsencrypt:

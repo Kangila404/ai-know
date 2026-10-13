@@ -6,7 +6,8 @@
 
 ## 설치 원칙: 최초 한 번 수동 준비
 
-폴더 생성, env·키·인증서 배치, 최초 Docker Compose 실행은 한 번 수동으로 진행합니다.
+영구 경로와 권한, env·필요한 서비스 키 배치는 최초 한 번 준비합니다.
+인증서 발급과 서버 기동은 CD가 처리합니다. PEM 파일을 수동으로 만들거나 전달할 필요가 없습니다.
 이후 main 배포마다 폴더 구조를 바꾸거나 env를 다시 복사하지 않습니다.
 아래 고정 경로를 계속 사용하고, 배포 스크립트가 릴리스 폴더와 백업을 자동으로 추가합니다.
 
@@ -16,9 +17,6 @@
 ├── server.env                  # 최초 배치: Spring 운영 설정
 ├── secrets/
 │   └── firebase-admin.json     # 최초 배치: Firebase 서비스 계정
-├── tls/
-│   ├── fullchain.pem           # 최초 배치, 이후 인증서 갱신 시 교체
-│   └── privkey.pem
 ├── media/
 │   └── generated/              # 고정 NAS 이미지 저장 위치
 │       └── .aiknow-storage-id
@@ -28,9 +26,9 @@
 └── current-server-image        # 자동 기록: 마지막 배포 성공 이미지
 ```
 
-MySQL과 n8n 데이터는 Compose의 named volume에 보관됩니다. 위 트리에 DB 파일을 옮기지 않습니다.
+MySQL·n8n 데이터와 Certbot 인증서/계정은 Compose의 named volume에 보관됩니다. 위 트리에 DB 파일을 옮기지 않습니다.
 `COMPOSE_PROJECT_NAME=aiknow-prod`를 유지해 배포마다 같은 볼륨을 사용하세요.
-인증서 갱신이나 설정 변경이 필요할 때만 고정 파일을 수정하고 해당 서비스를 다시 반영합니다.
+인증서는 Certbot이 자동 갱신하고 Nginx가 자동 reload합니다. 설정 변경 때만 해당 서비스를 다시 반영합니다.
 
 ## 현재 자동 배포 흐름
 
@@ -44,7 +42,8 @@ MySQL과 n8n 데이터는 Compose의 named volume에 보관됩니다. 위 트리
 ## 최초 NAS 준비
 
 1. NAS의 Docker Compose 지원, CPU, 실제 dataset 경로, 포트 점유와 Tailscale을 통한 SSH 접근을 확인하세요.
-   `aiknow.kro.kr` DNS, Nginx로의 80/443 연결과 TLS 인증서를 준비하세요. NAS 관리 UI로 전달하면 안 됩니다.
+   `aiknow.kro.kr` 공개 DNS와 인터넷에서 Nginx로의 80/443 연결을 준비하세요. NAS 관리 UI로 전달하면 안 됩니다.
+   Tailscale의 SSH 연결만으로 공개 HTTP-01 인증이 되지는 않습니다.
 2. `/opt/aiknow`가 NAS의 영구 dataset을 사용하게 준비하세요. 필요하면 영구 dataset을 가리키는 경로로 연결하세요.
    배포 계정은 이 경로 쓰기 및 비대화형 Docker 실행 권한이 필요합니다.
 3. 준비한 `infra/.env.prod`, `server/.env.prod`를 각각 `/opt/aiknow/infra.env`, `/opt/aiknow/server.env`로 배치하세요.
@@ -55,7 +54,9 @@ MySQL과 n8n 데이터는 Compose의 named volume에 보관됩니다. 위 트리
 COMPOSE_PROJECT_NAME=aiknow-prod
 SERVER_ENV_FILE=/opt/aiknow/server.env
 SERVER_SECRETS_PATH=/opt/aiknow/secrets
-TLS_CERT_PATH=/opt/aiknow/tls
+CERTBOT_IMAGE=certbot/certbot:v5.8.0
+ACME_EMAIL=YOUR_CONTACT_EMAIL
+ACME_AGREE_TOS=false
 MEDIA_HOST_PATH=/opt/aiknow/media/generated
 MEDIA_ROOT=/var/aiknow-media
 API_DOMAIN=aiknow.kro.kr
@@ -63,15 +64,15 @@ AIKNOW_SERVER_BASE_URL=http://server:8080
 AIKNOW_MEDIA_PUBLIC_BASE_URL=https://aiknow.kro.kr/media/generated
 ```
 
-5. `secrets/firebase-admin.json`, `tls/fullchain.pem`, `tls/privkey.pem`을 준비하세요.
+5. Firebase를 활성화한다면 `secrets/firebase-admin.json`을 준비하세요. PEM은 CD가 자동 발급합니다.
+   `ACME_EMAIL`을 실제 연락처로 바꾸고 [가입자 약관](https://letsencrypt.org/repository/)에 동의한 뒤 `ACME_AGREE_TOS=true`로 설정하세요.
    실제 NAS dataset의 `media/generated/.aiknow-storage-id` 내용은 `aiknow-media-prod` 한 줄입니다.
    Spring UID/GID `10001:10001`에 JSON 읽기·미디어 읽기/쓰기 권한을 주세요. env는 배포 계정만 읽도록 제한하세요.
-6. 최초에는 저장소 루트에서 `docker build -t aiknow-server:20261008 ./server`를 실행하고,
-   `/opt/aiknow/infra.env`의 `SERVER_IMAGE=aiknow-server:20261008`로 설정한 뒤 실행하세요.
+6. 최초에도 GitHub CD가 게시한 이미지를 사용합니다. NAS에서 직접 이미지를 빌드하지 않아도 됩니다.
+   CD 또는 같은 배포 스크립트가 HTTP proxy부터 시작하고 인증서 발급 후 HTTPS·앱을 기동합니다.
 
 ```sh
-docker compose --env-file /opt/aiknow/infra.env -f infra/docker-compose.prod.yml config --quiet
-docker compose --env-file /opt/aiknow/infra.env -f infra/docker-compose.prod.yml up -d --wait
+sh infra/deploy-server.sh /opt/aiknow/infra.env docker.io/ACCOUNT/aiknow-server:FULL_COMMIT_SHA
 ```
 
 7. 신규 DB는 Flyway가 초기화합니다. 기존 DB 도입은 `server/docs/migrations.md`를 먼저 확인하세요.
@@ -134,7 +135,7 @@ Docker 계정 비밀번호 대신 PAT을 사용합니다. 토큰은 채팅에 �
 
 1. **NAS 접속 정보:** 실제 NAS 경로, CPU 종류, 배포 계정과 Tailscale 주소를 확인합니다.
    Tailscale 정책·NAS 방화벽에서 runner의 TCP 22번 접속을 허용합니다. 공유기의 공인 SSH 포트포워딩은 필요하지 않습니다.
-2. **운영 파일:** 두 env 파일, Firebase JSON, `aiknow.kro.kr` TLS 인증서를 준비합니다.
+2. **운영 파일:** 두 env 파일과 Firebase 활성화 시 JSON을 준비합니다. TLS는 CD에서 자동 발급합니다.
    위 폴더 생성과 파일 배치는 NAS에서 작업하는 AI에게 맡겨도 됩니다. `/opt/aiknow`의 영구 저장과 재부팅 후 유지도 확인합니다.
 3. **SSH 인증:** 배포 전용 키 쌍을 만들고 공개키를 NAS 배포 계정에 등록합니다.
    현재 워크플로에는 키 암호를 입력하는 기능이 없으므로 비대화형 인증 가능한 전용 키를 사용합니다.
@@ -142,8 +143,8 @@ Docker 계정 비밀번호 대신 PAT을 사용합니다. 토큰은 채팅에 �
 4. **Docker Hub:** 계정 아래 `aiknow-server` 저장소를 만들고 공개/비공개를 선택합니다.
    계정명과 업로드용 PAT을 위 GitHub Repository 설정에 등록합니다.
    비공개라면 별도의 Read 전용 PAT으로 NAS 배포 계정에서도 한 번 로그인합니다.
-5. **최초 실행과 확인:** 위 Compose 명령으로 시작하고 n8n Owner·OpenAI 인증정보를 연결합니다.
-   HTTPS, 로그인, DB, n8n 검수 대기 저장을 검증합니다. 인증서 자동 갱신도 NAS 환경에 맞게 별도 설정합니다.
+5. **최초 실행과 확인:** 위 배포 스크립트로 시작하고 n8n Owner·OpenAI 인증정보를 연결합니다.
+   HTTPS, 로그인, DB, n8n 검수 대기 저장을 검증합니다. Certbot의 주기적 갱신과 Nginx 자동 reload도 확인합니다.
 6. **자동 배포 켜기:** 위 Secrets 7개를 등록하고 `production` 환경을 준비한 뒤,
    Repository variable `DEPLOY_ENABLED=true`를 마지막에 설정합니다.
    배포 코드가 포함된 main push/merge 후 Actions와 실제 NAS 이미지 버전을 확인합니다.
@@ -157,7 +158,7 @@ Docker 계정 비밀번호 대신 PAT을 사용합니다. 토큰은 채팅에 �
 - 준비된 main 변경으로 `Server CI`와 `Server release`의 publish/deploy 결과를 확인하세요.
   NAS 서버 이미지가 해당 SHA인지, DB 백업과 `/opt/aiknow/current-server-image`가 남았는지 확인하세요.
 - 자동 배포 스크립트는 `SERVER_IMAGE`를 실행 시 덮어쓰고 성공 이미지를 위 파일에 기록합니다.
-  이후 수동 Compose 실행 시에는 그 기록의 이미지로 env를 맞춰 최초 로컬 이미지로 돌아가지 않게 하세요.
+  이후 수동 Compose 실행 시에는 그 기록의 이미지로 env를 맞춰 이전 이미지로 돌아가지 않게 하세요.
 - n8n JSON 변경/최초 인증 연결은 미게시 초안이 됩니다. 실제 수집은 OpenAI 연결·수동 검증 후 스케줄 활성화와 Publish가 필요합니다.
   `AIKNOW_DRY_RUN`, 이미지 생성, `NEWS_BATCH_ENABLED`는 실제 검증 후 운영 설정으로 전환하세요.
 - 파일 변경만 로컬에 남아 있다면 NAS와 main에 포함됐는지도 확인하세요. 소스가 없는 기능을 배포 완료라고 보고하지 마세요.

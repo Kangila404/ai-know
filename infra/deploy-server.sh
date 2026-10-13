@@ -16,7 +16,20 @@ previous=$(compose ps -q server)
 if [ -n "$previous" ]; then
     docker inspect --format '{{.Config.Image}}' "$previous" > "$state_dir/previous-server-image"
 fi
-compose pull server proxy n8n
+compose pull server proxy n8n certbot
+# Validate account settings before changing running services or touching the database.
+compose run --rm --no-deps certbot check
+# The proxy can serve ACME HTTP challenges without an application or existing PEM files.
+compose up -d --no-deps --wait --wait-timeout 90 proxy
+# Avoid overlapping Certbot processes sharing its account/renewal lock.
+compose stop certbot
+if ! compose run --rm --no-deps certbot issue; then
+    echo 'Certificate issuance failed. Check public DNS, inbound port 80, ACME settings and certbot output.' >&2
+    compose up -d --no-deps certbot
+    exit 1
+fi
+compose up -d --no-deps certbot
+compose exec -T proxy sh /opt/aiknow/nginx/wait-https.sh
 compose up -d --wait --wait-timeout 180 mysql
 umask 077
 mkdir -p "$state_dir/backups"
