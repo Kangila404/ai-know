@@ -65,6 +65,23 @@ test('first deployment provisions one credential and binds every internal API wi
   assert.ok(db.tempFiles.every(file => !fs.existsSync(file)));
 });
 
+test('stdin token provisions credentials when sudo removed the caller environment', t => {
+  const { db, runtime } = harness(t);
+  delete runtime.env.N8N_INGEST_TOKEN;
+  runtime.readToken = () => token;
+  main(['apply', filename, '--token-stdin'], runtime);
+  assert.equal([...db.credentials.values()][0].data.value, `Bearer ${token}`);
+  assert.ok(!JSON.stringify(db.workflow).includes(token));
+});
+
+test('empty stdin token and stdin on check are rejected before n8n changes', t => {
+  const { db, runtime } = harness(t);
+  runtime.readToken = () => '';
+  assert.throws(() => main(['apply', filename, '--token-stdin'], runtime), /stdin is empty/);
+  assert.throws(() => main(['check', filename, '--token-stdin'], runtime), /requires apply/);
+  assert.equal(db.calls.length, 0);
+});
+
 test('token rotation updates the same credential without importing or unpublishing the workflow', t => {
   const { db, runtime, apply } = harness(t);
   apply();

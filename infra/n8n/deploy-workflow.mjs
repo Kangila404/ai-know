@@ -123,7 +123,13 @@ export function main(args = process.argv.slice(2), runtime = {}) {
   const state = runtime.stateDirectory ?? stateDirectory;
   const [action = 'check', filename = 'ai-know-news-draft.json', ...flags] = args;
   if (!['check', 'apply'].includes(action) || !/^[a-zA-Z0-9_-]+\.json$/.test(filename)
-      || flags.some(flag => flag !== '--replace')) throw new Error('Usage: check|apply <filename.json> [--replace]');
+      || flags.some(flag => !['--replace', '--token-stdin'].includes(flag))) throw new Error('Usage: check|apply <filename.json> [--replace] [--token-stdin]');
+  if (flags.includes('--token-stdin')) {
+    if (action !== 'apply') throw new Error('--token-stdin requires apply.');
+    const token = (runtime.readToken ?? (() => fs.readFileSync(0, 'utf8')))();
+    if (!token) throw new Error('Ingestion token on stdin is empty.');
+    env.N8N_INGEST_TOKEN = token;
+  }
   const source = configureWorkflow(JSON.parse(fs.readFileSync(path.join(sources, filename), 'utf8').replace(/^\uFEFF/, '')), env);
   validate(source);
   if (action === 'apply' && env.AIKNOW_ENV === 'prod' && !env.N8N_INGEST_TOKEN) {

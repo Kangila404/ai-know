@@ -15,6 +15,14 @@ try {
   for(const [key,value]of Object.entries(values))content=content.replace(new RegExp('^'+key+'=.*$','m'),()=>key+'='+value);
   const file=path.join(dir,'infra.env');fs.writeFileSync(file,content);
   execFileSync('docker',['compose','--env-file',file,'-f','infra/docker-compose.prod.yml','config','--quiet'],{stdio:'inherit'});
+  const release = path.join(dir, 'release.env');
+  const image = `docker.io/example/aiknow-server:${'a'.repeat(40)}`;
+  fs.writeFileSync(release, `SERVER_IMAGE=${image}\n`);
+  const env = { ...process.env };
+  delete env.SERVER_IMAGE; // sudo does not inherit the deploy shell's SERVER_IMAGE.
+  const images = execFileSync('docker', ['compose', '--env-file', file, '--env-file', release,
+    '-f', 'infra/docker-compose.prod.yml', 'config', '--images'], { encoding: 'utf8', env });
+  if (!images.trim().split(/\r?\n/).includes(image)) throw new Error('Verified release image override was lost.');
   console.log('Production Compose references resolve with isolated test settings. No containers were started.');
 } finally {
   const resolved=path.resolve(dir);

@@ -9,8 +9,8 @@ const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' 
 const shellPath = value => process.platform === 'win32'
   ? value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase()) : value;
 
-for (const failure of ['missing-directory', 'missing-env', 'empty-env', 'docker', 'compose', 'none']) {
-  test(`NAS preflight identifies ${failure} without printing env contents`, t => {
+for (const sudo of [false, true]) for (const failure of ['missing-directory', 'missing-env', 'empty-env', 'docker', 'compose', 'none']) {
+  test(`NAS preflight identifies ${failure} (sudo=${sudo}) without printing env contents`, t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiknow-preflight-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     const nas = path.join(dir, 'nas');
@@ -25,10 +25,15 @@ if [ "$1" = info ] && [ "$FAILURE" = docker ]; then exit 1; fi
 if [ "$1" = compose ] && [ "$FAILURE" = compose ]; then exit 1; fi
 exit 0
 `, { mode: 0o700 });
-    fs.writeFileSync(path.join(dir, 'check.sh'), fs.readFileSync(new URL('../infra/check-deploy-host.sh', import.meta.url), 'utf8')
+    fs.writeFileSync(path.join(dir, 'sudo'), `#!/bin/sh
+[ "$1" = -n ] && [ "$2" = /usr/bin/docker ] || exit 99
+shift 2
+exec docker "$@"
+`, { mode: 0o700 });
+    fs.writeFileSync(path.join(dir, 'check.sh'), fs.readFileSync(new URL('../infra/docker-command.sh', import.meta.url), 'utf8') + '\n' + fs.readFileSync(new URL('../infra/check-deploy-host.sh', import.meta.url), 'utf8')
       .replaceAll('/opt/aiknow', shellPath(nas)));
     const r = spawnSync(bash, ['-c', 'export PATH="$1:$PATH"; exec sh "$1/check.sh"', 'test', shellPath(dir)], {
-      env: { ...process.env, FAILURE: failure }, encoding: 'utf8', timeout: 10000,
+      env: { ...process.env, FAILURE: failure, AIKNOW_DOCKER_SUDO: String(sudo) }, encoding: 'utf8', timeout: 10000,
     });
     if (r.error) throw r.error;
     assert.equal(r.status, failure === 'none' ? 0 : 1, r.stderr);

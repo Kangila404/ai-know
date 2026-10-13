@@ -46,6 +46,10 @@ MySQL·n8n 데이터와 Certbot 인증서/계정은 Compose의 named volume에 �
    Tailscale의 SSH 연결만으로 공개 HTTP-01 인증이 되지는 않습니다.
 2. `/opt/aiknow`가 NAS의 영구 dataset을 사용하게 준비하세요. 필요하면 영구 dataset을 가리키는 경로로 연결하세요.
    배포 계정은 이 경로 쓰기 및 비대화형 Docker 실행 권한이 필요합니다.
+   CD는 Docker만 `sudo -n /usr/bin/docker`로 실행합니다. TrueNAS에서 배포 계정에 해당 명령의
+   비밀번호 없는 sudo 권한을 설정하고 `sudo -n /usr/bin/docker info`와
+   `sudo -n /usr/bin/docker compose version`으로 확인하세요. Docker 그룹 가입은 이 방식에 필요하지 않습니다.
+   수동 배포·n8n 반영·Nginx reload 명령에는 `AIKNOW_DOCKER_SUDO=true`를 앞에 붙이세요.
 3. 준비한 `infra/.env.prod`, `server/.env.prod`를 각각 `/opt/aiknow/infra.env`, `/opt/aiknow/server.env`로 배치하세요.
    기존 파일/DB가 있으면 비밀번호·암호화 키·데이터를 유지하세요. 앞으로 운영 설정은 이 두 고정 파일에서 관리합니다.
 4. `/opt/aiknow/infra.env`에서 아래 경로를 절대 경로로 바꾸세요. 릴리스별 폴더 안의 `../.local` 경로는 쓰지 마세요.
@@ -126,7 +130,8 @@ Docker 계정 비밀번호 대신 PAT을 사용합니다. 토큰은 채팅에 �
 - production 환경에 승인자를 설정하면 매번 승인 후 배포됩니다. 승인 없이 배포하려면 그 보호 규칙을 사용하지 않습니다.
 - 이미지 **게시**는 위 Docker Hub PAT을 사용합니다. GitHub 패키지용 PAT은 필요하지 않습니다.
 - 비공개 Docker Hub 이미지 **다운로드**에는 해당 저장소를 읽을 수 있는 Docker Hub Read 전용 PAT을 준비합니다.
-  NAS에서 실제 배포 계정으로 `docker login --username <DockerHub계정>`을 실행하고 비밀번호 입력란에 PAT을 넣으세요.
+  NAS에서 실제 배포 계정으로 `sudo -n /usr/bin/docker login --username <DockerHub계정>`을 실행하고 비밀번호 입력란에 PAT을 넣으세요.
+  CD도 sudo로 실행하므로 같은 Docker 인증 저장소를 사용해야 합니다. GitHub runner의 로그인은 NAS에 전달되지 않습니다.
   현재 워크플로는 다운로드 PAT을 GitHub Secret에서 NAS로 전달하지 않습니다. 공개 이미지는 로그인 없이 pull 가능합니다.
 - Docker Hub가 NAS 컨테이너를 자동으로 재시작하지는 않습니다. 자동 배포를 위해 위 SSH 설정도 필요합니다.
 - Google/Kakao/Firebase/n8n 비밀값은 NAS에 유지합니다. GitHub에 env 전체를 등록할 필요가 없습니다.
