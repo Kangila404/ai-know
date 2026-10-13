@@ -10,7 +10,7 @@ try {
   fs.writeFileSync(server, fs.readFileSync('server/.env.prod.example', 'utf8'));
   const values = { MYSQL_PASSWORD:'ci-test-only', MYSQL_ROOT_PASSWORD:'ci-root-test-only',
     N8N_ENCRYPTION_KEY:'ci-encryption-test-only-at-least-32-characters', SERVER_ENV_FILE:server,
-    TLS_CERT_PATH:dir.replaceAll('\\','/'), MEDIA_HOST_PATH:dir.replaceAll('\\','/'), SERVER_SECRETS_PATH:dir.replaceAll('\\','/') };
+    MEDIA_HOST_PATH:dir.replaceAll('\\','/'), SERVER_SECRETS_PATH:dir.replaceAll('\\','/') };
   let content=example;
   for(const [key,value]of Object.entries(values))content=content.replace(new RegExp('^'+key+'=.*$','m'),()=>key+'='+value);
   const file=path.join(dir,'infra.env');fs.writeFileSync(file,content);

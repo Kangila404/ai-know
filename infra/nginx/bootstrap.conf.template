@@ -1,0 +1,16 @@
+# No application traffic or untrusted temporary HTTPS certificate during issuance.
+server {
+    listen 80;
+    server_name ${API_DOMAIN};
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+    location / { return 503; }
+}
+
+server {
+    listen 127.0.0.1:8081;
+    location = /live { return 200; }
+    location = /ready { return 503; }
+    location / { return 404; }
+}

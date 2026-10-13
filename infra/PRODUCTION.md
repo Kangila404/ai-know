@@ -2,7 +2,7 @@
 
 다른 작업자에게 전달할 짧은 실행 지침은 [NAS 배포 인수인계](NAS_DEPLOY_HANDOFF.md)를 참고한다.
 
-Linux x86_64를 기본으로 준비한다. 실제 서버/도메인은 미정이며 이 파일의 예제는 배포 완료를 뜻하지 않는다.
+Linux x86_64를 기본으로 준비한다. 운영 도메인은 `aiknow.kro.kr`이며 코드 변경만으로 실제 배포가 완료되는 것은 아니다.
 Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Spring 포트는 호스트에 공개하지 않는다.
 외부 요청은 Nginx 80/443으로만 받고, n8n 관리 UI는 localhost 바인딩과 SSH 터널로 접근한다.
 운영에는 Assistant 샌드박스를 띄우지 않는다. 저장된 워크플로 실행에는 해당 샌드박스가 필요하지 않다.
@@ -15,30 +15,49 @@ Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Sprin
 3. `/opt/aiknow/secrets`를 만들고 Firebase 준비 시 JSON을 둔다. Spring 컨테이너 UID/GID는 10001이다.
 4. 미디어 마운트 경로를 준비한다. NAS 연결을 보류하는 동안 `MEDIA_STORAGE_ENABLED=false`를 유지한다.
    Compose bind mount 경로 자체는 존재해야 한다. `mounted` 모드에는 임의 로컬 폴더에 NAS 표식을 만들지 않는다.
-5. 인증서 발급 후 `/opt/aiknow/tls/fullchain.pem`, `privkey.pem`을 실제 파일로 둔다.
-   Let's Encrypt symlink가 마운트 밖을 가리키지 않도록 인증서 체인과 키를 전용 디렉터리로 복사한다.
+5. `API_DOMAIN`의 공개 DNS와 인터넷에서 proxy로 들어오는 TCP 80/443 연결을 준비한다.
+   `ACME_EMAIL`에 연락처를 입력하고 Let's Encrypt 가입자 약관에 동의한 뒤 `ACME_AGREE_TOS=true`로 설정한다.
 6. [DB 전환 절차](../server/docs/migrations.md)를 확인한다. 기존 DB에 자동 baseline하지 않는다.
 
 ## HTTPS 인증서
 
-Nginx는 제공된 인증서를 읽는다. ACME/Certbot 또는 기존 인증서 관리 시스템의 발급·갱신을 사용한다.
-DNS와 80/443 연결을 먼저 준비하고 최초 인증서는 Nginx 기동 전에 발급한다.
-갱신 후 전용 TLS 디렉터리의 두 파일을 교체하고 다음 명령으로 설정 검사 후 reload한다.
+PEM 파일을 미리 준비하지 않는다. `deploy-server.sh`가 다음 순서를 처리한다.
+
+1. Certbot 계정 설정을 검사한다. 이메일/약관 동의가 없으면 서비스 변경 전에 중단한다.
+2. Nginx를 앱과 독립적으로 시작한다. 인증서가 없으면 HTTP 인증 경로만 제공하고 일반 요청은 503으로 응답한다.
+3. Certbot이 HTTP-01 방식으로 발급한다. 기존 인증서가 갱신 시점 전이면 재사용한다.
+4. Nginx는 15초마다 인증서 변경을 확인하고 설정 검사 후 HTTPS 전환 또는 reload를 수행한다.
+   잘못된 교체는 반영하지 않고 기존 실행 설정을 유지하며 재시도한다.
+5. HTTPS 전환 확인 후 DB 백업과 앱 배포를 진행한다. 발급 실패 시 앱 교체 전에 CD가 실패한다.
+
+Certbot 서비스는 NAS에서 12시간마다 갱신을 확인한다. CD가 실행되지 않아도 계속 동작한다.
+갱신 오류는 로그에 기록되며 마지막 성공이 약 25시간 이상 지나면 unhealthy가 된다.
+인증서·개인키·계정·갱신 설정은 `${COMPOSE_PROJECT_NAME}_letsencrypt` named volume에 저장한다.
+Nginx는 볼륨 전체를 읽기 전용으로 마운트해 live/archive 심볼릭 링크를 유지한다.
+컨테이너 교체·재부팅에도 같은 볼륨을 재사용한다. 이 볼륨을 백업하고 `down -v`로 삭제하지 않는다.
+호스트 Certbot/cron 설치나 Docker 소켓 마운트는 필요 없다.
+
+수동으로 Nginx 설정을 다시 읽힐 때만 다음 명령을 사용한다.
 
 ```sh
 sh infra/reload-nginx.sh /opt/aiknow/infra.env
 ```
 
-Certbot 사용 시 이 동작을 인증서 갱신 deploy hook에 연결한다.
-`/.well-known/acme-challenge/`는 `acme-webroot` 볼륨을 사용하므로 webroot 갱신 프로세스도 같은 볼륨을 공유해야 한다.
-인증서 발급 자체는 실제 도메인이 정해진 후 구성·검증한다.
+`/.well-known/acme-challenge/`는 두 서비스가 공유하는 `acme-webroot` 볼륨을 사용한다.
+공개 DNS A/AAAA와 TCP 80이 이 proxy로 연결되어야 한다. Tailscale SSH 연결만으로 발급되지는 않는다.
+NAS 관리 UI의 포트 점유도 확인한다. 공개 80번을 열 수 없으면 별도 DNS-01 구성이 필요하다.
+기존 수동 `TLS_CERT_PATH` 인증서는 자동으로 가져오지 않는다. 전용 볼륨에서 새로 발급·관리한다.
+실제 발급·HTTPS 연결·갱신 dry-run은 운영 DNS와 NAS 연결이 준비된 후 검증한다.
+
+공식 참고: [Certbot webroot 및 갱신](https://eff-certbot.readthedocs.io/en/stable/using.html),
+[Let's Encrypt 가입자 약관](https://letsencrypt.org/repository/).
 
 ## 최초 설치
 
-검증한 커밋의 서버 이미지를 빌드하거나 CI가 게시한 태그로 `SERVER_IMAGE`를 지정한다.
+최초에도 GitHub CD가 게시한 이미지를 사용한다. 직접 실행할 때도 전체 SHA 이미지로 같은 스크립트를 사용한다.
 
 ```sh
-docker compose --env-file /opt/aiknow/infra.env -f infra/docker-compose.prod.yml up -d --wait
+sh infra/deploy-server.sh /opt/aiknow/infra.env docker.io/ACCOUNT/aiknow-server:FULL_COMMIT_SHA
 ```
 
 SSH 터널 `ssh -L 5678:127.0.0.1:5678 <배포계정>@<서버>`로 n8n Owner를 설정하고,
@@ -89,7 +108,7 @@ Docker Hub에 올려도 NAS 자동 재시작에는 위 SSH 설정이 필요하�
 현재 SSH는 22번 포트, `/opt/aiknow` 경로, Linux amd64 이미지 기준이다.
 각 릴리스가 다른 디렉터리에 풀리므로 운영 env의 서버 env/비밀 파일/인증서/미디어 경로는 고정 절대 경로를 사용한다.
 
-배포는 이전 이미지 기록 → DB 백업 → 이미지 교체/Flyway/헬스체크 → n8n JSON 적용 순서다.
+배포는 이전 이미지 기록 → HTTP 초기 기동·인증서 발급/재사용·갱신 서비스 시작 → DB 백업 → 이미지 교체/Flyway/헬스체크 → n8n JSON 적용 순서다.
 DB 백업은 `/opt/aiknow/backups`, 이전 이미지는 `previous-server-image`에 남는다.
 첫 n8n Owner/Credential 설정, UI와 Git 충돌은 자동으로 무시하지 않는다. 실패 원인을 해결하고 재배포한다.
 이 자동 배포는 서버 주소·인증정보 미설정 상태에서 실행되지 않는다.
