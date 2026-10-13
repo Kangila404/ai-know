@@ -86,11 +86,11 @@ jobs:
           [[ "${IMAGE##*:}" == "$REVISION" ]] || { echo 'Image tag does not match the release revision.' >&2; exit 1; }
           opts=(-i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
           echo 'Checking NAS deployment prerequisites through SSH...'
-          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'sh -s' < infra/check-deploy-host.sh
+          cat infra/docker-command.sh infra/check-deploy-host.sh | ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'AIKNOW_DOCKER_SUDO=true sh -s'
           echo 'Transferring release files...'
           # Expand the validated local revision/image into the remote command intentionally.
           # shellcheck disable=SC2029
           git archive --format=tar "$REVISION" | ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p /opt/aiknow/releases/$REVISION && tar -xf - -C /opt/aiknow/releases/$REVISION"
           # shellcheck disable=SC2029
           echo 'Starting the NAS deployment script...'
-          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "sh /opt/aiknow/releases/$REVISION/infra/deploy-server.sh /opt/aiknow/infra.env '$IMAGE'"
+          ssh "${opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "AIKNOW_DOCKER_SUDO=true sh /opt/aiknow/releases/$REVISION/infra/deploy-server.sh /opt/aiknow/infra.env '$IMAGE'"

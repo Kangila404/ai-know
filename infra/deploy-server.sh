@@ -9,12 +9,21 @@ if ! printf '%s\n' "$image" | LC_ALL=C grep -Eq '^docker\.io/[a-z0-9][a-z0-9_-]*
 fi
 infra_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 state_dir=$(dirname -- "$env_file")
+. "$infra_dir/docker-command.sh"
+# sudo resets the environment. Pass the verified image through a second Compose env file.
+umask 077
+AIKNOW_RELEASE_ENV_FILE=$(mktemp "$state_dir/.release-env.XXXXXX")
+trap 'rm -f -- "$AIKNOW_RELEASE_ENV_FILE"' EXIT
+trap 'exit 130' INT TERM
+printf 'SERVER_IMAGE=%s\n' "$image" > "$AIKNOW_RELEASE_ENV_FILE"
+export AIKNOW_RELEASE_ENV_FILE
+export AIKNOW_INFRA_ENV_FILE="$env_file" AIKNOW_COMPOSE_FILE="$infra_dir/docker-compose.prod.yml"
 export SERVER_IMAGE="$image"
-compose() { docker compose --env-file "$env_file" -f "$infra_dir/docker-compose.prod.yml" "$@"; }
+compose() { aiknow_compose "$@"; }
 compose config --quiet
 previous=$(compose ps -q server)
 if [ -n "$previous" ]; then
-    docker inspect --format '{{.Config.Image}}' "$previous" > "$state_dir/previous-server-image"
+    aiknow_docker inspect --format '{{.Config.Image}}' "$previous" > "$state_dir/previous-server-image"
 fi
 compose pull server proxy n8n certbot
 # Validate account settings before changing running services or touching the database.

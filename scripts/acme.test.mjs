@@ -50,22 +50,37 @@ for (const [name, env] of Object.entries({
   assert.equal(r.calls, '');
 });
 
-function deployment(t, failure = '') {
+function deployment(t, failure = '', sudo = false) {
   const f = fixture(t);
+  f.write('sudo', `#!/bin/sh
+[ "$1" = -n ] && [ "$2" = /usr/bin/docker ] || exit 99
+shift 2
+unset SERVER_IMAGE N8N_INGEST_TOKEN
+exec docker "$@"
+`);
   f.write('docker', `#!/bin/sh
 printf '%s\\n' "$*" >> "$FAKE_CALLS"
+if [ "$1" = compose ]; then
+  [ "$2" = --env-file ] && [ "$4" = --env-file ] || exit 88
+  grep -qx "SERVER_IMAGE=$EXPECTED_IMAGE" "$5" || exit 89
+fi
 case "$*" in
   *'certbot check') [ "$FAILURE" != check ] || exit 3 ;;
   *'certbot issue') [ "$FAILURE" != issue ] || exit 4 ;;
   *'exec -T mysql '*) echo '-- test database backup' ;;
   *'config --services') echo server ;;
   *'exec -T server printenv N8N_INGEST_TOKEN') printf 'test-ingestion-token-with-at-least-32-characters' ;;
+  *'ps -q server') echo previous-container ;;
+  'inspect '*) echo previous-image ;;
+  *'--token-stdin') [ "$(cat)" = test-ingestion-token-with-at-least-32-characters ] || exit 90 ;;
 esac
 `);
   const envFile = path.join(f.dir, 'infra.env');
   f.write('infra.env', '');
   const r = run(f, path.join(root, 'infra/deploy-server.sh'), [shellPath(envFile),
-    `docker.io/example/aiknow-server:${'a'.repeat(40)}`], { FAILURE: failure });
+    `docker.io/example/aiknow-server:${'a'.repeat(40)}`], { FAILURE: failure,
+      EXPECTED_IMAGE: `docker.io/example/aiknow-server:${'a'.repeat(40)}`, AIKNOW_DOCKER_SUDO: String(sudo) });
+  assert.ok(!fs.readdirSync(f.dir).some(name => name.startsWith('.release-env.')), 'release env must be cleaned on success and failure');
   return { ...r, dir: f.dir };
 }
 
@@ -82,6 +97,13 @@ test('first deployment bootstraps HTTP, issues TLS, starts renewal, then backs u
     previous = index;
   }
   assert.ok(fs.existsSync(path.join(r.dir, 'current-server-image')));
+});
+
+for (const failure of ['', 'check', 'issue']) test(`sudo deployment retains verified image after env reset on ${failure || 'success'}`, t => {
+  const r = deployment(t, failure, true);
+  assert.equal(r.status, { '': 0, check: 3, issue: 1 }[failure], r.stderr);
+  assert.match(r.calls, /inspect --format/);
+  if (!failure) assert.match(r.calls, /--token-stdin/);
 });
 
 test('missing ACME configuration aborts before service changes or database work', t => {

@@ -10,6 +10,11 @@ Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Sprin
 ## 서버 준비
 
 1. Docker/Compose를 설치하고 `/opt/aiknow`에 배포 계정의 작업 권한을 준다.
+   GitHub CD는 `AIKNOW_DOCKER_SUDO=true`로 Docker만 `sudo -n /usr/bin/docker`를 통해 실행한다.
+   배포 계정에 `/usr/bin/docker`의 비밀번호 없는 sudo 권한을 설정하고, 해당 계정으로
+   `sudo -n /usr/bin/docker info`와 `sudo -n /usr/bin/docker compose version`이 성공하는지 확인한다.
+   수동 배포·n8n 반영·Nginx reload에도 같은 권한을 쓸 때는 명령 앞에 `AIKNOW_DOCKER_SUDO=true`를 붙인다.
+   지정하지 않으면 기존처럼 sudo 없이 Docker를 실행한다. 전체 배포 셸을 sudo로 실행하지 않는다.
 2. `infra/.env.prod.example`을 `/opt/aiknow/infra.env`, `server/.env.prod.example`을 `/opt/aiknow/server.env`로 작성한다.
    예시 도메인·암호·이미지 태그를 실제 값으로 바꾼다. 실제 env는 Git에 올리지 않고 권한을 600으로 제한한다.
 3. `/opt/aiknow/secrets`를 만들고 Firebase 준비 시 JSON을 둔다. Spring 컨테이너 UID/GID는 10001이다.
