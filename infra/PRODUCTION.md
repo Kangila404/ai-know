@@ -1,6 +1,7 @@
 # 운영 배포: Docker Compose + Nginx
 
 다른 작업자에게 전달할 짧은 실행 지침은 [NAS 배포 인수인계](NAS_DEPLOY_HANDOFF.md)를 참고한다.
+Tailscale 없이 EC2 공인 IP로 배포할 때는 [EC2 전용 배포](EC2_DEPLOY.md)를 참고한다.
 
 Linux x86_64를 기본으로 준비한다. 운영 도메인은 `aiknow.kro.kr`이며 코드 변경만으로 실제 배포가 완료되는 것은 아니다.
 Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Spring 포트는 호스트에 공개하지 않는다.
