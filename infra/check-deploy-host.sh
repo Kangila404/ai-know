@@ -15,4 +15,22 @@ for file in /opt/aiknow/infra.env /opt/aiknow/server.env; do
 done
 aiknow_docker info >/dev/null || fail 'Docker is unavailable. For CD, allow passwordless sudo for /usr/bin/docker and check the daemon.'
 aiknow_docker compose version >/dev/null || fail 'The Docker Compose plugin is unavailable.'
+# Image extraction needs additional space beyond compressed image downloads.
+# Check containerd separately: recent Docker versions may store layers outside DockerRootDir.
+check_space() {
+    available=$(df -Pk "$1" | awk 'END {print $4}')
+    case "$available" in ''|*[!0-9]*) fail "Cannot determine free disk space at $1." ;; esac
+    [ "$available" -ge 2097152 ] || fail "Less than 2 GiB free at $1. Expand the disk and filesystem before deploying; do not delete data/certificate volumes."
+    available_inodes=$(df -Pi "$1" | awk 'END {print $4}')
+    case "$available_inodes" in
+        -) ;; # Filesystems without a fixed inode limit report '-'.
+        ''|*[!0-9]*) fail "Cannot determine free inodes at $1." ;;
+        *) [ "$available_inodes" -gt 0 ] || fail "No free inodes at $1." ;;
+    esac
+}
+docker_root=$(aiknow_docker info --format '{{.DockerRootDir}}') || fail 'Cannot determine Docker storage path.'
+[ -n "$docker_root" ] || fail 'Docker storage path is empty.'
+check_space /opt/aiknow
+check_space "$docker_root"
+if [ -d /var/lib/containerd ]; then check_space /var/lib/containerd; fi
 echo 'Deployment prerequisites passed.'
