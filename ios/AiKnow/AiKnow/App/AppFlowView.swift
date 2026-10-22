@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AppFlowView: View {
+    @State private var login = AuthSession.shared
     @State private var screen: LaunchScreen = .splash
 
     var body: some View {
@@ -8,11 +9,20 @@ struct AppFlowView: View {
             switch screen {
             case .splash:
                 SplashView {
-                    move(to: .login)
+                    Task {
+                        #if DEBUG
+                        if ProcessInfo.processInfo.arguments.contains("--preview-admin") || ProcessInfo.processInfo.arguments.contains("--preview-user") {
+                            login.beginPreview(admin: ProcessInfo.processInfo.arguments.contains("--preview-admin"))
+                            move(to: .app); return
+                        }
+                        #endif
+                        let restored = await login.restoreSession()
+                        move(to: restored ? authenticatedScreen : .login)
+                    }
                 }
             case .login:
                 LoginView {
-                    move(to: .onboarding)
+                    move(to: authenticatedScreen)
                 }
             case .onboarding:
                 OnboardingView {
@@ -20,9 +30,20 @@ struct AppFlowView: View {
                 }
             case .app:
                 RootTabView()
+                    .task { if !login.isPreview { await PushNotifications.shared.requestPermission() } }
             }
         }
         .animation(.snappy, value: screen)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIKnowSessionExpired"))) { _ in
+            if !login.isPreview { login.expireSession() }
+        }
+        .onChange(of: login.user == nil) { _, signedOut in
+            if signedOut { move(to: .login) }
+        }
+    }
+
+    private var authenticatedScreen: LaunchScreen {
+        login.user?.onboardingCompleted == true ? .app : .onboarding
     }
 
     private func move(to screen: LaunchScreen) {
