@@ -28,6 +28,44 @@ function run(f, script, args = [], extra = {}) {
   return { ...result, calls: fs.readFileSync(f.calls, 'utf8') };
 }
 
+for (const state of ['initializing', 'wrong-password', 'missing-database', 'ready']) {
+  test(`production MySQL probe requires initialized, authenticated database: ${state}`, t => {
+    const f = fixture(t);
+    const compose = fs.readFileSync(path.join(root, 'infra/docker-compose.prod.yml'), 'utf8');
+    const command = compose.match(/test: \[CMD-SHELL, '([^']+)'\]/)[1].replaceAll('$$', '$');
+    f.write('probe.sh', command + '\n');
+    // Model mysqladmin's documented success on authentication failure and on the init socket.
+    f.write('mysqladmin', '#!/bin/sh\nexit 0\n');
+    f.write('mysql', `#!/bin/sh
+printf '%s\\n' "$@" >> "$FAKE_CALLS"
+[ "$MYSQL_PWD" = "$EXPECTED_PASSWORD" ] || exit 10
+tcp=false
+database=false
+query=false
+for arg do
+  case "$arg" in
+    --protocol=TCP) tcp=true ;;
+    --database=probe_db) database=true ;;
+    '--execute=SELECT 1') query=true ;;
+  esac
+done
+# The entrypoint's temporary server has --skip-networking.
+if [ "$PROBE_STATE" = initializing ] && [ "$tcp" = true ]; then exit 1; fi
+[ "$PROBE_STATE" != wrong-password ] || exit 1
+if [ "$PROBE_STATE" = missing-database ] && [ "$database" = true ]; then exit 1; fi
+[ "$query" = true ] || exit 12
+echo 1
+`);
+    const password = 'probe-only $dollar "quote" space';
+    const r = run(f, path.join(f.dir, 'probe.sh'), [], {
+      PROBE_STATE: state, MYSQL_ROOT_PASSWORD: password, MYSQL_DATABASE: 'probe_db',
+      EXPECTED_PASSWORD: password,
+    });
+    assert.equal(r.status, state === 'ready' ? 0 : 1, r.stderr);
+    assert.ok(!(r.stdout + r.stderr + r.calls).includes(password));
+  });
+}
+
 test('issuance uses HTTP webroot, a stable lineage and reuses unexpired certificates', t => {
   const f = fixture(t);
   f.write('certbot', '#!/bin/sh\nprintf "%s\\n" "$*" >> "$FAKE_CALLS"\n');
@@ -65,9 +103,14 @@ if [ "$1" = compose ]; then
   grep -qx "SERVER_IMAGE=$EXPECTED_IMAGE" "$5" || exit 89
 fi
 case "$*" in
+  *'pull server proxy n8n certbot mysql') [ "$FAILURE" != pull ] || exit 6 ;;
   *'certbot check') [ "$FAILURE" != check ] || exit 3 ;;
   *'certbot issue') [ "$FAILURE" != issue ] || exit 4 ;;
-  *'exec -T mysql '*) echo '-- test database backup' ;;
+  *'up -d --wait --wait-timeout 180 mysql') [ "$FAILURE" != mysql ] || exit 5 ;;
+  *'exec -T mysql '*)
+    [ "$FAILURE" != empty-backup ] || exit 0
+    echo '-- test database backup'
+    [ "$FAILURE" != backup ] || exit 2 ;;
   *'config --services') echo server ;;
   *'exec -T server printenv N8N_INGEST_TOKEN') printf 'test-ingestion-token-with-at-least-32-characters' ;;
   *'ps -q server') echo previous-container ;;
@@ -120,6 +163,40 @@ test('CA failure restores renewal service but aborts before database and app rep
   assert.doesNotMatch(r.calls, /exec -T mysql|180 mysql|180 server/);
   assert.ok(!fs.existsSync(path.join(r.dir, 'current-server-image')));
 });
+
+for (const sudo of [false, true]) {
+  test(`image download failure occurs before service changes (sudo=${sudo})`, t => {
+    const r = deployment(t, 'pull', sudo);
+    assert.equal(r.status, 6);
+    assert.match(r.stderr, /failed during image-download/);
+    assert.doesNotMatch(r.calls, /up -d|stop certbot|exec -T mysql/);
+  });
+  test(`unready MySQL aborts before backup and application deployment (sudo=${sudo})`, t => {
+    const r = deployment(t, 'mysql', sudo);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /authenticated TCP queries/);
+    assert.doesNotMatch(r.calls, /exec -T mysql|180 server|n8n-workflows|down|volume rm/);
+    assert.ok(!fs.existsSync(path.join(r.dir, 'current-server-image')));
+  });
+
+  test(`backup failure removes partial backup and preserves services and volumes (sudo=${sudo})`, t => {
+    const r = deployment(t, 'backup', sudo);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /MySQL backup failed/);
+    assert.match(r.calls, /mysqldump --protocol=TCP -h 127\.0\.0\.1/);
+    assert.doesNotMatch(r.calls, /180 server|n8n-workflows|down|volume rm/);
+    assert.deepEqual(fs.readdirSync(path.join(r.dir, 'backups')), []);
+    assert.ok(!fs.existsSync(path.join(r.dir, 'current-server-image')));
+  });
+  test(`empty backup aborts application deployment (sudo=${sudo})`, t => {
+    const r = deployment(t, 'empty-backup', sudo);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /backup is empty/);
+    assert.match(r.stderr, /failed during database-backup/);
+    assert.deepEqual(fs.readdirSync(path.join(r.dir, 'backups')), []);
+    assert.doesNotMatch(r.calls, /180 server|n8n-workflows/);
+  });
+}
 
 for (const invalidFirst of [false, true]) test(`proxy switches from HTTP to HTTPS${invalidFirst ? ' after rejecting an invalid certificate' : ''}`, t => {
   const f = fixture(t);

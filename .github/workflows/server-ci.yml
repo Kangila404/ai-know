@@ -41,7 +41,7 @@ jobs:
           MYSQL_ROOT_PASSWORD: ci-ephemeral-only
         ports: ['3306:3306']
         options: >-
-          --health-cmd="mysqladmin ping -h localhost -pci-ephemeral-only"
+          --health-cmd="MYSQL_PWD=ci-ephemeral-only mysql --protocol=TCP -h 127.0.0.1 -u root --connect-timeout=3 --execute='SELECT 1'"
           --health-interval=10s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +84,8 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/validate-infra.mjs
+      - name: Verify first-install MySQL readiness and backup
+        run: node scripts/verify-mysql-readiness.mjs
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
