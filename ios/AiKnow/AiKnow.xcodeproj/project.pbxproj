@@ -368,8 +368,7 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
                 APS_ENVIRONMENT = development;
 				INFOPLIST_FILE = AiKnow/Info.plist;
-				AIKNOW_API_BASE_URL = "http://localhost:8080";
-                "AIKNOW_API_BASE_URL[sdk=iphoneos*]" = "http://gang-il-aui-MacBookPro.local:8080";
+				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = SS32PHC392;
 				ENABLE_PREVIEWS = YES;

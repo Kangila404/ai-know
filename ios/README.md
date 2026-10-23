@@ -18,7 +18,17 @@ SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세�
 
 ## 서버 토큰 등록
 
-앱 Build Settings의 `AIKNOW_API_BASE_URL`로 서버 주소를 지정합니다. Debug Simulator 기본값은 `http://localhost:8080`, 실제 iPhone 기본값은 `http://gang-il-aui-MacBookPro.local:8080`입니다. Mac과 iPhone은 같은 Wi-Fi에 연결하고 iPhone에서 로컬 네트워크 접근을 허용합니다. 다른 Mac에서는 해당 조건부 Build Setting을 그 Mac의 `.local` 호스트 이름이나 HTTPS 서버 주소로 바꿉니다. Release 기본값은 `https://aiknow.kro.kr`입니다. 운영 서버와 TLS가 준비되기 전에는 Debug로 로컬 서버를 사용합니다.
+앱 Build Settings의 `AIKNOW_API_BASE_URL`로 서버 주소를 지정합니다. **Debug/Release 및 Simulator/iPhone 모두 기본값은 `https://aiknow.kro.kr`입니다.** Xcode에서 실행해도 TestFlight와 같은 운영 서버에 연결하며 개발자의 Mac 서버나 핫스팟은 필요하지 않습니다. 실제 계정으로 실행하면 운영 데이터를 사용합니다.
+
+로컬 서버를 개발할 때만 `AIKNOW_API_BASE_URL`을 별도로 지정합니다. Simulator에서는 `http://localhost:8080`, 실제 iPhone에서는 해당 Mac의 LAN IP 또는 `.local` 호스트 주소를 사용합니다. 로컬 연결 시 Mac과 iPhone이 같은 네트워크에 있어야 하며 iPhone의 로컬 네트워크 접근을 허용합니다. 개인 Mac 주소를 프로젝트 기본값으로 커밋하지 않습니다.
+
+```sh
+xcodebuild -project ios/AiKnow/AiKnow.xcodeproj -scheme AiKnow \
+  -configuration Debug -destination 'generic/platform=iOS Simulator' \
+  AIKNOW_API_BASE_URL=http://localhost:8080 build
+```
+
+다른 개발자가 이전 버전에서 연결 오류를 봤다면 이 변경을 받은 뒤 Xcode에서 앱을 다시 빌드·실행합니다. 계속 로컬 주소가 사용되면 Target → Build Settings → `AIKNOW_API_BASE_URL`에 남은 개인 설정을 확인하고 Product → Clean Build Folder 후 다시 실행합니다. 아래 날짜별 검증 기록의 로컬 주소는 당시 빌드의 설정입니다.
 
 `PushNotifications.shared.syncToken()`은 공유 APIClient의 세션 쿠키와 CSRF로 `PUT /api/v1/device-tokens`에 IOS 플랫폼과 설치 UUID를 등록합니다. Google·Apple·Kakao 로그인 완료, FCM 토큰 갱신, 앱 활성화, 수동 재시도 시 등록합니다. 로그아웃은 진행 중인 등록을 기다린 뒤 기기 토큰을 비활성화하고 서버 세션·로컬 쿠키·Keychain 세션·Google SDK 상태를 정리합니다.
 
