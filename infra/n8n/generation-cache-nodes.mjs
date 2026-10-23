@@ -33,7 +33,7 @@ s.candidates=unprocessed.slice(0,s.config.maxCandidates);
 s.audit.push({event:'existing_submissions',detail:r.body});
 return [{json:s,pairedItem:{item:0}}];`),
     http('aiknow-generation-claim', '모델 호출 예약 또는 캐시 조회', [1000, 736], '/internal/v1/generation/claim',
-      '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,task:$json.task,requestJson:JSON.stringify($json.request),...($json.task === "image_selection" ? {contextJson:JSON.stringify({version:1,draft:$json.draft,assets:$json.assets})} : {})}) }}'),
+      '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,task:$json.retryOf ? "text_retry" : $json.task,requestJson:JSON.stringify($json.request),...($json.retryOf ? {retryOf:$json.retryOf} : {}),...($json.task === "image_selection" ? {contextJson:JSON.stringify({version:1,draft:$json.draft,assets:$json.assets})} : {})}) }}'),
     code('aiknow-generation-prepare', '모델 호출 준비', [1224, 736], `const r=$input.first().json;
 if(r.statusCode!==200||!['CALL','REPLAY','BLOCKED'].includes(r.body?.decision)) throw new Error('모델 호출 예약 실패. 유료 재시도하지 않습니다.');
 const before=$('작업 결정').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));
@@ -50,11 +50,12 @@ if(r.body.decision==='BLOCKED'){
   s.phase='stop';s.status='blocked';s.reason=r.body.reason;
   // A reserved draft belongs to its original execution. Leave it intact and try
   // the next bounded candidate instead of blocking every scheduled run on it.
-  if(s.task==='draft'&&Number.isInteger(s.candidateIndex)&&s.candidateIndex>=0
+  if(!s.retryOf&&s.task==='draft'&&Number.isInteger(s.candidateIndex)&&s.candidateIndex>=0
       &&s.candidateIndex+1<s.candidates?.length){
     s.audit.push({event:'reserved_draft_skipped',detail:{sourceUrl:s.current.sourceUrl,id:r.body.id,reason:r.body.reason}});
     s.phase='candidate';s.cacheRoute=3;delete s.status;delete s.reason;
   }
+  if(s.retryOf){s.status='fallback';s.fallback={mode:'server_daily_edition',priority:['APPROVED_NEWS','APPROVED_AI_THEORY'],requiresApproval:true};}
 }
 s.audit.push({event:'generation_cache',detail:{decision:r.body.decision,id:r.body.id}});
 return [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];`),

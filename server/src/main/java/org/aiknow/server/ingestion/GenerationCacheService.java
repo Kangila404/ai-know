@@ -35,14 +35,30 @@ public class GenerationCacheService {
         return claim(url, task, requestJson, null);
     }
     public Claim claim(String url, String task, String requestJson, String contextJson) {
+        return claim(url, task, requestJson, contextJson, null);
+    }
+    public Claim claim(String url, String task, String requestJson, String contextJson, Long retryOf) {
         requireJson(requestJson);
+        String originalTask = task;
+        if (task.equals("text_retry")) {
+            var original = retryOf == null ? null : records.findById(retryOf).orElse(null);
+            if (original == null || !original.getSourceUrl().equals(url)
+                || !Set.of("draft", "image_selection").contains(original.getTask())
+                || original.getResponseJson() == null)
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재시도에는 같은 기사의 보관된 원본 텍스트 응답이 필요합니다.");
+            originalTask = original.getTask();
+            // Include the parent in the hash. One durable retry slot per article,
+            // shared by draft and image selection, including concurrent/manual runs.
+        } else if (retryOf != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "retryOf is only supported for text_retry");
+        }
         if (contextJson != null) {
-            if (!task.equals("image_selection")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Context is only supported for image selection");
+            if (!originalTask.equals("image_selection")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Context is only supported for image selection");
             requireContext(contextJson);
         }
         if (submissions.findBySourceHash(hash(url)).isPresent())
             return new Claim("BLOCKED", null, null, "이미 검수 DB에 저장된 기사입니다.");
-        String key = hash(url + "\n" + task), requestHash = hash(requestJson);
+        String key = hash(url + "\n" + task), requestHash = hash(requestJson + (retryOf == null ? "" : "\nretryOf=" + retryOf));
         var existing = records.findByAttemptKey(key);
         if (existing.isPresent()) return reuse(existing.get(), requestHash);
         try {

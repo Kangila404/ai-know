@@ -54,6 +54,42 @@ class GenerationCacheTests {
         }
     }
 
+    @Test void oneDurableTextRetryIsSharedAcrossTasksAndManualExecutions() {
+        var first = service.claim(URL,"draft","{}");
+        assertThatThrownBy(() -> service.claim(URL,"text_retry","{}",null,first.id()))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        service.complete(first.id(),"{\"invalid\":true}");
+        var retry = service.claim(URL,"text_retry","{\"repair\":true}",null,first.id());
+        assertThat(retry.decision()).isEqualTo("CALL");
+        assertThat(service.claim(URL,"text_retry","{\"repair\":true}",null,first.id()).decision()).isEqualTo("BLOCKED");
+        service.complete(retry.id(),"{\"corrected\":true}");
+        assertThat(service.claim(URL,"text_retry","{\"repair\":true}",null,first.id()).decision()).isEqualTo("REPLAY");
+        assertThat(service.claim(URL,"text_retry","{\"repair\":false}",null,first.id()).decision()).isEqualTo("BLOCKED");
+        assertThatThrownBy(() -> service.claim(URL,"text_retry","{}",null,retry.id()))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> service.claim(URL+"/other","text_retry","{}",null,first.id()))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        var selection = service.claim(URL,"image_selection","{}",CONTEXT);
+        service.complete(selection.id(),"{}");
+        assertThat(service.claim(URL,"text_retry","{\"repair\":true}",CONTEXT,selection.id()).decision()).isEqualTo("BLOCKED");
+        assertThat(records.count()).isEqualTo(3);
+    }
+
+    @Test void retryApiRequiresParentAndConcurrentRetryReservesOnlyOneCall() throws Exception {
+        var first = service.claim(URL,"draft","{}"); service.complete(first.id(),"{}");
+        String missing=mapper.writeValueAsString(new GenerationCacheController.Request(URL,"text_retry","{}"));
+        mvc.perform(post("/internal/v1/generation/claim").header("Authorization",AUTH).contentType(MediaType.APPLICATION_JSON).content(missing))
+            .andExpect(status().isBadRequest());
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var gate=new CountDownLatch(1);
+            Callable<String> claim=()->{gate.await();return service.claim(URL,"text_retry","{}",null,first.id()).decision();};
+            var a=pool.submit(claim);var b=pool.submit(claim);gate.countDown();
+            assertThat(List.of(a.get(10,TimeUnit.SECONDS),b.get(10,TimeUnit.SECONDS)))
+                .containsExactlyInAnyOrder("CALL","BLOCKED");
+        }
+        assertThat(records.count()).isEqualTo(2);
+    }
+
     @Test void requiresMachineAuthAndValidJson() throws Exception {
         String body = mapper.writeValueAsString(new GenerationCacheController.Request(URL,"draft","{}"));
         mvc.perform(post("/internal/v1/generation/claim").contentType(MediaType.APPLICATION_JSON).content(body))
