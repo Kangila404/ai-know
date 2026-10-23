@@ -52,10 +52,33 @@ test('only reviewed high-confidence alternatives can replace a failed source pag
   applyImageChoices(state,{selections:[{...choice,confidence:'low'}]});assert.equal(state.assets[0].selected,null);
 });
 
+test('search relevance uses all associated slide topics, never an imagined composition, including cached drafts',()=>{
+  const state={draft:{title:'AI의 탐색 학습',summary:'AI 에이전트의 학습과 연구의 한계',slides:[
+    {title:'가상 환경 탐색',content:'AI 에이전트가 탐색을 통해 학습합니다.',visual:{assetKey:'agent',description:'그림에만 사용할 장면'}},
+    {title:'시행착오',content:'에이전트가 다른 방법을 시도합니다.',visual:{assetKey:'agent'}},
+    {title:'별도 주제',content:'다른 이미지 용도입니다.',visual:{assetKey:'other'}}]},
+    assets:[{key:'agent',description:'그림에만 사용할 장면',generationPrompt:'GENERATED_COMPOSITION_ONLY',candidates:[candidate('1')]}]};
+  const wf=JSON.parse(fs.readFileSync(new URL('./workflows/ai-know-news-draft.json',import.meta.url),'utf8'));
+  const code=wf.nodes.find(n=>n.name==='작업 결정').parameters.jsCode;
+  const embedded=new Function('state',code.slice(code.indexOf('// BEGIN IMAGE SEARCH HELPERS'),code.indexOf('// END IMAGE SEARCH HELPERS'))+'\nreturn imageSelectionPayload(state);');
+  for(const payloadOf of [imageSelectionPayload,embedded]) {
+    const p=payloadOf(state),encoded=JSON.stringify(p);
+    assert.match(p.assets[0].purpose,/가상 환경 탐색/);
+    assert.match(p.assets[0].purpose,/시행착오/);
+    assert.doesNotMatch(p.assets[0].purpose,/별도 주제/);
+    assert.ok(!encoded.includes('그림에만 사용할 장면'));
+    assert.ok(!encoded.includes('GENERATED_COMPOSITION_ONLY'));
+    assert.equal(p.assets[0].candidates[0].candidateId,'openverse:1');
+    const legacy=structuredClone(state);delete legacy.draft.slides;
+    assert.match(payloadOf(legacy).assets[0].purpose,/AI의 탐색 학습/);
+    assert.ok(!JSON.stringify(payloadOf(legacy)).includes('그림에만 사용할 장면'));
+  }
+});
+
 const workflow=JSON.parse(fs.readFileSync(new URL('./workflows/ai-know-news-draft.json',import.meta.url),'utf8'));
 const runController=state=>new Function('$input',workflow.nodes.find(n=>n.name==='작업 결정').parameters.jsCode)({first:()=>({json:state})})[0].json;
 test('controller exhausts search before selecting; suitable existing images bypass generation',()=>{
-  const state={phase:'search',config:{allowImageGeneration:true,maxImageGenerations:3,dryRun:false},
+  const state={phase:'search',selectionLookupChecked:true,config:{allowImageGeneration:true,maxImageGenerations:3,dryRun:false},
     counters:{transitions:0,commonsCalls:0,imageCalls:0},assets:[{key:'topic',searchQuery:'model | computer',candidates:[]}],assetIndex:0,audit:[]};
   let next=runController(state);assert.equal(next.route,2);assert.equal(next.searchRequest.provider,'commons');
   next.assets[0].searchIndex=1;next=runController(next);assert.equal(next.searchRequest.provider,'openverse');

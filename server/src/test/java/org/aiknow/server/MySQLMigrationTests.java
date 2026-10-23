@@ -37,7 +37,7 @@ class MySQLMigrationTests {
             .baselineOnMigrate(false).cleanDisabled(true);
     }
     @Test void newDatabaseMigratesOnceAndHibernateValidatesAllEntities() {
-        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
+        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(5);
         assertThat(flyway.migrate().migrationsExecuted).isZero(); flyway.validate();
         try (var context = new SpringApplicationBuilder(ServerApplication.class).profiles("test").run(
             "--server.port=0", "--spring.datasource.url=" + url, "--spring.datasource.username=" + user,
@@ -54,10 +54,22 @@ class MySQLMigrationTests {
         }
         assertThatThrownBy(() -> config().load().migrate()).isInstanceOf(FlywayException.class);
         var adopted = config().baselineVersion("1").load(); adopted.baseline();
-        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(4);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement();
              var rs = s.executeQuery("SELECT nickname FROM users WHERE user_id='migration-fixture'")) {
             assertThat(rs.next()).isTrue(); assertThat(rs.getString(1)).isEqualTo("preserved");
+        }
+    }
+    @Test void selectionContextUpgradePreservesExistingRequestsAndResponses() throws Exception {
+        config().target("4").load().migrate();
+        try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement()) {
+            s.execute("INSERT INTO news_generation_record(attempt_key,source_url,task,request_hash,request_json,response_json,created_at,version) VALUES(REPEAT('a',64),'https://example.test/legacy','image_selection',REPEAT('b',64),'{}','{\"original\":true}',NOW(),0)");
+        }
+        assertThat(config().load().migrate().migrationsExecuted).isOne();
+        try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
+             var r=s.executeQuery("SELECT request_json,response_json,context_json FROM news_generation_record")) {
+            assertThat(r.next()).isTrue(); assertThat(r.getString(1)).isEqualTo("{}");
+            assertThat(r.getString(2)).isEqualTo("{\"original\":true}"); assertThat(r.getString(3)).isNull();
         }
     }
 }

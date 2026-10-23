@@ -84,4 +84,4 @@ fi
 begin_stage n8n-workflow
 AIKNOW_INFRA_ENV_FILE="$env_file" AIKNOW_COMPOSE_FILE="$infra_dir/docker-compose.prod.yml" sh "$infra_dir/n8n/deploy.sh" apply
 printf '%s\n' "$image" > "$state_dir/current-server-image"
-echo 'Server is healthy; workflow imported as an unpublished draft when changed.'
+echo 'Server is healthy; workflow deployment completed with the configured automation policy.'

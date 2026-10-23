@@ -158,6 +158,19 @@ final class AuthSession {
 
     func refreshUser() async throws { user = try await APIClient.shared.currentUser() }
 
+    private var refreshingUser = false
+    func refreshAccountIfSignedIn() async {
+        guard let current = user, !isPreview, !busy, !refreshingUser else { return }
+        refreshingUser = true
+        defer { refreshingUser = false }
+        do {
+            let updated = try await APIClient.shared.currentUser()
+            // Do not restore a stale account if logout or another sign-in completed meanwhile.
+            guard !busy, !isPreview, user != nil, user?.userId == current.userId else { return }
+            user = updated
+        } catch { /* APIClient handles 401; keep the current screen on transient network failures. */ }
+    }
+
     func completeOnboarding() async -> Bool {
         guard !busy else { return false }
         busy = true; errorMessage = nil

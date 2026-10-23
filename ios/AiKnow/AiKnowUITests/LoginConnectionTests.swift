@@ -45,7 +45,7 @@ final class ContentConnectionTests: XCTestCase {
         app.buttons["프로필 편집"].tap()
         XCTAssertTrue(app.buttons["테스트 프로필"].waitForExistence(timeout: 10))
         let nickname = app.textFields["닉네임 (20자 이내)"]
-        nickname.tap(); nickname.typeText(" 수정")
+        nickname.tap(); nickname.typeText(" 수정"); app.buttons["입력 완료"].tap()
         app.buttons["테스트 프로필"].tap()
         app.buttons["저장"].tap()
         XCTAssertTrue(app.staticTexts["저장했습니다."].waitForExistence(timeout: 10))
@@ -79,7 +79,7 @@ final class LoginConnectionTests: XCTestCase {
 
     @MainActor
     func testKakaoReachesAccountPage() {
-        checkAccountPage(button: "카카오로 계속하기", name: "Kakao")
+        checkAccountPage(button: "카카오 로그인", name: "Kakao")
     }
 
     @MainActor
@@ -115,7 +115,7 @@ final class LoginConnectionTests: XCTestCase {
     @MainActor
     func testApplePresentsAuthorizationWithoutImmediateFailure() {
         let app = launchLogin()
-        app.buttons["Apple로 계속하기"].tap()
+        app.buttons["login.apple"].tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let boundary = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             app.alerts.count > 0 || springboard.alerts.count > 0 ||
@@ -223,5 +223,140 @@ final class PreviewAdminTests: XCTestCase {
         app.buttons["입력 완료"].tap()
         let recover = app.buttons["응답 복구"]; reveal(recover, in: app); recover.tap(); app.buttons["복구"].tap()
         XCTAssertTrue(app.staticTexts["복구했습니다."].waitForExistence(timeout: 10))
+    }
+}
+
+// Real HTTP transport against the isolated fixture in test_admin_ui.py.
+final class AdminAPIConnectionTests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18082/__fixture")!)) == nil,
+                      "Run with ios/tests/test_admin_ui.py")
+    }
+    @MainActor private func launch() throws -> XCUIApplication {
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=ADMIN")!)
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.tabBars.buttons["관리자"].firstMatch.waitForExistence(timeout: 30))
+        app.tabBars.buttons["관리자"].firstMatch.tap()
+        return app
+    }
+    @MainActor private func field(_ name: String, _ app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "(elementType == %d OR elementType == %d) AND (identifier == %@ OR label == %@ OR placeholderValue == %@)", XCUIElement.ElementType.textField.rawValue, XCUIElement.ElementType.textView.rawValue, name, name, name)).firstMatch
+    }
+    @MainActor private func reveal(_ element: XCUIElement, _ app: XCUIApplication) {
+        for _ in 0..<12 {
+            if element.exists && element.isHittable { return }
+            if element.exists && element.frame.minY < 120 { app.swipeDown() } else { app.swipeUp() }
+        }
+        XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
+    }
+    @MainActor private func reason(_ app: XCUIApplication) {
+        let input = field("수정·반려·복원 사유 (필수)", app)
+        reveal(input, app); input.tap(); input.typeText("HTTP 검증 사유"); app.buttons["입력 완료"].tap()
+    }
+    @MainActor private func apply(_ name: String, _ app: XCUIApplication) {
+        let button = app.buttons[name].firstMatch; reveal(button, app); button.tap()
+        app.buttons["적용"].tap()
+        XCTAssertTrue(app.staticTexts["반영했습니다."].waitForExistence(timeout: 10))
+    }
+    @MainActor private func row(_ text: String, _ app: XCUIApplication) -> XCUIElement {
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10)); return row
+    }
+    @MainActor func testAReviewAndPublication() throws {
+        let app = try launch()
+        XCTAssertGreaterThan(app.tabBars.buttons["관리자"].firstMatch.frame.midX, app.tabBars.buttons["마이"].firstMatch.frame.midX)
+        app.buttons["뉴스 검수"].tap(); row("검수 요청 #1", app).tap()
+        reason(app); apply("수정 저장", app)
+        reason(app); apply("반려", app)
+        reason(app); apply("재검수로 돌리기", app)
+        apply("승인", app)
+        let approved = app.buttons["승인된 카드 관리"]; reveal(approved, app); approved.tap()
+        XCTAssertTrue(app.navigationBars["카드뉴스 수정"].waitForExistence(timeout: 10))
+        reason(app); apply("수정 저장", app)
+        reason(app); apply("숨김", app)
+        reason(app); apply("복원", app)
+        let history = app.buttons["변경 이력"]; reveal(history, app); history.tap()
+        XCTAssertTrue(app.navigationBars["변경 이력"].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testBNoticeAndProfileCRUD() throws {
+        let app = try launch()
+        app.buttons["공지 관리"].tap(); app.buttons["추가"].tap()
+        let title = field("admin.notice.title", app)
+        XCTAssertTrue(title.waitForExistence(timeout: 10)); title.tap(); title.typeText("운영 공지")
+        let content = field("admin.notice.content", app); content.tap(); content.typeText("공지 본문 검증"); app.buttons["입력 완료"].tap()
+        app.buttons["저장"].tap(); row("운영 공지", app).tap()
+        XCTAssertTrue(title.waitForExistence(timeout: 10)); title.tap(); title.typeText(" 수정"); app.buttons["입력 완료"].tap()
+        app.buttons["저장"].tap(); row("수정", app).tap()
+        XCTAssertTrue(app.buttons["공지 삭제"].waitForExistence(timeout: 10)); app.buttons["공지 삭제"].tap(); app.buttons["삭제"].tap()
+        XCTAssertTrue(app.staticTexts["등록된 항목이 없습니다"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["프로필 이미지 관리"].tap(); app.buttons["추가"].tap()
+        let name = field("이름 (20자 이내)", app)
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText("운영 프로필")
+        let url = field("이미지 주소", app); url.tap(); url.typeText("/profile/admin"); app.buttons["입력 완료"].tap()
+        app.buttons["저장"].tap(); row("운영 프로필", app).tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap(); name.typeText(" 수정"); app.buttons["입력 완료"].tap()
+        app.buttons["저장"].tap(); row("수정", app).tap()
+        XCTAssertTrue(app.buttons["프로필 이미지 삭제"].waitForExistence(timeout: 10))
+        app.buttons["프로필 이미지 삭제"].tap(); app.buttons["삭제"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "테스트 프로필")).firstMatch.waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testCGenerationRecovery() throws {
+        let app = try launch()
+        app.buttons["생성 복구"].tap(); row("draft #1", app).tap()
+        XCTAssertTrue(app.buttons["이미지 선택 참고 자료"].waitForExistence(timeout: 10))
+        let reason = field("복구 사유 (필수)", app); reveal(reason, app); reason.tap(); reason.typeText("HTTP 복구 검증")
+        app.buttons["입력 완료"].tap()
+        let recovery = app.buttons["응답 복구"]; reveal(recovery, app); recovery.tap(); app.buttons["복구"].tap()
+        XCTAssertTrue(app.staticTexts["복구했습니다."].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testDRoleChangesUpdateRightmostTab() throws {
+        let app = try launch()
+        XCUIDevice.shared.press(.home)
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=USER")!)
+        app.activate()
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.tabBars.buttons["관리자"].firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 15), .completed)
+        XCTAssertTrue(app.tabBars.buttons["마이"].firstMatch.isSelected)
+        XCUIDevice.shared.press(.home)
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=ADMIN")!)
+        app.activate()
+        XCTAssertTrue(app.tabBars.buttons["관리자"].firstMatch.waitForExistence(timeout: 15))
+        XCTAssertGreaterThan(app.tabBars.buttons["관리자"].firstMatch.frame.midX, app.tabBars.buttons["마이"].firstMatch.frame.midX)
+        app.terminate()
+    }
+}
+
+// Official assets and native Apple control, using an isolated all-provider fixture.
+final class LoginBrandingTests: XCTestCase {
+    @MainActor func testLight() throws { try verify("light") }
+    @MainActor func testDark() throws { try verify("dark") }
+
+    @MainActor private func verify(_ mode: String) throws {
+        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18083/__fixture")!)) == nil,
+                      "Run with ios/tests/test_login_ui.py")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["-appearance", mode]
+        app.launch()
+        for label in ["Google로 계속하기", "카카오 로그인", "login.apple"] {
+            XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 20))
+            XCTAssertTrue(app.buttons[label].isHittable)
+        }
+        let image = XCTAttachment(screenshot: app.screenshot())
+        image.name = "Official login buttons — \(mode)"
+        image.lifetime = .keepAlways
+        add(image)
+        for (label, provider) in [("Google로 계속하기", "Google"), ("카카오 로그인", "Kakao"), ("login.apple", "Apple")] {
+            app.buttons[label].tap()
+            let error = app.staticTexts["login.error"]
+            let reported = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND label BEGINSWITH %@", provider + ":"), object: error)
+            XCTAssertEqual(XCTWaiter.wait(for: [reported], timeout: 10), .completed)
+        }
+        app.terminate()
     }
 }

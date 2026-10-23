@@ -34,6 +34,7 @@ struct ProfileView: View {
                     if let message = login.errorMessage { Text(message).font(.footnote).foregroundStyle(.red) }
                 }
             }.navigationTitle("마이")
+                .refreshable { await login.refreshAccountIfSignedIn() }
                 .confirmationDialog("계정을 삭제할까요?", isPresented: $confirmingWithdrawal, titleVisibility: .visible) {
                     Button("회원탈퇴", role: .destructive) { Task { await login.withdraw() } }
                     Button("취소", role: .cancel) { }
@@ -103,6 +104,7 @@ private struct NoticeDetailView: View {
 private struct ProfileInfoView: View {
     @State private var login = AuthSession.shared
     @State private var nickname = ""
+    @FocusState private var editingNickname: Bool
     @State private var profiles: [APIClient.Profile] = []
     @State private var selected: Int64?
     @State private var loading = true
@@ -114,6 +116,9 @@ private struct ProfileInfoView: View {
             if loading { ProgressView() }
             Section("닉네임") {
                 TextField("닉네임 (20자 이내)", text: $nickname)
+                    .focused($editingNickname)
+                    .submitLabel(.done)
+                    .onSubmit { editingNickname = false }
                     .onChange(of: nickname) { _, value in if value.count > 20 { nickname = String(value.prefix(20)) }; saved = false }
             }
             Section("프로필 이미지") {
@@ -135,7 +140,15 @@ private struct ProfileInfoView: View {
                     .disabled(loading || saving || nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 if saved { Text("저장했습니다.").foregroundStyle(.green) }
             }
-        }.navigationTitle("프로필 편집").navigationBarTitleDisplayMode(.inline).disabled(saving).task { await load() }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("입력 완료") { editingNickname = false }
+            }
+        }
+        .navigationTitle("프로필 편집").navigationBarTitleDisplayMode(.inline).disabled(saving).task { await load() }
     }
     private func load() async {
         loading = true; error = nil; defer { loading = false }

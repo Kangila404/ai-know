@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct LoginView: View {
     let onLogin: () -> Void
@@ -37,39 +38,24 @@ struct LoginView: View {
                         Button("다시 확인") { Task { await loadProviders() } }
                     }
                     if providers.contains(.apple) {
-                    SocialLoginButton(
-                        title: "Apple로 계속하기",
-                        systemImage: "apple.logo",
-                        foreground: .white,
-                        background: .black,
-                        action: {
+                        AppleLoginButton {
                             Task { if await login.signInApple() { onLogin() } }
                         }
-                    )
+                        .frame(height: 62)
                     }
                     if providers.contains(.kakao) {
-                    SocialLoginButton(
-                        title: "카카오로 계속하기",
-                        systemImage: "bubble.left.and.bubble.right.fill",
-                        foreground: Color(red: 0.12, green: 0.11, blue: 0.05),
-                        background: Color(red: 0.99, green: 0.88, blue: 0.23),
-                        action: { Task { if await login.signInKakao() { onLogin() } } }
-                    )
+                        OfficialLoginImageButton(asset: "KakaoSignIn", label: "카카오 로그인") {
+                            Task { if await login.signInKakao() { onLogin() } }
+                        }
                     }
                     if providers.contains(.google) {
-                    SocialLoginButton(
-                        title: "Google로 계속하기",
-                        systemImage: "g.circle.fill",
-                        foreground: AppPalette.ink,
-                        background: AppPalette.surface,
-                        action: {
+                        OfficialLoginImageButton(asset: "GoogleSignIn", label: "Google로 계속하기") {
                             Task { if await login.signInGoogle() { onLogin() } }
-                        },
-                        bordered: true
-                    )
+                        }
                     }
                 }
 
+                .frame(maxWidth: 300)
                 .disabled(login.busy)
 
                 if login.busy { ProgressView("로그인 중…").padding(.top, 12) }
@@ -105,37 +91,62 @@ struct LoginView: View {
     }
 }
 
-private struct SocialLoginButton: View {
-    let title: String
-    let systemImage: String
-    let foreground: Color
-    let background: Color
+// Provider artwork is bundled unchanged; preserve its colors and aspect ratio.
+private struct OfficialLoginImageButton: View {
+    let asset: String
+    let label: String
     let action: () -> Void
-    var bordered = false
 
     var body: some View {
         Button(action: action) {
-            ZStack {
-                Text(title)
-                    .font(.body.weight(.semibold))
-                HStack {
-                    Image(systemName: systemImage)
-                        .font(.title3.weight(.semibold))
-                    Spacer()
-                }
-                .padding(.horizontal, 18)
-            }
-            .foregroundStyle(foreground)
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(background, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-            .overlay {
-                if bordered {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(AppPalette.separator, lineWidth: 1)
-                }
-            }
+            Image(asset)
+                .renderingMode(.original)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .accessibilityHidden(true)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+// Keep AuthSession's server challenge/nonce flow while using Apple's official UI.
+private struct AppleLoginButton: UIViewRepresentable {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var isEnabled
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeUIView(context: Context) -> UIView { UIView() }
+
+    func updateUIView(_ container: UIView, context: Context) {
+        context.coordinator.action = action
+        let style: ASAuthorizationAppleIDButton.Style = colorScheme == .dark ? .white : .black
+        if context.coordinator.style != style {
+            container.subviews.forEach { $0.removeFromSuperview() }
+            let button = ASAuthorizationAppleIDButton(type: .continue, style: style)
+            button.cornerRadius = 8
+            button.accessibilityIdentifier = "login.apple"
+            button.addTarget(context.coordinator, action: #selector(Coordinator.signIn), for: .touchUpInside)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(button)
+            NSLayoutConstraint.activate([
+                button.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                button.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                button.topAnchor.constraint(equalTo: container.topAnchor),
+                button.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+            ])
+            context.coordinator.style = style
+        }
+        (container.subviews.first as? ASAuthorizationAppleIDButton)?.isEnabled = isEnabled
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        var style: ASAuthorizationAppleIDButton.Style?
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func signIn() { action() }
     }
 }

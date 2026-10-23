@@ -70,6 +70,7 @@ export function importPayload(source, current) {
     // but only for the exact API paths on that same backend.
     const suffix = { 'aiknow-image-upload': '/internal/v1/images', 'aiknow-storage-check': '/internal/v1/images/storage',
       'aiknow-generation-existing': '/internal/v1/generation/existing', 'aiknow-generation-claim': '/internal/v1/generation/claim',
+      'aiknow-selection-context': '/internal/v1/generation/selection-context',
       'aiknow-generation-save': '/internal/v1/generation/response',
       'aiknow-image-claim': '/internal/v1/generation/claim', 'aiknow-image-persist': '/internal/v1/images' }[node.id];
     const ingestion = current?.nodes.find(n => n.id === 'aiknow-server-import' && n.type === 'n8n-nodes-base.httpRequest');
@@ -145,6 +146,18 @@ export function main(args = process.argv.slice(2), runtime = {}) {
     const outcome = decision(source, current, record, flags.includes('--replace'));
     console.log(`${outcome.toUpperCase()}: ${filename} (workflow ${source.id})`);
     if (action === 'check') return;
+    const publishAutomation = workflow => {
+      if (env.AIKNOW_AUTOMATION_ENABLED !== 'true') return;
+      if (!workflow || fingerprint(workflow) !== fingerprint(source)) {
+        throw new Error('Automation requires the reviewed deployment definition; resolve UI changes first.');
+      }
+      if (workflow.active && workflow.activeVersionId && workflow.activeVersionId === workflow.versionId) return;
+      cli(['publish:workflow', `--id=${source.id}`]);
+      const published = exportAll(tempDirectory, cli).find(w => w.id === source.id);
+      if (!published?.active || !published.activeVersionId || published.activeVersionId !== published.versionId
+          || fingerprint(published) !== fingerprint(source)) throw new Error('Workflow publication verification failed.');
+      console.log('Daily automation published; deploy.sh restarts n8n to register the schedule.');
+    };
     let payload = importPayload(outcome === 'import' ? source : current, current);
     if (credential) {
       payload = bindIngestionCredential(payload, env.AIKNOW_SERVER_BASE_URL, credential);
@@ -152,7 +165,7 @@ export function main(args = process.argv.slice(2), runtime = {}) {
       console.log('Ingestion credential synchronized from the server environment.');
     }
     const bindingChanged = credential && current && !sameCredentialBindings(payload, current);
-    if (outcome === 'unchanged' && !bindingChanged) return;
+    if (outcome === 'unchanged' && !bindingChanged) { publishAutomation(current); return; }
     fs.mkdirSync(state, { recursive: true, mode: 0o700 });
     let deployed = current;
     if (outcome === 'import' || bindingChanged) {
@@ -178,12 +191,13 @@ export function main(args = process.argv.slice(2), runtime = {}) {
       console.log('Imported as an unpublished draft. Check OpenAI credentials and publish in n8n when ready.');
     }
     // A binding-only update must not silently adopt unrelated UI edits as a new baseline.
-    if (outcome === 'unchanged') return;
+    if (outcome === 'unchanged') { publishAutomation(deployed); return; }
     const nextRecord = { workflowId: source.id, sourceHash: fingerprint(source), liveHash: fingerprint(deployed), appliedAt: new Date().toISOString() };
     const pending = `${recordPath}.tmp`;
     saveJson(pending, nextRecord);
     fs.renameSync(pending, recordPath);
     console.log('Deployment baseline saved. Container restarts do not import workflows.');
+    publishAutomation(deployed);
   } finally {
     fs.rmSync(tempDirectory, { recursive: true, force: true });
   }

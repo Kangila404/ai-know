@@ -47,6 +47,18 @@ Object.assign(wf.connections, ingestionConnections(newName));
 Object.assign(wf.connections, imageUploadConnections());
 Object.assign(wf.connections, generationConnections());
 Object.assign(wf.connections, imageCacheConnections());
+wf.nodes.find(n=>n.name==='처리 경로').parameters.numberOutputs=7;
+wf.connections['처리 경로'].main[6]=[{node:'기존 이미지 선택 조회',type:'main',index:0}];
+const controller=wf.nodes.find(n=>n.name==='작업 결정');
+if(!controller.parameters.jsCode.includes('if (!s.selectionLookupChecked)')) {
+  controller.parameters.jsCode=controller.parameters.jsCode.replace("  if (s.phase==='search') {", `  if (s.phase==='search') {
+    if (!s.selectionLookupChecked) {s.route=6;break;}
+    if (s.selectionRequest) {
+      s.request=s.selectionRequest;delete s.selectionRequest;s.task='image_selection';s.route=1;
+      s.counters.textCalls++;if(s.counters.textCalls>6)throw new Error('텍스트 호출 상한 초과');
+      break;
+    }`);
+}
 wf.connections['처리 경로'].main[3] = [{node:'이미지 호출 예약 또는 캐시 조회',type:'main',index:0}];
 const acquired=wf.nodes.find(n=>n.name==='생성 이미지 확보');
 acquired.parameters.jsCode=acquired.parameters.jsCode.replace("const before=$('작업 결정').itemMatching(0)","const before=$('이미지 호출 준비').itemMatching(0)");
@@ -54,6 +66,9 @@ final.parameters.jsCode=final.parameters.jsCode.replace("if(!item.binary?.[image
 wf.connections['처리 경로'].main[1] = [{node:'모델 호출 예약 또는 캐시 조회',type:'main',index:0}];
 const responseNode = wf.nodes.find(n=>n.name==='텍스트 응답 검증');
 responseNode.parameters.jsCode=responseNode.parameters.jsCode.replace("const before=$('작업 결정').itemMatching(0)","const before=$('모델 호출 준비').itemMatching(0)");
+if(!responseNode.parameters.jsCode.includes('delete s.selectionLookupChecked;')) {
+  responseNode.parameters.jsCode=responseNode.parameters.jsCode.replace("if (s.task==='draft') {", "if (s.task==='draft') {\n      delete s.selectionLookupChecked;delete s.selectionRequest;");
+}
 const terminal=wf.nodes.find(n=>n.name==='점검 또는 정상 종료');
 terminal.parameters.jsCode=terminal.parameters.jsCode.replace('candidatesReviewed:s.counters.candidates,', 'generationRecordId:s.cacheClaim?.id||null,sourceUrl:s.current?.sourceUrl||null,candidatesReviewed:s.counters.candidates,');
 terminal.parameters.jsCode=terminal.parameters.jsCode.replace('generationRecordId:s.cacheClaim?.id||null,sourceUrl:s.current?.sourceUrl||null,generationRecordId:s.cacheClaim?.id||null,sourceUrl:s.current?.sourceUrl||null,', 'generationRecordId:s.cacheClaim?.id||null,sourceUrl:s.current?.sourceUrl||null,');

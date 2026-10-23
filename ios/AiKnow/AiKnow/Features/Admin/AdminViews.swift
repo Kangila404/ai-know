@@ -91,7 +91,7 @@ struct AdminListView: View {
                 result = data.content.map { AdminRow(id: $0.id, title: $0.news.title, subtitle: statusLabel($0.publicationStatus)) }; isLast = data.last
             case .generations:
                 let data: AdminPage<Generation> = try await APIClient.shared.decode(kind.path, query: query)
-                result = data.content.map { AdminRow(id: $0.id, title: "\($0.task) #\($0.id)", subtitle: $0.sourceUrl) }; isLast = data.last
+                result = data.content.map { AdminRow(id: $0.id, title: "\($0.task) #\($0.id)", subtitle: "\($0.statusText) · \($0.sourceUrl)") }; isLast = data.last
             case .notices:
                 let data: AdminPage<AdminNotice> = try await APIClient.shared.decode(kind.path, query: query)
                 result = data.content.compactMap { value in value.id.map { AdminRow(id: $0, title: value.title, subtitle: value.published ? "공개" : "비공개") } }; isLast = data.last
@@ -121,6 +121,7 @@ struct EditorialDetailView: View {
     @State private var error: String?
     @State private var message: String?
     @State private var action: String?
+    @State private var review: Submission?
     private var resource: String { kind == .submissions ? "SUBMISSION" : "ARTICLE" }
     private var canEdit: Bool { kind == .articles || status != "APPROVED" }
     private var hasReason: Bool { !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && reason.count <= 2000 }
@@ -132,9 +133,35 @@ struct EditorialDetailView: View {
                     Text(statusLabel(status)).foregroundStyle(.secondary)
                     if let url = URL(string: draft.sourceUrl) { Link(draft.sourceTitle, destination: url) }
                 }
+                if let review, review.status != "PENDING" {
+                    Section("검수 결과") {
+                        if let note = review.reviewNote, !note.isEmpty { Text(note) }
+                        if let date = review.reviewedAt { Text("검수 시각: \(date)").font(.caption).foregroundStyle(.secondary) }
+                        if let reviewer = review.reviewedBy { Text("검수자 #\(reviewer)").font(.caption).foregroundStyle(.secondary) }
+                        if let publication = review.publicationStatus { Text("게시 상태: \(statusLabel(publication))") }
+                        if let cardID = review.cardNewsId {
+                            NavigationLink("승인된 카드 관리") { EditorialDetailView(id: cardID, kind: .articles) }
+                        }
+                    }
+                }
+                Section {
+                    DisclosureGroup("콘텐츠 미리보기") {
+                        Text(draft.title).font(.headline)
+                        Text(draft.summary)
+                        if let image = draft.titleImage { RemoteImage(raw: image.url).frame(maxHeight: 220) }
+                        ForEach(Array(draft.slides.enumerated()), id: \.offset) { index, slide in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("\(index + 1). \(slide.title)").font(.headline)
+                                if let image = slide.image { RemoteImage(raw: image.url).frame(maxHeight: 220) }
+                                Text(slide.content)
+                            }.padding(.vertical, 8)
+                        }
+                    }
+                }
                 if canEdit {
                     EditorialDraftFields(draft: Binding(get: { self.draft ?? draft }, set: { self.draft = $0 }))
                     Section("변경 사유") { TextField("수정·반려·복원 사유 (필수)", text: $reason, axis: .vertical) }
+                    if let validation = draft.validationMessage { Text(validation).font(.footnote).foregroundStyle(.red) }
                     Button("수정 저장") { action = "edit" }.disabled(!draft.valid || !hasReason)
                 }
                 if kind == .submissions && status == "PENDING" {
@@ -160,9 +187,14 @@ struct EditorialDetailView: View {
                 NavigationLink("변경 이력") { EditorialHistoryView(type: resource, id: id) }
             } else if busy { ProgressView() }
             if let error { RequestFailureView(message: error) { Task { await load() } } }
-            if let message { Text(message).foregroundStyle(.secondary) }
         }.navigationTitle(kind == .submissions ? "뉴스 검수 #\(id)" : "카드뉴스 수정")
-            .navigationBarTitleDisplayMode(.inline).disabled(busy)
+            .navigationBarTitleDisplayMode(.inline).disabled(busy).modifier(AdminKeyboardDismissal())
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let message {
+                    Text(message).font(.callout).frame(maxWidth: .infinity).padding(10)
+                        .background(AppPalette.surface)
+                }
+            }
             .task { await load() }
             .confirmationDialog("변경을 적용할까요?", isPresented: Binding(get: { action != nil }, set: { if !$0 { action = nil } }), titleVisibility: .visible) {
                 if let action { Button("적용", role: action == "hide" || action == "reject" ? .destructive : nil) { Task { await apply(action) } } }
@@ -174,7 +206,7 @@ struct EditorialDetailView: View {
         do {
             if kind == .submissions {
                 let value: Submission = try await APIClient.shared.decode("\(kind.path)/\(id)")
-                draft = value.draft; version = value.version ?? 0; status = value.status
+                review = value; draft = value.draft; version = value.version ?? 0; status = value.status
                 categories = try await APIClient.shared.decode("api/v1/cardNews/categories")
             } else {
                 let value: AdminArticle = try await APIClient.shared.decode("\(kind.path)/\(id)")
@@ -261,7 +293,7 @@ struct AdminNoticeEditor: View {
             if let error { RequestFailureView(message: error) { Task { await load() } } }
             Button("저장") { Task { await save() } }.disabled(!loaded || value.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || value.title.count > 200 || value.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || value.content.count > 10000)
             if id != nil { Button("공지 삭제", role: .destructive) { deleting = true }.disabled(!loaded) }
-        }.disabled(busy).navigationTitle(id == nil ? "공지 추가" : "공지 수정").navigationBarTitleDisplayMode(.inline)
+        }.disabled(busy).navigationTitle(id == nil ? "공지 추가" : "공지 수정").navigationBarTitleDisplayMode(.inline).modifier(AdminKeyboardDismissal())
             .task { await load() }.toolbar { if id == nil { Button("취소") { dismiss() } } }
             .confirmationDialog("공지를 삭제할까요?", isPresented: $deleting, titleVisibility: .visible) {
                 Button("삭제", role: .destructive) { Task { await save(delete: true) } }
@@ -304,7 +336,7 @@ struct AdminProfileEditor: View {
             if let error { RequestFailureView(message: error) { Task { await load() } } }
             Button("저장") { Task { await save() } }.disabled(!loaded || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 20 || url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || url.count > 20)
             if id != nil { Button("프로필 이미지 삭제", role: .destructive) { deleting = true }.disabled(!loaded) }
-        }.disabled(busy).navigationTitle(id == nil ? "프로필 이미지 추가" : "프로필 이미지 수정").navigationBarTitleDisplayMode(.inline)
+        }.disabled(busy).navigationTitle(id == nil ? "프로필 이미지 추가" : "프로필 이미지 수정").navigationBarTitleDisplayMode(.inline).modifier(AdminKeyboardDismissal())
             .task { await load() }.toolbar { if id == nil { Button("취소") { dismiss() } } }
             .confirmationDialog("프로필 이미지를 삭제할까요?", isPresented: $deleting, titleVisibility: .visible) {
                 Button("삭제", role: .destructive) { Task { await save(delete: true) } }
@@ -386,8 +418,13 @@ struct GenerationDetailView: View {
             if let value {
                 Section("생성 기록") {
                     Text(value.task).font(.headline)
+                    Text(value.statusText).foregroundStyle(.secondary)
+                    Text(value.createdAt).font(.caption).foregroundStyle(.secondary)
                     Text(value.sourceUrl).font(.caption).textSelection(.enabled)
                     if let raw = value.requestJson { DisclosureGroup("요청 내용") { Text(raw).font(.caption.monospaced()).textSelection(.enabled) } }
+                    if let raw = value.contextJson { DisclosureGroup("이미지 선택 참고 자료") { Text(raw).font(.caption.monospaced()).textSelection(.enabled) } }
+                    if let raw = value.responseJson { DisclosureGroup("원래 생성 응답") { Text(raw).font(.caption.monospaced()).textSelection(.enabled) } }
+                    if let raw = value.recoveredResponseJson { DisclosureGroup("마지막 복구 응답") { Text(raw).font(.caption.monospaced()).textSelection(.enabled) } }
                 }
                 Section("복구") {
                     TextField("복구 사유 (필수)", text: $reason, axis: .vertical).focused($inputFocused)
@@ -447,5 +484,19 @@ struct GenerationDetailView: View {
             await load(); imageData = nil; photo = nil; reason = ""; message = "복구했습니다."
         } catch { self.error = error.localizedDescription }
         busy = false
+    }
+}
+
+private struct AdminKeyboardDismissal: ViewModifier {
+    func body(content: Content) -> some View {
+        content.scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("입력 완료") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
     }
 }
