@@ -41,15 +41,15 @@ struct LoginView: View {
                         AppleLoginButton {
                             Task { if await login.signInApple() { onLogin() } }
                         }
-                        .frame(height: 62)
+                        .frame(height: 54)
                     }
                     if providers.contains(.kakao) {
-                        OfficialLoginImageButton(asset: "KakaoSignIn", label: "카카오 로그인") {
+                        SocialLoginButton(provider: .kakao) {
                             Task { if await login.signInKakao() { onLogin() } }
                         }
                     }
                     if providers.contains(.google) {
-                        OfficialLoginImageButton(asset: "GoogleSignIn", label: "Google로 계속하기") {
+                        SocialLoginButton(provider: .google) {
                             Task { if await login.signInGoogle() { onLogin() } }
                         }
                     }
@@ -63,12 +63,6 @@ struct LoginView: View {
                     Text(message).accessibilityIdentifier("login.error").font(.footnote).foregroundStyle(.red).multilineTextAlignment(.center).padding(.top, 12)
                 }
 
-                #if DEBUG
-                HStack {
-                    Button("화면 미리보기") { login.beginPreview(admin: false); onLogin() }
-                    Button("관리자 미리보기") { login.beginPreview(admin: true); onLogin() }
-                }.font(.footnote).padding(.top, 16)
-                #endif
 
                 Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.")
                     .font(.caption2)
@@ -91,23 +85,43 @@ struct LoginView: View {
     }
 }
 
-// Provider artwork is bundled unchanged; preserve its colors and aspect ratio.
-private struct OfficialLoginImageButton: View {
-    let asset: String
-    let label: String
+// Use official symbols with a common native text layout, without scaling button screenshots.
+private struct SocialLoginButton: View {
+    enum Provider { case google, kakao }
+    @Environment(\.colorScheme) private var colorScheme
+    let provider: Provider
     let action: () -> Void
-
+    private var isGoogle: Bool { provider == .google }
+    private var title: String { isGoogle ? "Google 로그인" : "카카오 로그인" }
+    private var background: Color {
+        if !isGoogle { return Color(red: 254 / 255, green: 229 / 255, blue: 0) }
+        return colorScheme == .dark ? Color(red: 19 / 255, green: 19 / 255, blue: 20 / 255) : .white
+    }
+    private var foreground: Color {
+        if !isGoogle { return .black.opacity(0.85) }
+        return colorScheme == .dark ? Color(red: 227 / 255, green: 227 / 255, blue: 227 / 255) : Color(white: 31 / 255)
+    }
     var body: some View {
         Button(action: action) {
-            Image(asset)
-                .renderingMode(.original)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .accessibilityHidden(true)
+            HStack(spacing: 12) {
+                Image(isGoogle ? "GoogleSymbol" : "KakaoSymbol")
+                    .renderingMode(.original).resizable().scaledToFit()
+                    .frame(width: 20, height: 20).accessibilityHidden(true)
+                Text(title).font(.custom("GoogleSans-Regular", size: 16, relativeTo: .body).weight(.medium))
+            }
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity).frame(height: 54)
+            .background(background, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                if isGoogle {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(colorScheme == .dark ? Color(white: 143 / 255) : Color(white: 117 / 255), lineWidth: 1)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel(title)
     }
 }
 
@@ -126,7 +140,7 @@ private struct AppleLoginButton: UIViewRepresentable {
         let style: ASAuthorizationAppleIDButton.Style = colorScheme == .dark ? .white : .black
         if context.coordinator.style != style {
             container.subviews.forEach { $0.removeFromSuperview() }
-            let button = ASAuthorizationAppleIDButton(type: .continue, style: style)
+            let button = ASAuthorizationAppleIDButton(type: .signIn, style: style)
             button.cornerRadius = 8
             button.accessibilityIdentifier = "login.apple"
             button.addTarget(context.coordinator, action: #selector(Coordinator.signIn), for: .touchUpInside)

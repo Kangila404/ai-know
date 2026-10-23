@@ -9,16 +9,6 @@ struct RootTabView: View {
         @Bindable var store = store
 
         VStack(spacing: 0) {
-            #if DEBUG
-            if AuthSession.shared.isPreview {
-                HStack {
-                    Text("개발 미리보기 · 변경은 임시 저장됩니다").font(.caption)
-                    Spacer()
-                    Button("종료") { AuthSession.shared.endPreview() }.font(.caption.bold())
-                }.padding(10).background(AppPalette.surface)
-            }
-            #endif
-
             TabView(selection: $store.selectedTab) {
                 HomeView()
                     .tabItem {

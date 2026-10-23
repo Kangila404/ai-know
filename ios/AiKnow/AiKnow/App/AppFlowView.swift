@@ -10,12 +10,6 @@ struct AppFlowView: View {
             case .splash:
                 SplashView {
                     Task {
-                        #if DEBUG
-                        if ProcessInfo.processInfo.arguments.contains("--preview-admin") || ProcessInfo.processInfo.arguments.contains("--preview-user") {
-                            login.beginPreview(admin: ProcessInfo.processInfo.arguments.contains("--preview-admin"))
-                            move(to: .app); return
-                        }
-                        #endif
                         let restored = await login.restoreSession()
                         move(to: restored ? authenticatedScreen : .login)
                     }
@@ -30,12 +24,12 @@ struct AppFlowView: View {
                 }
             case .app:
                 RootTabView()
-                    .task { if !login.isPreview { await PushNotifications.shared.requestPermission() } }
+                    .task { await PushNotifications.shared.requestPermission() }
             }
         }
         .animation(.snappy, value: screen)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIKnowSessionExpired"))) { _ in
-            if !login.isPreview { login.expireSession() }
+            login.expireSession()
         }
         .onChange(of: login.user == nil) { _, signedOut in
             if signedOut { move(to: .login) }

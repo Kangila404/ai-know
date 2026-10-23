@@ -68,13 +68,13 @@ final class LoginConnectionTests: XCTestCase {
     private func launchLogin() -> XCUIApplication {
         let app = XCUIApplication()
         app.launch()
-        XCTAssertTrue(app.buttons["Google로 계속하기"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["Google 로그인"].waitForExistence(timeout: 30))
         return app
     }
 
     @MainActor
     func testGoogleReachesAccountPage() {
-        checkAccountPage(button: "Google로 계속하기", name: "Google")
+        checkAccountPage(button: "Google 로그인", name: "Google")
     }
 
     @MainActor
@@ -146,83 +146,6 @@ final class LoginConnectionTests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
-    }
-}
-
-final class PreviewAdminTests: XCTestCase {
-    override func setUpWithError() throws { continueAfterFailure = false }
-    @MainActor private func launch(admin: Bool, mode: String) -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments = [admin ? "--preview-admin" : "--preview-user", "-appearance", mode]
-        app.launch()
-        XCTAssertTrue(app.tabBars.buttons["마이"].waitForExistence(timeout: 30))
-        return app
-    }
-    @MainActor private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<10 { if element.exists && element.isHittable { return }; app.swipeUp() }
-        XCTAssertTrue(element.exists && element.isHittable)
-    }
-    @MainActor private func input(_ label: String, app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "(elementType == %d OR elementType == %d) AND (label == %@ OR placeholderValue == %@ OR identifier == %@)", XCUIElement.ElementType.textField.rawValue, XCUIElement.ElementType.textView.rawValue, label, label, label)).firstMatch
-    }
-    @MainActor private func capture(_ title: String) {
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.name = title; attachment.lifetime = .keepAlways; add(attachment)
-    }
-    @MainActor func testUserPreviewProfileAndLightMode() {
-        let app = launch(admin: false, mode: "light")
-        XCTAssertFalse(app.tabBars.buttons["관리자"].exists)
-        XCTAssertTrue(app.staticTexts["개발 미리보기 · 변경은 임시 저장됩니다"].exists)
-        capture("Light home")
-        app.tabBars.buttons["마이"].tap()
-        app.buttons["프로필 편집"].tap()
-        XCTAssertTrue(app.buttons["두 번째 프로필"].waitForExistence(timeout: 10))
-        app.textFields["닉네임 (20자 이내)"].tap()
-        app.textFields["닉네임 (20자 이내)"].typeText(" 수정")
-        app.buttons["두 번째 프로필"].tap()
-        app.buttons["저장"].tap()
-        XCTAssertTrue(app.staticTexts["저장했습니다."].waitForExistence(timeout: 10))
-        capture("Light profile saved")
-        app.buttons["종료"].tap()
-        XCTAssertTrue(app.buttons["관리자 미리보기"].waitForExistence(timeout: 15))
-    }
-    @MainActor func testAdminPreviewReviewAndDarkMode() {
-        let app = launch(admin: true, mode: "dark")
-        XCTAssertTrue(app.tabBars.buttons["관리자"].exists)
-        capture("Dark home")
-        app.tabBars.buttons["관리자"].firstMatch.tap()
-        capture("Dark admin")
-        app.buttons["뉴스 검수"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "검수 요청 #1")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10)); row.tap()
-        let reason = input("수정·반려·복원 사유 (필수)", app: app)
-        reveal(reason, in: app); reason.tap(); reason.typeText("검수 테스트")
-        let save = app.buttons["수정 저장"]; reveal(save, in: app); save.tap()
-        app.buttons["적용"].tap()
-        XCTAssertTrue(app.staticTexts["반영했습니다."].waitForExistence(timeout: 10))
-        let approve = app.buttons["승인"]; reveal(approve, in: app); approve.tap(); app.buttons["적용"].tap()
-        XCTAssertTrue(app.buttons["변경 이력"].waitForExistence(timeout: 10))
-        app.buttons["변경 이력"].tap()
-        capture("Review history")
-        app.terminate()
-    }
-    @MainActor func testAdminNoticeCreationAndGeneration() {
-        let app = launch(admin: true, mode: "light")
-        app.tabBars.buttons["관리자"].firstMatch.tap(); app.buttons["공지 관리"].tap(); app.buttons["추가"].tap()
-        let title = app.descendants(matching: .any)["admin.notice.title"].firstMatch; XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription); title.tap(); title.typeText("새 공지 검증")
-        let content = app.descendants(matching: .any)["admin.notice.content"].firstMatch; content.tap(); content.typeText("테스트 본문")
-        app.buttons["저장"].tap()
-        let notice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "새 공지 검증")).firstMatch
-        XCTAssertTrue(notice.waitForExistence(timeout: 10))
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.buttons["생성 복구"].tap()
-        let record = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "TEXT #1")).firstMatch
-        XCTAssertTrue(record.waitForExistence(timeout: 10)); record.tap()
-        let reason = input("복구 사유 (필수)", app: app)
-        XCTAssertTrue(reason.waitForExistence(timeout: 10)); reason.tap(); reason.typeText("응답 복구 테스트")
-        app.buttons["입력 완료"].tap()
-        let recover = app.buttons["응답 복구"]; reveal(recover, in: app); recover.tap(); app.buttons["복구"].tap()
-        XCTAssertTrue(app.staticTexts["복구했습니다."].waitForExistence(timeout: 10))
     }
 }
 
@@ -336,14 +259,29 @@ final class LoginBrandingTests: XCTestCase {
     @MainActor func testLight() throws { try verify("light") }
     @MainActor func testDark() throws { try verify("dark") }
 
+    @MainActor func testLegacyPreviewArgumentsCannotBypassLogin() throws {
+        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18083/__fixture")!)) == nil,
+                      "Run with ios/tests/test_login_ui.py")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--preview-admin", "--preview-user"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Google 로그인"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["화면 미리보기"].exists)
+        XCTAssertFalse(app.buttons["관리자 미리보기"].exists)
+        XCTAssertFalse(app.tabBars.buttons["관리자"].exists)
+        XCTAssertFalse(app.tabBars.buttons["마이"].exists)
+        app.terminate()
+    }
+
     @MainActor private func verify(_ mode: String) throws {
         try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18083/__fixture")!)) == nil,
                       "Run with ios/tests/test_login_ui.py")
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-appearance", mode]
+        app.launchArguments = ["-appearance", mode, "-AppleLanguages", "(ko)", "-AppleLocale", "ko_KR"]
         app.launch()
-        for label in ["Google로 계속하기", "카카오 로그인", "login.apple"] {
+        for label in ["Google 로그인", "카카오 로그인", "login.apple"] {
             XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 20))
             XCTAssertTrue(app.buttons[label].isHittable)
         }
@@ -351,7 +289,7 @@ final class LoginBrandingTests: XCTestCase {
         image.name = "Official login buttons — \(mode)"
         image.lifetime = .keepAlways
         add(image)
-        for (label, provider) in [("Google로 계속하기", "Google"), ("카카오 로그인", "Kakao"), ("login.apple", "Apple")] {
+        for (label, provider) in [("Google 로그인", "Google"), ("카카오 로그인", "Kakao"), ("login.apple", "Apple")] {
             app.buttons[label].tap()
             let error = app.staticTexts["login.error"]
             let reported = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND label BEGINSWITH %@", provider + ":"), object: error)

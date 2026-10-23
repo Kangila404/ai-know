@@ -2,6 +2,8 @@
 
 SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세션으로 교환하며, 푸시 수신은 Firebase Messaging SDK로 연결되어 있습니다. 오늘의 카드·아카이브·상세·좋아요·읽음·공지·프로필·알림 설정은 서버 API를 사용합니다. 온보딩 안내 문구는 앱에 포함하며 완료 상태는 서버에 저장합니다.
 
+**현재 Debug/Release 모두 실제 로그인을 사용합니다. 개발 미리보기와 가짜 ADMIN 계정은 제거했으며 서버가 ADMIN으로 응답하는 계정에만 관리자 탭이 표시됩니다.**
+
 ## 실행
 
 1. 로컬 Firebase 설정 파일을 `AiKnow/AiKnow.xcodeproj/GoogleService-Info.plist`에 둡니다. Firebase의 iOS 앱 Bundle ID는 `org.aiknow.AiKnow`여야 합니다. 이 파일은 Git에서 제외됩니다.
@@ -204,9 +206,9 @@ Production 재시험에서는 연결된 실제 iPhone의 새 IOS 기기 등록�
 로그인 화면은 `GET /api/v1/auth/social/providers`가 반환한 제공자만 표시합니다. 서버가 연결되지 않으면 연결 안내와 재시도를 표시하고, 활성화된 제공자가 없으면 로그인 준비 상태를 표시합니다. 서버의 `status/code/message` 오류 응답을 처리하며 입력 검증 메시지는 화면에 전달합니다. 401 세션 만료, 오늘의 카드 404 빈 상태, Security의 403 CSRF 갱신은 기존 동작을 유지하고 업무 규칙의 403은 자동 재시도하지 않습니다. 네트워크/TLS 실패도 별도로 안내합니다.
 
 
-### 개발 미리보기와 관리자 화면 (2026-10-08)
+### 개발 미리보기 도입 기록 (2026-10-08, 2026-10-23 제거)
 
-Debug 로그인 화면의 ‘화면 미리보기’ / ‘관리자 미리보기’로 인증 없이 UI를 확인할 수 있습니다. 상단 배너의 ‘종료’로 로그인 화면으로 돌아갑니다. 변경은 메모리에만 저장되며 앱을 재시작하면 초기화됩니다. 이 경로는 서버 인증 우회가 아니며 미리보기 API는 외부 서버에 요청하지 않습니다. 푸시 등록과 회원탈퇴도 실행하지 않습니다. `DevelopmentPreview.swift`, 진입 버튼 및 전송 분기는 모두 `#if DEBUG` 안에 있고 Release에는 포함되지 않습니다. 마지막 배포 전 임시 코드 삭제 시 이 파일과 `beginPreview`/`endPreview`/`previewRequest` 호출부, 미리보기 UI 테스트를 함께 제거합니다.
+2026-10-08에 UI 확인용 임시 미리보기를 도입했으나, 2026-10-23에 사용자 요청으로 진입 버튼·실행 인자·가짜 데이터·API 대체 코드·해당 UI 테스트를 삭제했습니다. 아래 검증 기록은 당시 상태이며 현재는 Xcode에서도 실제 로그인과 서버 계정 권한을 사용합니다.
 
 실제 로그인은 `/api/v1/users`의 `userRole == ADMIN`일 때 네 번째 관리자 탭을 표시합니다. 모든 관리자 요청은 기존 세션/CSRF를 사용하며 서버의 ADMIN 권한 검사를 거칩니다.
 
@@ -253,11 +255,11 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 관리자 API UI 검증은 `python3 ios/tests/test_admin_ui.py --device <UDID>`로 실행합니다. 별도 HTTP 서버에서 세션 쿠키·CSRF·ADMIN 역할·버전·변경 사유·요청 본문을 검사하며 검수, 카드 공개 상태, 공지/프로필 CRUD, 생성 복구와 탭 권한 갱신을 조작합니다. 실제 운영 계정·콘텐츠는 변경하지 않습니다. `--only <test method>`로 특정 시나리오만 재실행할 수 있습니다. 기존 일반 사용자 흐름은 `test_content_ui.py`로 검증합니다. 테스트 후 일반 Xcode 빌드로 테스트용 API 주소를 복원해야 합니다.
 
 
-소셜 로그인 버튼은 SF Symbols 대체 아이콘을 제거하고 공식 리소스를 사용합니다. 이미지는 원본의 색상·비율을 유지하며 Google은 라이트/다크 리소스를 전환합니다. Google·카카오의 접근성 레이블은 한국어이며 Apple 버튼은 시스템의 현지화 레이블을 사용합니다.
+소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Google/카카오는 ‘Google 로그인 / 카카오 로그인’ 문구, 54pt 높이, 16pt Medium 글꼴, 20pt 심볼, 12pt 간격을 공유합니다. Google은 라이트/다크 색상을 전환합니다.
 
-- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 ZIP](https://developers.google.com/static/identity/images/signin-assets.zip)에서 iOS/PNG @4x/{Light,Dark}/`Theme=…, Show text=Yes, Shape=Square, Platform=iOS@4x.png`를 그대로 사용합니다. 버튼에 포함된 영문 문구와 서체도 원본입니다. 공식 SVG의 마스크/필터가 iOS 에셋 렌더러에서 깨지는 것을 확인해 제공된 최고 해상도 PNG를 사용합니다.
-- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)를 그대로 사용합니다.
-- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)을 사용합니다. 버튼 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
+- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 두 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
+- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)에서 말풍선 심볼 path를 분리했습니다. 심볼의 형태·비율·색상은 유지합니다.
+- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)의 로그인 타입을 사용합니다. 버튼 높이는 54pt이며 문구/서체는 Apple이 제공합니다. 한국어 지원 언어를 선언해 한국어 기기에서 시스템 로그인 문구도 현지화됩니다. 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
 
 `python3 ios/tests/test_login_ui.py --device <UDID>`는 세 제공자를 반환하는 별도 HTTP fixture에서 밝은/어두운 로그인 화면을 캡처하고 각 버튼이 해당 제공자의 challenge API와 CSRF 처리로 연결되는지 검사합니다. 실제 Google·카카오·Apple 계정 로그인 성공을 대신하는 검증은 아닙니다. 운영 로그인 버튼 노출은 서버의 `/api/v1/auth/social/providers` 응답을 따릅니다.
 
@@ -272,3 +274,24 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 14:58 KST에 Xcode가 `Upload succeeded`, `Uploaded package is processing`, `EXPORT SUCCEEDED`를 반환했고 전송 메타데이터의 버전 3을 확인했습니다. 배포 코드 커밋은 `94bfdcc`이며 [PR #25](https://github.com/Kangila404/ai-know/pull/25)에서 검토할 수 있습니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
 
 App Store 배포용 IPA의 코드 서명과 provisioning profile에서 Bundle ID `org.aiknow.AiKnow`, Team `SS32PHC392`, Production APNs, Sign in with Apple, 디버깅 비활성화를 확인했습니다. 최종 실행 파일에 개발 미리보기 진입 인자·타입·표시 문자열이 없고 API 주소가 `https://aiknow.kro.kr`인 것도 확인했습니다. 아카이브·검증 IPA·업로드 로그는 `.local/testflight/2026-10-23-build-3/`에 보관합니다.
+
+
+### Xcode에서도 실제 로그인과 서버 관리자 권한 사용
+
+Xcode Debug와 TestFlight 모두 실제 소셜 로그인/서버 세션을 사용합니다. 개발 미리보기 버튼, 실행 인자, 가짜 사용자/콘텐츠 데이터 및 API 응답 대체 코드를 제거했습니다. 기존 `--preview-admin`/`--preview-user` 인자를 넣어도 로그인 화면을 우회하지 않습니다.
+
+- `/api/v1/users`의 `userRole == ADMIN`일 때만 관리자 탭이 맨 오른쪽에 표시됩니다. Xcode로 실행했다는 이유로 관리자 권한을 부여하지 않습니다.
+- 로그인 후 계정 권한을 바꿨다면 앱을 다시 활성화하거나 마이 화면을 당겨 새로고침합니다. 오래된 서버 세션의 권한이 남아 관리자 API가 403을 반환하면 로그아웃 후 다시 로그인합니다.
+- 현재 최신 iOS 코드는 `develop` 기준입니다. 다른 Mac에서는 실행 브랜치/커밋과 API 주소를 확인합니다.
+- `test_login_ui.py`는 라이트/다크 버튼과 인증 challenge 연결, 이전 미리보기 인자로도 로그인 우회가 되지 않는지 검사합니다. `test_admin_ui.py`는 별도 HTTP fixture의 ADMIN↔USER 응답에 따라 탭이 갱신되는지 검사합니다. 테스트용 HTTP 서버는 앱 배포물에 포함되지 않습니다.
+
+미리보기 삭제 후 검증: 인증/세션/CSRF/multipart APIClient 회귀 테스트, 라이트/다크 로그인 화면과 기존 인자를 통한 우회 차단 3개 UI 테스트, HTTP ADMIN→USER→ADMIN 응답에 따른 탭 갱신 테스트를 통과했습니다. 실제 다른 사용자의 운영 계정 권한은 조회하거나 변경하지 않았습니다.
+
+
+### 2026-10-23 TestFlight 업로드 — 1.0 (4)
+
+개발 미리보기 제거와 소셜 로그인 버튼 통일을 포함한 버전 1.0 빌드 4를 업로드했습니다. 15:27 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했으며 업로드 메타데이터의 빌드 번호도 4로 확인했습니다. Apple의 업로드 수락까지 확인했으며 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
+
+Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니다. 최종 일반 Debug 빌드와 Release 아카이브의 API 주소는 `https://aiknow.kro.kr`입니다. App Store 배포 IPA의 코드 서명, Bundle ID/Team, Production APNs, Sign in with Apple 및 디버깅 비활성화를 검증했습니다. 최종 실행 파일에 개발 미리보기 코드/진입 인자가 없는 것도 확인했습니다. 실제 다른 사용자의 계정 권한과 이번 빌드의 실기기 로그인·푸시는 아직 검증하지 않았습니다.
+
+아카이브와 업로드 로그는 로컬 `.local/testflight/2026-10-23-build-4/`에, 최종 로그인 라이트/다크 화면은 `.local/login-no-preview-evidence/final-{light,dark}.png`에 보관합니다.
