@@ -1,142 +1,74 @@
 import SwiftUI
 
 struct CardNewsDetailView: View {
-    let card: NewsCard
-    @Environment(StoryStore.self) private var store
+    let cardID: Int64
+    @State private var card: NewsCard?
+    @State private var slides: [StorySlide] = []
     @State private var currentSlide = 0
+    @State private var loading = true
+    @State private var error: String?
+    @State private var savingRead = false
+    @Environment(StoryStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+
+    init(card: NewsCard) { cardID = card.id; _card = State(initialValue: card) }
+    init(cardID: Int64) { self.cardID = cardID }
 
     var body: some View {
-        VStack(spacing: 14) {
-            TabView(selection: $currentSlide) {
-                ForEach(Array(card.slides.enumerated()), id: \.element.id) { index, slide in
-                    StoryPage(slide: slide, index: index + 1)
-                        .tag(index)
-                        .padding(.horizontal, 20)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-
-            Text(card.slides[currentSlide].caption)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(minHeight: 22)
-                .padding(.horizontal, 28)
-
-            HStack(spacing: 7) {
-                ForEach(card.slides.indices, id: \.self) { index in
-                    Capsule()
-                        .fill(index == currentSlide ? Color.indigo : Color.indigo.opacity(0.18))
-                        .frame(width: index == currentSlide ? 19 : 7, height: 7)
-                }
-            }
-
-            Button {
-                if currentSlide == card.slides.count - 1 {
-                    store.markRead(card)
-                    store.selectedTab = .archive
-                } else {
-                    withAnimation(.snappy) {
-                        currentSlide += 1
+        VStack(spacing: 12) {
+            if loading { ProgressView("카드뉴스를 불러오는 중…").frame(maxWidth: .infinity, maxHeight: .infinity) }
+            else if let error { RequestFailureView(message: error) { Task { await load() } }.frame(maxHeight: .infinity) }
+            else if slides.isEmpty { ContentUnavailableView("아직 카드가 없어요", systemImage: "rectangle.stack") }
+            else {
+                TabView(selection: $currentSlide) {
+                    ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 20) {
+                                Text("\(index + 1) / \(slides.count)").font(.caption.bold()).foregroundStyle(AppPalette.accent)
+                                if slide.imgUrl != nil { RemoteImage(raw: slide.imgUrl).clipShape(RoundedRectangle(cornerRadius: 20)) }
+                                if let title = slide.title { Text(title).font(.title.bold()) }
+                                if let content = slide.content { Text(content).font(.body).lineSpacing(5) }
+                                if let credit = slide.imageCredit { Text(credit).font(.caption).foregroundStyle(.secondary) }
+                                if let url = APIClient.shared.mediaURL(slide.imageSourceUrl) { Link("이미지 출처", destination: url).font(.caption) }
+                            }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+                                .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 26)).padding(16)
+                        }.tag(index)
                     }
+                }.tabViewStyle(.page(indexDisplayMode: .automatic))
+                if let card, let url = APIClient.shared.mediaURL(card.sourceUrl) {
+                    Link(card.sourceTitle ?? "원문 보기", destination: url).font(.caption).lineLimit(2).padding(.horizontal)
                 }
-            } label: {
-                Label(
-                    currentSlide == card.slides.count - 1 ? "다 읽었어요" : "다음 카드",
-                    systemImage: currentSlide == card.slides.count - 1 ? "checkmark" : "arrow.right"
-                )
-                .font(.subheadline.weight(.bold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.indigo)
-            .frame(maxWidth: 300)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 14)
-        }
-        .padding(.top, 6)
-        .background(AppPalette.background)
-        .onChange(of: currentSlide) { _, newValue in
-            if newValue == card.slides.count - 1 {
-                store.markRead(card)
-            }
-        }
-        .navigationTitle("카드 뉴스")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    withAnimation(.snappy) {
-                        store.toggleLike(for: card)
-                    }
+                    if currentSlide == slides.count - 1, let card {
+                        savingRead = true
+                        Task { if await store.markRead(card) { dismiss() }; savingRead = false }
+                    } else { withAnimation { currentSlide += 1 } }
                 } label: {
-                    Image(systemName: store.likedIDs.contains(card.id) ? "heart.fill" : "heart")
-                        .foregroundStyle(store.likedIDs.contains(card.id) ? .pink : .primary)
-                }
-                .accessibilityLabel(store.likedIDs.contains(card.id) ? "좋아요 취소" : "좋아요")
+                    Label(currentSlide == slides.count - 1 ? "다 읽었어요" : "다음 카드", systemImage: "arrow.right")
+                        .frame(maxWidth: .infinity).padding(8)
+                }.disabled(savingRead).buttonStyle(.borderedProminent).padding(.horizontal, 25).padding(.bottom)
             }
-        }
+        }.background(AppPalette.background)
+            .navigationTitle("카드 뉴스").navigationBarTitleDisplayMode(.inline)
+            .task(id: cardID) { await load() }
+            .toolbar {
+                if let card {
+                    let current = store.current(card)
+                    Button { Task { await store.toggleLike(current) } } label: {
+                        Image(systemName: current.liked ? "heart.fill" : "heart").foregroundStyle(current.liked ? .pink : .primary)
+                    }.disabled(store.busyIDs.contains(card.id) || loading || error != nil)
+                        .accessibilityLabel(current.liked ? "좋아요 취소" : "좋아요")
+                }
+            }
     }
-}
-
-private struct StoryPage: View {
-    let slide: StorySlide
-    let index: Int
-
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(LinearGradient(colors: slide.theme.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-
-            Circle()
-                .fill(.white.opacity(0.20))
-                .frame(width: 260)
-                .blur(radius: 1)
-                .offset(x: 120, y: -195)
-
-            Image(systemName: slide.theme.symbol)
-                .font(.system(size: 132, weight: .thin))
-                .foregroundStyle(.white.opacity(0.26))
-                .offset(x: 105, y: -36)
-
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Text(slide.eyebrow)
-                        .font(.caption2.weight(.heavy))
-                        .tracking(1.4)
-                    Spacer()
-                    Text(String(format: "%02d", index))
-                        .font(.caption.weight(.bold))
-                }
-                .foregroundStyle(.white.opacity(0.9))
-
-                Spacer()
-
-                Text(slide.title)
-                    .font(.system(size: 31, weight: .heavy, design: .rounded))
-                    .lineSpacing(3)
-                    .multilineTextAlignment(.leading)
-
-                Text(slide.body)
-                    .font(.subheadline)
-                    .lineSpacing(4)
-                    .foregroundStyle(.white.opacity(0.86))
-            }
-            .padding(28)
-            .foregroundStyle(.white)
-
-            Text("A BRIGHTER TOMORROW\nWITH AI")
-                .font(.caption2.weight(.bold))
-                .tracking(1.6)
-                .foregroundStyle(.white.opacity(0.66))
-                .multilineTextAlignment(.leading)
-                .padding(28)
-                .padding(.bottom, 2)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .shadow(color: Color.indigo.opacity(0.16), radius: 18, y: 8)
-        .padding(.vertical, 8)
+    private func load() async {
+        loading = true; error = nil
+        defer { loading = false }
+        do {
+            async let news: NewsCard = APIClient.shared.decode("api/v1/cardNews/\(cardID)")
+            async let pages: [StorySlide] = APIClient.shared.decode("api/v1/cardNews/cardSlides", query: [URLQueryItem(name: "cardNewsId", value: String(cardID))])
+            let (result, content) = try await (news, pages)
+            card = result; store.remember(result); slides = content.sorted { $0.sequence < $1.sequence }; currentSlide = 0
+        } catch { self.error = error.localizedDescription }
     }
 }

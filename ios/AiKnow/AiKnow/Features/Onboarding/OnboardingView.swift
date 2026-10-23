@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     let onFinished: () -> Void
     @State private var page = 0
+    @State private var login = AuthSession.shared
 
     private let pages = OnboardingPage.samples
 
@@ -14,7 +15,7 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 HStack {
                     Spacer()
-                    Button("건너뛰기", action: onFinished)
+                    Button("건너뛰기", action: finish)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
@@ -29,6 +30,10 @@ struct OnboardingView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
+                if let message = login.errorMessage {
+                    Text(message).font(.footnote).foregroundStyle(.red).padding(.horizontal)
+                }
+                if login.busy { ProgressView("설정을 저장하는 중…") }
                 VStack(spacing: 20) {
                     HStack(spacing: 7) {
                         ForEach(pages.indices, id: \.self) { index in
@@ -40,7 +45,7 @@ struct OnboardingView: View {
 
                     Button {
                         if page == pages.count - 1 {
-                            onFinished()
+                            finish()
                         } else {
                             withAnimation(.snappy) {
                                 page += 1
@@ -61,7 +66,10 @@ struct OnboardingView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 22)
             }
-        }
+        }.disabled(login.busy)
+    }
+    private func finish() {
+        Task { if await login.completeOnboarding() { onFinished() } }
     }
 }
 

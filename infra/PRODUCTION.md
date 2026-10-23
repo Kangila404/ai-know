@@ -3,7 +3,7 @@
 다른 작업자에게 전달할 짧은 실행 지침은 [NAS 배포 인수인계](NAS_DEPLOY_HANDOFF.md)를 참고한다.
 Tailscale 없이 EC2 공인 IP로 배포할 때는 [EC2 전용 배포](EC2_DEPLOY.md)를 참고한다.
 
-Linux x86_64를 기본으로 준비한다. 운영 도메인은 `aiknow.kro.kr`이며 코드 변경만으로 실제 배포가 완료되는 것은 아니다.
+Linux x86_64를 기본으로 준비한다. 운영 도메인은 `aiknow.kro.kr`이며 앱 API의 기준 주소는 `https://aiknow.kro.kr`이다. 코드 변경만으로 실제 배포가 완료되는 것은 아니다.
 Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Spring 포트는 호스트에 공개하지 않는다.
 외부 요청은 Nginx 80/443으로만 받고, n8n 관리 UI는 localhost 바인딩과 SSH 터널로 접근한다.
 운영에는 Assistant 샌드박스를 띄우지 않는다. 저장된 워크플로 실행에는 해당 샌드박스가 필요하지 않다.
@@ -17,7 +17,7 @@ Spring·MySQL·n8n은 같은 Docker 네트워크를 사용한다. MySQL과 Sprin
    수동 배포·n8n 반영·Nginx reload에도 같은 권한을 쓸 때는 명령 앞에 `AIKNOW_DOCKER_SUDO=true`를 붙인다.
    지정하지 않으면 기존처럼 sudo 없이 Docker를 실행한다. 전체 배포 셸을 sudo로 실행하지 않는다.
 2. `infra/.env.prod.example`을 `/opt/aiknow/infra.env`, `server/.env.prod.example`을 `/opt/aiknow/server.env`로 작성한다.
-   예시 도메인·암호·이미지 태그를 실제 값으로 바꾼다. 실제 env는 Git에 올리지 않고 권한을 600으로 제한한다.
+   도메인 `aiknow.kro.kr`을 확인하고 암호·이미지 태그·인증 제공자 설정을 실제 값으로 채운다. 실제 env는 Git에 올리지 않고 권한을 600으로 제한한다.
 3. `/opt/aiknow/secrets`를 만들고 Firebase 준비 시 JSON을 둔다. Spring 컨테이너 UID/GID는 10001이다.
 4. 미디어 마운트 경로를 준비한다. NAS 연결을 보류하는 동안 `MEDIA_STORAGE_ENABLED=false`를 유지한다.
    Compose bind mount 경로 자체는 존재해야 한다. `mounted` 모드에는 임의 로컬 폴더에 NAS 표식을 만들지 않는다.
@@ -130,3 +130,13 @@ MySQL 준비 또는 백업 실패 시 앱 배포를 중단한다. 초기화 로�
 DB 외에 n8n 데이터 볼륨과 N8N_ENCRYPTION_KEY, TLS 인증서, 미디어 파일도 보관해야 한다.
 실행 중인 SQLite 파일을 단순 복사하지 말고 n8n을 정지하거나 SQLite 백업 방식을 사용한다.
 볼륨 삭제(`down -v`)는 배포/복구 절차에 포함하지 않는다.
+
+
+## 앱 API 주소와 배포 전 확인
+
+- Nginx `API_DOMAIN=aiknow.kro.kr`이며 `/api/v1/...` 경로를 그대로 Spring에 전달한다.
+- Google 웹 OAuth 콜백은 `https://aiknow.kro.kr/login/oauth2/code/google`로 Google Console에도 등록한다. 네이티브 앱은 기존 SDK → challenge/ID token API 흐름을 유지한다.
+- 미디어 공개 주소는 서버와 n8n 모두 `https://aiknow.kro.kr/media/generated`로 맞춘다.
+- `FRONTEND_ORIGIN`과 `LOGIN_SUCCESS_URL`은 같은 도메인의 웹 로그인용 기본값이다. 별도 웹 클라이언트를 배포하면 그 실제 주소로 변경한다. 이 저장소의 SwiftUI 앱은 웹 완료 페이지에 의존하지 않는다.
+- 운영 env 예제의 인증정보와 native login/FCM 활성화 설정을 배포 전에 채운다. 로컬 `.env`를 운영 Compose에 그대로 사용하지 않는다.
+- DNS, 80/443 접근, 인증서, 서버 health, 운영 로그인 설정이 준비된 뒤 iOS Release로 확인한다. 현재 개발용 앱 실행은 Debug의 로컬 서버를 사용한다.
