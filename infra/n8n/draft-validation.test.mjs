@@ -31,6 +31,21 @@ test('ordinary numbers, decimals, percentages and grouped digits remain checked'
   assert.throws(() => assertSupportedNumbers('35%', '3.5%', 'summary'), /35/);
 });
 
+test('attested digit-prefixed names are not numeric claims or numeric evidence', () => {
+  const source = 'Password manager 1Password launched a new tool. The company warns against handing over passwords.';
+  const quote = 'The company warns against handing over passwords.';
+  assertSupportedNumbers('1Password는 비밀번호 전달에 주의를 요구합니다.', quote, 'slide 1', source);
+  assertSupportedNumbers('23andMe의 소식', 'The company announced news.', 'slide', 'News from 23andMe.');
+  assert.throws(() => assertSupportedNumbers('2Password의 소식', quote, 'slide', source), /2/);
+  assert.throws(() => assertSupportedNumbers('1Password는 1년간 제공합니다.', quote, 'slide', source), /\(1\)/);
+  assert.throws(() => assertSupportedNumbers('1년간 제공합니다.', '1Password launched a tool.', 'slide'), /\(1\)/);
+  assert.throws(() => assertSupportedNumbers('1년간 제공합니다.', quote, 'slide', source + ' Launched 1 year ago.'), /\(1\)/);
+  assert.throws(() => assertSupportedNumbers('1PasswordExtra의 소식', quote, 'slide', source), /\(1\)/);
+  assert.throws(() => assertSupportedNumbers('20Million 달러', quote, 'slide', source + ' Raised 20Million dollars.'), /20000000/);
+  assert.throws(() => assertSupportedNumbers('5Kg', quote, 'slide', source + ' It weighs 5Kg.'), /\(5\)/);
+  assert.throws(() => assertSupportedNumbers('30억 달러', '$30 billion', 'slide'), /3000000000/);
+});
+
 test('English singular measurements support translated digits without treating every article as one', () => {
   assertSupportedNumbers('첫 출시 뒤 거의 1년이 지났습니다.',
     'Nearly a year after its initial launch, it revealed a platform.', 'slide 4');
@@ -92,5 +107,19 @@ test('deployed workflow helpers accept translated quantities and still reject fa
     const fabricated = structuredClone(draft);
     fabricated.slides[0].content = '9,999만 달러를 유치했습니다.';
     assert.throws(() => validate(fabricated, state), /99990000/, node.name);
+    const brandQuote = 'Handing over a password can leave people with sensitive information in places they can no longer control.';
+    const brandState = { docs: [{ id: 'source-1', text: 'Password manager 1Password launched a new tool. ' + brandQuote }] };
+    const branded = structuredClone(draft);
+    branded.title = '1Password의 로그인 도구';
+    branded.summary = '1Password는 비밀번호 전달에 주의를 요구합니다.';
+    branded.evidence = [{ sourceId: 'source-1', quote: brandQuote }];
+    for (const slide of branded.slides) {
+      slide.title = '1Password의 설명';
+      slide.content = '비밀번호를 전달하면 통제하기 어려운 곳에 사본이 남을 수 있다고 1Password는 설명합니다.';
+      slide.evidence = branded.evidence;
+    }
+    assert.equal(validate(structuredClone(branded), brandState).draft.slides.length, 3, node.name);
+    branded.slides[0].content += ' 1년간 제공합니다.';
+    assert.throws(() => validate(branded, brandState), /슬라이드 1.*\(1\)/, node.name);
   }
 });

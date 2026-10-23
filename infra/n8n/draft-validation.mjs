@@ -38,9 +38,19 @@ export function numericValues(input) {
   });
 }
 
-export function assertSupportedNumbers(text, evidence, context) {
-  const supported = new Set(numericValues(evidence));
-  const missing = [...new Set(numericValues(text).filter(value => !supported.has(value)))];
+export function assertSupportedNumbers(text, evidence, context, sourceText = '') {
+  // A digit-prefixed mixed-case name (1Password, 23andMe) is not a quantity.
+  // Recognize only names attested in the source, not arbitrary model output.
+  // Source context establishes names only; numeric claims still need quoted evidence.
+  const token = /(?<![A-Za-z0-9_.-])\d+[A-Za-z]+(?![A-Za-z0-9_-])/g;
+  const unit = /^\d+(?:hundred|thousand|million|billion|trillion|years?|months?|weeks?|days?|hours?|minutes?|seconds?|percent|kg|mg|gb|mb|km|cm|mm|hz|mhz|ghz)$/i;
+  const names = new Set([...String(sourceText + ' ' + evidence).matchAll(token)]
+    .map(match => match[0]).filter(name => /[A-Z]/.test(name) && /[a-z]/.test(name) && !unit.test(name))
+    .map(name => name.toLowerCase()));
+  const quantities = value => numericValues(String(value ?? '').replace(token,
+    name => names.has(name.toLowerCase()) ? ' ' : name));
+  const supported = new Set(quantities(evidence));
+  const missing = [...new Set(quantities(text).filter(value => !supported.has(value)))];
   if (missing.length) throw new Error(`${context}: 인용 근거에 없는 수치가 있습니다 (${missing.join(', ')}).`);
 }
 

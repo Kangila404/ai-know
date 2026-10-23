@@ -83,6 +83,12 @@ for (const node of wf.nodes) {
       + "  assertSupportedNumbers([d.title,d.summary].join(' '), d.evidence.map(q=>q.quote).join(' '), '제목/요약');\n"
       + code.slice(stop);
   }
+  code = code.replace(
+    "x.evidence.map(q=>q.quote).join(' '), '슬라이드 '+x.sequence);",
+    "x.evidence.map(q=>q.quote).join(' '), '슬라이드 '+x.sequence, s.docs.filter(doc=>x.sourceIds.includes(doc.id)).map(doc=>doc.text).join(' '));");
+  code = code.replace(
+    "d.evidence.map(q=>q.quote).join(' '), '제목/요약');",
+    "d.evidence.map(q=>q.quote).join(' '), '제목/요약', s.docs.filter(doc=>d.evidence.some(q=>q.sourceId===doc.id)).map(doc=>doc.text).join(' '));");
   node.parameters.jsCode = code;
   updated++;
 }
