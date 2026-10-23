@@ -50,26 +50,3 @@ private struct HeaderIconButton: View {
         }
     }
 }
-
-struct NotificationPreviewSheet: View {
-    var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "bell.badge.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(.indigo)
-                .frame(width: 62, height: 62)
-                .background(Color.indigo.opacity(0.12), in: Circle())
-            VStack(spacing: 6) {
-                Text("오늘의 카드가 도착했어요")
-                    .font(.headline)
-                Text("매일 한 장의 AI 인사이트를 알려드릴게요.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Text("정적 목 데이터 기반 미리보기입니다.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .padding()
-    }
-}

@@ -33,10 +33,13 @@ public class SecurityConfig {
         HttpSecurity http,
         OAuth2LoginSuccessHandler successHandler,
         SessionAuthenticationService sessionAuthenticationService,
+        org.aiknow.server.user.repository.UserRepository users,
         ObjectMapper objectMapper
     ) throws Exception {
 
         http
+            .addFilterBefore(new org.aiknow.server.auth.service.CurrentAccountFilter(users, sessionAuthenticationService),
+                org.springframework.security.web.access.intercept.AuthorizationFilter.class)
             .cors(Customizer.withDefaults())
             .csrf(Customizer.withDefaults())
 

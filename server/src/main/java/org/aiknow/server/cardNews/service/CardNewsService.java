@@ -38,6 +38,19 @@ public class CardNewsService {
     private final NewsDeliveryProperties deliveryProperties;
     private final org.aiknow.server.notification.batch.DailyNewsEditionRepository editions;
     private final org.aiknow.server.cardNews.repository.CardReadRepository reads;
+    private final org.aiknow.server.cardNews.repository.CardViewRepository views;
+
+    @Transactional
+    public CardNewsResponse openCard(Long id, String userId) {
+        var user = userRepository.findByUserIdForUpdate(userId)
+            .filter(u -> !u.isSuspended()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        var card = approvedNews(id);
+        var now = clock.instant();
+        var existing = views.findByUserIdAndCardNewsId(user.getId(), id);
+        if (existing.isPresent()) existing.get().record(now);
+        else views.save(new CardView(user.getId(), id, now));
+        return responses(List.of(card), user).getFirst();
+    }
 
     @Transactional(readOnly = true)
     public List<CardNewsResponse> getCardNews(Pageable pageable, Long categoryId, String userId, boolean likedOnly) {

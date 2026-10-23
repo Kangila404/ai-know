@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        AC10000000000000000000001 = {isa = PBXBuildFile; fileRef = AC20000000000000000000001; };
 		A10000000000000000000001 /* AiKnowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AiKnowApp.swift */; };
 		A10000000000000000000002 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* RootTabView.swift */; };
 		A10000000000000000000003 /* NewsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* NewsCard.swift */; };
@@ -21,9 +22,22 @@
 		A10000000000000000000012 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* LoginView.swift */; };
 		A10000000000000000000013 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* OnboardingView.swift */; };
 		A10000000000000000000014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* Assets.xcassets */; };
+		B10000000000000000000001 = {isa = PBXBuildFile; productRef = B90000000000000000000001; };
+		B10000000000000000000002 = {isa = PBXBuildFile; fileRef = B20000000000000000000001; };
+		B10000000000000000000003 = {isa = PBXBuildFile; fileRef = B20000000000000000000002; };
+        C10000000000000000000001 = {isa = PBXBuildFile; productRef = C90000000000000000000001; };
+        C10000000000000000000002 = {isa = PBXBuildFile; fileRef = C20000000000000000000001; };
+        C10000000000000000000003 = {isa = PBXBuildFile; fileRef = C20000000000000000000002; };
+        D10000000000000000000001 = {isa = PBXBuildFile; fileRef = D20000000000000000000001; };
+        E10000000000000000000001 = {isa = PBXBuildFile; fileRef = E20000000000000000000001; };
+        F10000000000000000000001 = {isa = PBXBuildFile; productRef = F90000000000000000000001; };
+AB10000000000000000000001 = {isa = PBXBuildFile; fileRef = AB20000000000000000000001; };
+AB10000000000000000000002 = {isa = PBXBuildFile; fileRef = AB20000000000000000000002; };
+AB10000000000000000000003 = {isa = PBXBuildFile; fileRef = AB20000000000000000000003; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        AC20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminOperations.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000001 /* AiKnowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnowApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* NewsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsCard.swift; sourceTree = "<group>"; };
@@ -39,6 +53,16 @@
 		A20000000000000000000013 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A20000000000000000000014 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/PushNotifications.swift; sourceTree = SOURCE_ROOT; };
+		B20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = AiKnow.xcodeproj/GoogleService-Info.plist; sourceTree = SOURCE_ROOT; };
+        C20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/APIClient.swift; sourceTree = SOURCE_ROOT; };
+        C20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/AuthSession.swift; sourceTree = SOURCE_ROOT; };
+        D20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/AppleAuthorization.swift; sourceTree = SOURCE_ROOT; };
+        E20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnowUITests/LoginConnectionTests.swift; sourceTree = SOURCE_ROOT; };
+        E20000000000000000000002 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AiKnowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+AB20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminModels.swift; sourceTree = SOURCE_ROOT; };
+AB20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminViews.swift; sourceTree = SOURCE_ROOT; };
+AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/DevelopmentPreview.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +70,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B10000000000000000000001,
+                C10000000000000000000001,
+                F10000000000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,6 +83,16 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000002 /* AiKnow */,
+                E20000000000000000000001,
+				B20000000000000000000001,
+                C20000000000000000000001,
+                C20000000000000000000002,
+                D20000000000000000000001,
+                AB20000000000000000000003,
+                AC20000000000000000000001,
+                AB20000000000000000000002,
+                AB20000000000000000000001,
+				B20000000000000000000002,
 				A40000000000000000000009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -132,6 +169,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000007 /* AiKnow.app */,
+                E20000000000000000000002,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -185,10 +223,22 @@
 			dependencies = (
 			);
 			name = AiKnow;
+			packageProductDependencies = (B90000000000000000000001, C90000000000000000000001, F90000000000000000000001,);
 			productName = AiKnow;
 			productReference = A20000000000000000000007 /* AiKnow.app */;
 			productType = "com.apple.product-type.application";
 		};
+        E50000000000000000000001 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = E60000000000000000000001;
+            buildPhases = (E30000000000000000000001, E30000000000000000000002, E30000000000000000000003,);
+            buildRules = ();
+            dependencies = (E90000000000000000000002,);
+            name = AiKnowUITests;
+            productName = AiKnowUITests;
+            productReference = E20000000000000000000002;
+            productType = "com.apple.product-type.bundle.ui-testing";
+        };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -201,6 +251,7 @@
 				TargetAttributes = {
 					A50000000000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
+						SystemCapabilities = {com.apple.SignInWithApple = {enabled = 1;}; com.apple.Push = {enabled = 1;}; com.apple.BackgroundModes = {enabled = 1;};};
 					};
 				};
 			};
@@ -215,9 +266,11 @@
 			);
 			mainGroup = A40000000000000000000001;
 			productRefGroup = A40000000000000000000009 /* Products */;
+			packageReferences = (B90000000000000000000002, C90000000000000000000002, F90000000000000000000002,);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+                E50000000000000000000001,
 				A50000000000000000000001 /* AiKnow */,
 			);
 		};
@@ -229,6 +282,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* Assets.xcassets in Resources */,
+				B10000000000000000000003,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -252,6 +306,14 @@
 				A10000000000000000000011 /* SplashView.swift in Sources */,
 				A10000000000000000000012 /* LoginView.swift in Sources */,
 				A10000000000000000000013 /* OnboardingView.swift in Sources */,
+				B10000000000000000000002,
+                C10000000000000000000002,
+                C10000000000000000000003,
+                D10000000000000000000001,
+                AB10000000000000000000003,
+                AC10000000000000000000001,
+                AB10000000000000000000002,
+                AB10000000000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,8 +368,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CODE_SIGN_ENTITLEMENTS = AiKnow/AiKnow.entitlements;
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                APS_ENVIRONMENT = development;
+				INFOPLIST_FILE = AiKnow/Info.plist;
+				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = SS32PHC392;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -331,8 +398,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CODE_SIGN_ENTITLEMENTS = AiKnow/AiKnow.entitlements;
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                APS_ENVIRONMENT = production;
+				INFOPLIST_FILE = AiKnow/Info.plist;
+				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = SS32PHC392;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -353,6 +425,16 @@
 		};
 /* End XCBuildConfiguration section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+        B90000000000000000000002 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git"; requirement = {kind = upToNextMajorVersion; minimumVersion = 12.9.0;}; };
+/* End XCRemoteSwiftPackageReference section */
+/* Begin XCSwiftPackageProductDependency section */
+        B90000000000000000000001 = {isa = XCSwiftPackageProductDependency; package = B90000000000000000000002; productName = FirebaseMessaging; };
+/* End XCSwiftPackageProductDependency section */
+        F90000000000000000000002 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/kakao/kakao-ios-sdk.git"; requirement = {kind = exactVersion; version = 2.29.0;}; };
+        F90000000000000000000001 = {isa = XCSwiftPackageProductDependency; package = F90000000000000000000002; productName = KakaoSDKUser; };
+        C90000000000000000000002 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git"; requirement = {kind = exactVersion; version = 9.2.0;}; };
+        C90000000000000000000001 = {isa = XCSwiftPackageProductDependency; package = C90000000000000000000002; productName = GoogleSignIn; };
 /* Begin XCConfigurationList section */
 		A60000000000000000000001 /* Build configuration list for PBXProject "AiKnow" */ = {
 			isa = XCConfigurationList;
@@ -373,6 +455,15 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+        E30000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (E10000000000000000000001,); runOnlyForDeploymentPostprocessing = 0;};
+        E30000000000000000000002 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+        E30000000000000000000003 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0;};
+        E90000000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = A70000000000000000000001; proxyType = 1; remoteGlobalIDString = A50000000000000000000001; remoteInfo = AiKnow;};
+        E90000000000000000000002 = {isa = PBXTargetDependency; target = A50000000000000000000001; targetProxy = E90000000000000000000001;};
+        E60000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (E80000000000000000000001, E80000000000000000000002,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+        E80000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = SS32PHC392; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = org.aiknow.AiKnowUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = AiKnow; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";}; name = Debug;};
+        E80000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = SS32PHC392; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; PRODUCT_BUNDLE_IDENTIFIER = org.aiknow.AiKnowUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; TEST_TARGET_NAME = AiKnow; SDKROOT = iphoneos; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";}; name = Release;};
 	};
 	rootObject = A70000000000000000000001 /* Project object */;
 }

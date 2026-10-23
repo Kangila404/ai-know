@@ -36,7 +36,7 @@ public class EditorialController {
     public EditorialService.Article restore(@PathVariable Long id, @Valid @RequestBody EditorialService.Action body,
         @AuthenticationPrincipal String actor) { return editorial.visibility(id, true, body, actor); }
     @GetMapping("/editorial/history")
-    public Page<EditorialAudit> history(@RequestParam @Pattern(regexp = "SUBMISSION|ARTICLE|GENERATION") String resourceType,
+    public Page<EditorialAudit> history(@RequestParam @Pattern(regexp = "SUBMISSION|ARTICLE|GENERATION|USER") String resourceType,
         @RequestParam @Positive Long resourceId, @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return audits.findByResourceTypeAndResourceIdOrderByIdDesc(resourceType, resourceId, PageRequest.of(page, size));

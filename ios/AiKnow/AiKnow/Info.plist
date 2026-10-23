@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AIKnowAPIBaseURL</key>
+	<string>$(AIKNOW_API_BASE_URL)</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>GIDClientID</key>
+	<string>911270764810-7fv7p889f1ir36ilnfg18qqldvqga0ng.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>GoogleSignIn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.911270764810-7fv7p889f1ir36ilnfg18qqldvqga0ng</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>KakaoLogin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaod73639f6dbccf8cc1d6ada9a092299ee</string>
+			</array>
+		</dict>
+	</array>
+	<key>GIDServerClientID</key>
+	<string>911270764810-q5jojr7eh8im5j83nhp0gmltotsv1btf.apps.googleusercontent.com</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>개발 서버에 연결하여 로그인과 알림 설정을 처리합니다.</string>
+	<key>KakaoNativeAppKey</key>
+	<string>d73639f6dbccf8cc1d6ada9a092299ee</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
