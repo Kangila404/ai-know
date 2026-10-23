@@ -25,7 +25,7 @@ public class NewsDeliveryPlanner {
     public void plan(Long settingId, LocalDate date, LocalTime time, Instant now) {
         var setting = settings.findForUpdate(settingId).orElse(null);
         if (setting == null || !setting.isAllowed() || setting.getSettingTime().isAfter(time)
-            || !users.existsById(setting.getUserId())) return;
+            || !users.existsByIdAndSuspendedFalse(setting.getUserId())) return;
         var edition = editions.findById(date).orElse(null);
         if (edition == null || edition.getCardNewsId() == null) return;
         var article = news.findById(edition.getCardNewsId()).orElse(null);

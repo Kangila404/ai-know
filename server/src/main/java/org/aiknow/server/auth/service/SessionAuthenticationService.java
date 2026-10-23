@@ -77,6 +77,8 @@ public class SessionAuthenticationService {
     private Authentication createAuthentication(String userId) {
         User user = userRepository.findByUserId(userId)
             .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+        if (user.isSuspended()) throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.FORBIDDEN, "이용이 정지된 계정입니다.");
 
         return UsernamePasswordAuthenticationToken.authenticated(
             userId,

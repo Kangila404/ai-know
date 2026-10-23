@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        AC10000000000000000000001 = {isa = PBXBuildFile; fileRef = AC20000000000000000000001; };
 		A10000000000000000000001 /* AiKnowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AiKnowApp.swift */; };
 		A10000000000000000000002 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* RootTabView.swift */; };
 		A10000000000000000000003 /* NewsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* NewsCard.swift */; };
@@ -36,6 +37,7 @@ AB10000000000000000000003 = {isa = PBXBuildFile; fileRef = AB2000000000000000000
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        AC20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminOperations.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000001 /* AiKnowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnowApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* NewsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsCard.swift; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 C20000000000000000000002,
                 D20000000000000000000001,
                 AB20000000000000000000003,
+                AC20000000000000000000001,
                 AB20000000000000000000002,
                 AB20000000000000000000001,
 				B20000000000000000000002,
@@ -308,6 +311,7 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 C10000000000000000000003,
                 D10000000000000000000001,
                 AB10000000000000000000003,
+                AC10000000000000000000001,
                 AB10000000000000000000002,
                 AB10000000000000000000001,
 			);

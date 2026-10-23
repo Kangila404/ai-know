@@ -1,0 +1,43 @@
+name: iOS build
+on:
+  pull_request:
+    branches: [main, develop]
+    paths: ['ios/**', '.github/workflows/ios-build.yml']
+  push:
+    branches: [main, develop]
+    paths: ['ios/**', '.github/workflows/ios-build.yml']
+permissions:
+  contents: read
+concurrency:
+  group: ios-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator-build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Supply non-production Firebase build fixture
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+          target = Path("ios/AiKnow/AiKnow.xcodeproj/GoogleService-Info.plist")
+          target.write_bytes(plistlib.dumps({
+              "GOOGLE_APP_ID": "1:123456789:ios:ci-fixture",
+              "GCM_SENDER_ID": "123456789", "API_KEY": "ci-build-only",
+              "PROJECT_ID": "ci-build-only", "BUNDLE_ID": "org.aiknow.AiKnow"
+          }))
+          PY
+      - name: Compile app for iOS Simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/AiKnow/AiKnow.xcodeproj -scheme AiKnow \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath /tmp/aiknow-ios-build CODE_SIGNING_ALLOWED=NO build \
+            > /tmp/aiknow-ios-build.log 2>&1 || { tail -n 120 /tmp/aiknow-ios-build.log; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-build-log
+          path: /tmp/aiknow-ios-build.log
