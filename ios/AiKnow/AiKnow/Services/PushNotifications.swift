@@ -89,7 +89,6 @@ final class PushNotifications {
     }
 
     func refresh() async {
-        guard !AuthSession.shared.isPreview else { status = "개발 미리보기 · 기기에 등록하지 않습니다."; return }
         authorization = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         guard [.authorized, .provisional, .ephemeral].contains(authorization) else { return }
         UIApplication.shared.registerForRemoteNotifications()
@@ -104,7 +103,7 @@ final class PushNotifications {
 
     /// Call after native login completes. Uses the same session-cookie store as URLSession.shared.
     func syncToken() async {
-        guard AuthSession.shared.user != nil, !AuthSession.shared.isPreview, !AuthSession.shared.busy, !syncing, let token,
+        guard AuthSession.shared.user != nil, !AuthSession.shared.busy, !syncing, let token,
               [.authorized, .provisional, .ephemeral].contains(authorization) else { return }
         syncing = true
         defer {

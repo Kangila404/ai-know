@@ -30,7 +30,7 @@ struct ProfileView: View {
                 }
                 Section {
                     Button("로그아웃") { Task { await login.logout() } }.disabled(login.busy)
-                    Button("회원탈퇴", role: .destructive) { confirmingWithdrawal = true }.disabled(login.busy || login.isPreview)
+                    Button("회원탈퇴", role: .destructive) { confirmingWithdrawal = true }.disabled(login.busy)
                     if let message = login.errorMessage { Text(message).font(.footnote).foregroundStyle(.red) }
                 }
             }.navigationTitle("마이")

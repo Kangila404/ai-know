@@ -14,26 +14,6 @@ final class AuthSession {
     private(set) var busy = false
     var errorMessage: String?
     var isAdmin: Bool { user?.userRole == "ADMIN" }
-    var isPreview: Bool {
-        #if DEBUG
-        return APIClient.shared.previewRequest != nil
-        #else
-        return false
-        #endif
-    }
-    #if DEBUG
-    func beginPreview(admin: Bool) {
-        let preview = DevelopmentPreview(admin: admin)
-        APIClient.shared.previewRequest = preview.request
-        user = preview.user
-        errorMessage = nil
-    }
-    func endPreview() {
-        APIClient.shared.previewRequest = nil
-        user = nil
-        errorMessage = nil
-    }
-    #endif
     private let logger = Logger(subsystem: "org.aiknow.AiKnow", category: "Authentication")
     private let appleAuthorization = AppleAuthorization()
 
@@ -160,13 +140,13 @@ final class AuthSession {
 
     private var refreshingUser = false
     func refreshAccountIfSignedIn() async {
-        guard let current = user, !isPreview, !busy, !refreshingUser else { return }
+        guard let current = user, !busy, !refreshingUser else { return }
         refreshingUser = true
         defer { refreshingUser = false }
         do {
             let updated = try await APIClient.shared.currentUser()
             // Do not restore a stale account if logout or another sign-in completed meanwhile.
-            guard !busy, !isPreview, user != nil, user?.userId == current.userId else { return }
+            guard !busy, user != nil, user?.userId == current.userId else { return }
             user = updated
         } catch { /* APIClient handles 401; keep the current screen on transient network failures. */ }
     }
@@ -187,7 +167,6 @@ final class AuthSession {
     }
 
     func withdraw() async {
-        if isPreview { errorMessage = "미리보기에서는 계정을 삭제하지 않습니다."; return }
         guard !busy else { return }
         busy = true; errorMessage = nil
         defer { busy = false }
@@ -202,9 +181,6 @@ final class AuthSession {
     }
 
     func logout() async {
-        #if DEBUG
-        if isPreview { endPreview(); return }
-        #endif
         guard !busy else { return }
         busy = true
         defer { busy = false }

@@ -32,7 +32,8 @@
         F10000000000000000000001 = {isa = PBXBuildFile; productRef = F90000000000000000000001; };
 AB10000000000000000000001 = {isa = PBXBuildFile; fileRef = AB20000000000000000000001; };
 AB10000000000000000000002 = {isa = PBXBuildFile; fileRef = AB20000000000000000000002; };
-AB10000000000000000000003 = {isa = PBXBuildFile; fileRef = AB20000000000000000000003; };
+AC10000000000000000000001 = {isa = PBXBuildFile; fileRef = AC20000000000000000000001; };
+AC10000000000000000000002 = {isa = PBXBuildFile; fileRef = AC20000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,7 +61,8 @@ AB10000000000000000000003 = {isa = PBXBuildFile; fileRef = AB2000000000000000000
         E20000000000000000000002 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AiKnowUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 AB20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminModels.swift; sourceTree = SOURCE_ROOT; };
 AB20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminViews.swift; sourceTree = SOURCE_ROOT; };
-AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/DevelopmentPreview.swift; sourceTree = SOURCE_ROOT; };
+AC20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = file; path = AiKnow/Resources/GoogleSans.ttf; sourceTree = SOURCE_ROOT; };
+AC20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text; path = "AiKnow/Resources/GoogleSans-OFL.txt"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,12 +83,13 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000002 /* AiKnow */,
+                AC20000000000000000000001,
+                AC20000000000000000000002,
                 E20000000000000000000001,
 				B20000000000000000000001,
                 C20000000000000000000001,
                 C20000000000000000000002,
                 D20000000000000000000001,
-                AB20000000000000000000003,
                 AB20000000000000000000002,
                 AB20000000000000000000001,
 				B20000000000000000000002,
@@ -279,6 +282,8 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* Assets.xcassets in Resources */,
+                AC10000000000000000000001,
+                AC10000000000000000000002,
 				B10000000000000000000003,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -307,7 +312,6 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 C10000000000000000000002,
                 C10000000000000000000003,
                 D10000000000000000000001,
-                AB10000000000000000000003,
                 AB10000000000000000000002,
                 AB10000000000000000000001,
 			);
@@ -369,7 +373,7 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 APS_ENVIRONMENT = development;
 				INFOPLIST_FILE = AiKnow/Info.plist;
 				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = SS32PHC392;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -399,7 +403,7 @@ AB20000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = sourcec
                 APS_ENVIRONMENT = production;
 				INFOPLIST_FILE = AiKnow/Info.plist;
 				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = SS32PHC392;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

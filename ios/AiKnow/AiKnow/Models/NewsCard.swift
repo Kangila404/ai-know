@@ -157,7 +157,7 @@ struct RequestFailureView: View {
 struct RemoteImage: View {
     let raw: String?
     var body: some View {
-        AsyncImage(url: AuthSession.shared.isPreview ? nil : APIClient.shared.mediaURL(raw)) { phase in
+        AsyncImage(url: APIClient.shared.mediaURL(raw)) { phase in
             if let image = phase.image { image.resizable().scaledToFit() }
             else {
                 RoundedRectangle(cornerRadius: 16).fill(Color.indigo.opacity(0.1))
