@@ -265,3 +265,10 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 2026-10-23 검증: 관리자 검수·게시 숨김/복원, 공지/프로필 CRUD, 생성 응답 복구, ADMIN↔USER 탭 갱신의 4개 UI 시나리오는 수정 후 개별 재실행을 포함해 통과했습니다. 일반 사용자 HTTP UI 테스트도 11개 요청 항목을 모두 검증했습니다. APIClient 인증·세션·CSRF·multipart 회귀 테스트와 `node scripts/validate-infra.mjs`도 통과했습니다. 운영 `https://aiknow.kro.kr/health-check`와 로그인 제공자 목록은 정상 응답했으며 현재 제공자는 GOOGLE/KAKAO입니다. 실제 운영 관리자 계정으로 쓰기, 실제 이미지 복구 업로드, 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 재검증하지 않았습니다.
 
 로그인 버튼 UI 테스트는 라이트/다크 2개 시나리오와 APPLE/GOOGLE/KAKAO challenge 연결을 통과했습니다. Google SVG 렌더링 문제는 공식 PNG 원본으로 교체했으며, 마지막 일반 Debug 빌드에서 운영 API 주소와 최종 라이트/다크 버튼 렌더링을 별도로 확인했습니다. 화면 캡처는 `.local/login-branding-evidence/final-production-{light,dark}.png`에 있습니다.
+
+
+### 2026-10-23 TestFlight 업로드 — 1.0 (3)
+
+14:58 KST에 Xcode가 `Upload succeeded`, `Uploaded package is processing`, `EXPORT SUCCEEDED`를 반환했고 전송 메타데이터의 버전 3을 확인했습니다. 배포 코드 커밋은 `94bfdcc`이며 [PR #25](https://github.com/Kangila404/ai-know/pull/25)에서 검토할 수 있습니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
+
+App Store 배포용 IPA의 코드 서명과 provisioning profile에서 Bundle ID `org.aiknow.AiKnow`, Team `SS32PHC392`, Production APNs, Sign in with Apple, 디버깅 비활성화를 확인했습니다. 최종 실행 파일에 개발 미리보기 진입 인자·타입·표시 문자열이 없고 API 주소가 `https://aiknow.kro.kr`인 것도 확인했습니다. 아카이브·검증 IPA·업로드 로그는 `.local/testflight/2026-10-23-build-3/`에 보관합니다.
