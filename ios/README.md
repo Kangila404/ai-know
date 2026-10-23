@@ -323,3 +323,8 @@ Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니�
 빌드 5는 16:05 KST 업로드 수락/처리 시작을 확인했으며, 이 정책 안내까지 반영한 빌드 6을 후속 배포합니다.
 
 추가 검증: `NewsIngestionTests` 9개와 AI 이론 선택→승인→게시 카드 관리, READY 뉴스 공개 변경 차단 UI 시나리오 2개를 통과했습니다. 최신 main `de1868b`의 Server CI와 EC2 배포 성공도 확인했습니다. 빌드 5에서 검증한 사용자 관리·조회수·로그인·일반 사용자 흐름의 구현은 유지합니다.
+
+
+빌드 6 배포 결과: 2026-10-23 16:14 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했고 전송 메타데이터의 빌드 번호 6을 확인했습니다. 앱 코드 기준은 `efbc734`이며 최신 main `de1868b`(PR #29)를 포함합니다. Debug/Release 빌드, App Store IPA 서명과 Production APNs/Sign in with Apple, 운영 HTTPS 주소 검증을 통과했습니다. 시뮬레이터도 운영 API를 사용하는 빌드 6으로 복원했습니다.
+
+아카이브·서명 검증·업로드 로그는 로컬 `.local/testflight/2026-10-23-build-6/`에 보관합니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치와 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 확인하지 않았습니다. 빌드 5 구현 커밋 `32cda6d`의 GitHub Server CI/iOS build도 통과했으며, 후속 커밋의 자동 검사는 별도로 실행됩니다.
