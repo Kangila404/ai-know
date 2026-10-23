@@ -158,6 +158,42 @@ class NewsIngestionTests {
     }
 
     @Test
+    void theoryApprovalPublishesArchiveImmediatelyWithoutSendingOrConsumingFallback() throws Exception {
+        var approvedAt = Instant.parse("2026-10-06T16:00:00Z"); // Oct 7 in Seoul
+        when(clock.instant()).thenReturn(approvedAt);
+        long id = receive();
+        var session = login(admin); var token = csrf(session);
+        mvc.perform(get("/api/v1/cardNews").session(session)).andExpect(jsonPath("$.length()").value(0));
+        var body = mapper.writeValueAsString(new NewsSubmissionService.Approve(ContentType.AI_THEORY, List.of()));
+        for (int i=0; i<2; i++)
+            mvc.perform(post("/api/v1/admin/news-submissions/{id}/approve",id).session(session).header("X-CSRF-TOKEN",token)
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+        assertThat(news.count()).isEqualTo(1);
+        var article = news.findAll().getFirst();
+        assertThat(article.getPublicationStatus()).isEqualTo(PublicationStatus.PUBLISHED);
+        assertThat(article.getPublicationDate()).isEqualTo(LocalDate.of(2026,10,7));
+        assertThat(article.getFirstUsedAt()).isNull(); assertThat(article.getLastUsedAt()).isNull();
+        assertThat(deliveries.count()).isZero(); assertThat(editionRepository.count()).isZero();
+        mvc.perform(get("/api/v1/cardNews").session(session)).andExpect(jsonPath("$[0].id").value(article.getId()));
+        mvc.perform(get("/api/v1/cardNews/cardSlides").session(session).param("cardNewsId",article.getId().toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$[0].imageSourceUrl").value("https://example.com/image-source"));
+        mvc.perform(get("/api/v1/cardNews/today").session(session)).andExpect(status().isNotFound());
+        // The archive item remains eligible as an unused theory fallback on a later day.
+        var sendDate=LocalDate.of(2026,10,8);
+        var sendTime=sendDate.atTime(9,0).atZone(ZoneId.of("Asia/Seoul")).toInstant();
+        when(clock.instant()).thenReturn(sendTime);
+        editions.ensure(sendDate,sendTime);
+        var setting=NotificationSetting.createDefault(admin.getId()); setting.updateAllowed(true); settings.save(setting);
+        tokens.save(DeviceToken.register(admin.getId(),"theory-review-device",DeviceType.IOS,LocalDateTime.now()));
+        planner.plan(setting.getId(),sendDate,LocalTime.of(9,0),sendTime);
+        ledger.claim(deliveries.findAll().getFirst().getId(),sendTime).orElseThrow();
+        article=news.findById(article.getId()).orElseThrow();
+        assertThat(article.getFirstUsedAt()).isEqualTo(sendTime);
+        assertThat(article.getLastUsedAt()).isEqualTo(sendTime);
+        assertThat(article.getPublicationDate()).isEqualTo(LocalDate.of(2026,10,7));
+    }
+
+    @Test
     void rejectsInvalidSlidesMissingAttributionAndConflictingSourceRetries() throws Exception {
         var body = mapper.writeValueAsString(draft());
         mvc.perform(post(IMPORT).header("Authorization", AUTH).contentType(MediaType.APPLICATION_JSON)
