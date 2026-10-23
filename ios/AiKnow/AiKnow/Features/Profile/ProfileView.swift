@@ -3,14 +3,28 @@ import SwiftUI
 struct ProfileView: View {
     @State private var login = AuthSession.shared
     @State private var confirmingWithdrawal = false
+    @State private var choosingAvatar = false
+    @State private var editingNickname = false
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     HStack(spacing: 14) {
-                        ProfileAvatar(raw: login.user?.profile?.imgUrl, size: 54)
+                        Button { choosingAvatar = true } label: {
+                            ProfileAvatar(raw: login.user?.profile?.imgUrl, size: 64)
+                                .overlay(alignment: .bottomTrailing) {
+                                    Image(systemName: "pencil.circle.fill").symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, AppPalette.accent).font(.title3)
+                                }
+                        }.buttonStyle(.plain).accessibilityLabel("프로필 이미지 변경").accessibilityIdentifier("profile.avatar")
                         VStack(alignment: .leading, spacing: 5) {
-                            Text("\(login.user?.nickname ?? "사용자")님").font(.headline)
+                            Button { editingNickname = true } label: {
+                                HStack(spacing: 6) {
+                                    Text("\(login.user?.nickname ?? "사용자")님").font(.headline)
+                                    Image(systemName: "pencil").font(.caption).foregroundStyle(.secondary)
+                                }.foregroundStyle(.primary).padding(.vertical, 10).contentShape(Rectangle())
+                            }.buttonStyle(.plain).accessibilityLabel("닉네임 변경").accessibilityValue(login.user?.nickname ?? "사용자")
+                                .accessibilityIdentifier("profile.nickname")
                             Text("AI와 함께 더 나은 내일을 만들어가요!").font(.caption).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 8)
@@ -18,7 +32,6 @@ struct ProfileView: View {
                 Section {
                     NavigationLink { NoticeListView() } label: { Label("공지사항", systemImage: "megaphone") }
                     NavigationLink { PushSettingsView() } label: { Label("알림 설정", systemImage: "bell") }
-                    NavigationLink { ProfileInfoView() } label: { Label("프로필 편집", systemImage: "person.text.rectangle") }
                 }
                 Section {
                     Button("로그아웃") { Task { await login.logout() } }.disabled(login.busy)
@@ -27,6 +40,8 @@ struct ProfileView: View {
                 }
             }.navigationTitle("마이")
                 .refreshable { await login.refreshAccountIfSignedIn() }
+                .sheet(isPresented: $choosingAvatar) { AvatarPickerView() }
+                .sheet(isPresented: $editingNickname) { NicknameEditor(nickname: login.user?.nickname ?? "") }
                 .confirmationDialog("계정을 삭제할까요?", isPresented: $confirmingWithdrawal, titleVisibility: .visible) {
                     Button("회원탈퇴", role: .destructive) { Task { await login.withdraw() } }
                     Button("취소", role: .cancel) { }
@@ -93,84 +108,97 @@ private struct NoticeDetailView: View {
     }
 }
 
-private struct ProfileInfoView: View {
+private struct NicknameEditor: View {
+    @State var nickname: String
+    @State private var saving = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+    @Environment(\.dismiss) private var dismiss
+    private var trimmed: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canSave: Bool { !saving && !trimmed.isEmpty && trimmed != AuthSession.shared.user?.nickname }
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("닉네임 (20자 이내)", text: $nickname)
+                    .focused($focused).submitLabel(.done)
+                    .onChange(of: nickname) { _, value in if value.count > 20 { nickname = String(value.prefix(20)) } }
+                    .onSubmit { if canSave { Task { await save() } } }
+                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            }.navigationTitle("닉네임 변경").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() }.disabled(saving) }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(saving ? "저장 중…" : "저장") { Task { await save() } }.disabled(!canSave)
+                    }
+                }
+                .disabled(saving)
+                .task { focused = true }
+        }.presentationDetents([.medium]).interactiveDismissDisabled(saving)
+    }
+    private func save() async {
+        guard canSave else { return }
+        saving = true; error = nil
+        defer { saving = false }
+        do {
+            struct Nickname: Encodable { let nickname: String }
+            _ = try await APIClient.shared.request(path: "api/v1/users/nickname", method: "PATCH", body: JSONEncoder().encode(Nickname(nickname: trimmed)))
+            try await AuthSession.shared.refreshUser(); dismiss()
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct AvatarPickerView: View {
     @State private var login = AuthSession.shared
-    @State private var nickname = ""
-    @FocusState private var editingNickname: Bool
     @State private var profiles: [APIClient.Profile] = []
-    @State private var selected: Int64?
     @State private var loading = true
     @State private var saving = false
     @State private var error: String?
     @Environment(\.dismiss) private var dismiss
-    private var hasChanges: Bool { nickname.trimmingCharacters(in: .whitespacesAndNewlines) != login.user?.nickname || selected != login.user?.profile?.id }
     var body: some View {
-        Form {
-            if loading { ProgressView() }
-            Section("닉네임") {
-                TextField("닉네임 (20자 이내)", text: $nickname)
-                    .focused($editingNickname)
-                    .submitLabel(.done)
-                    .onSubmit { editingNickname = false }
-                    .onChange(of: nickname) { _, value in if value.count > 20 { nickname = String(value.prefix(20)) } }
-            }
-            Section("프로필 이미지") {
-                if profiles.isEmpty && !loading { Text("선택할 수 있는 이미지가 없습니다.").foregroundStyle(.secondary) }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 12)], spacing: 20) {
-                    ForEach(profiles) { profile in
-                        Button { selected = profile.id } label: {
-                            VStack(spacing: 8) {
-                                ProfileAvatar(raw: profile.imgUrl, size: 72)
-                                    .padding(4)
-                                    .overlay(Circle().stroke(selected == profile.id ? AppPalette.accent : .clear, lineWidth: 3))
-                                    .overlay(alignment: .bottomTrailing) {
-                                        if selected == profile.id {
-                                            Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette)
-                                                .foregroundStyle(.white, AppPalette.accent).font(.title3)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    if loading || saving { ProgressView() }
+                    if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                    if profiles.isEmpty && !loading && error == nil { Text("선택할 수 있는 이미지가 없습니다.").foregroundStyle(.secondary) }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 12)], spacing: 24) {
+                        ForEach(profiles) { profile in
+                            Button { Task { await select(profile) } } label: {
+                                VStack(spacing: 8) {
+                                    ProfileAvatar(raw: profile.imgUrl, size: 72).padding(4)
+                                        .overlay(Circle().stroke(login.user?.profile?.id == profile.id ? AppPalette.accent : .clear, lineWidth: 3))
+                                        .overlay(alignment: .bottomTrailing) {
+                                            if login.user?.profile?.id == profile.id {
+                                                Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette)
+                                                    .foregroundStyle(.white, AppPalette.accent).font(.title3)
+                                            }
                                         }
-                                    }
-                                Text(profile.name).font(.caption.weight(.medium)).foregroundStyle(.primary)
-                            }.frame(maxWidth: .infinity).contentShape(Rectangle())
-                        }.buttonStyle(.plain).accessibilityLabel(profile.name)
-                            .accessibilityAddTraits(selected == profile.id ? .isSelected : [])
-                    }
-                }.padding(.vertical, 12)
-
-            }
-            if let error { Section { Text(error).font(.footnote).foregroundStyle(.red) } }
-            Section {
-                Button(saving ? "저장 중…" : "저장") { Task { await save() } }
-                    .disabled(loading || saving || !hasChanges || nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("입력 완료") { editingNickname = false }
-            }
-        }
-        .navigationTitle("프로필 편집").navigationBarTitleDisplayMode(.inline).disabled(saving).task { await load() }.refreshable { await load() }
+                                    Text(profile.name).font(.caption.weight(.medium)).foregroundStyle(.primary)
+                                }.frame(maxWidth: .infinity).contentShape(Rectangle())
+                            }.buttonStyle(.plain).accessibilityLabel(profile.name)
+                                .accessibilityAddTraits(login.user?.profile?.id == profile.id ? .isSelected : [])
+                        }
+                    }.disabled(saving)
+                }.padding(24)
+            }.navigationTitle("프로필 이미지").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() }.disabled(saving) } }
+                .task { await load() }.refreshable { await load() }
+        }.presentationDetents([.medium, .large]).interactiveDismissDisabled(saving)
     }
     private func load() async {
-        loading = true; error = nil; defer { loading = false }
-        do {
-            try await login.refreshUser()
-            nickname = login.user?.nickname ?? ""; selected = login.user?.profile?.id
-            profiles = try await APIClient.shared.decode("api/v1/profile")
-        } catch { self.error = error.localizedDescription }
+        guard !saving else { return }
+        loading = true; error = nil
+        defer { loading = false }
+        do { profiles = try await APIClient.shared.decode("api/v1/profile") }
+        catch { self.error = error.localizedDescription }
     }
-    private func save() async {
-        saving = true; error = nil; defer { saving = false }
+    private func select(_ profile: APIClient.Profile) async {
+        guard !saving else { return }
+        if login.user?.profile?.id == profile.id { dismiss(); return }
+        saving = true; error = nil
+        defer { saving = false }
         do {
-            struct Nickname: Encodable { let nickname: String }
-            let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed != login.user?.nickname {
-                _ = try await APIClient.shared.request(path: "api/v1/users/nickname", method: "PATCH", body: JSONEncoder().encode(Nickname(nickname: trimmed)))
-            }
-            if let selected, selected != login.user?.profile?.id {
-                _ = try await APIClient.shared.request(path: "api/v1/users/profile/\(selected)", method: "PATCH")
-            }
+            _ = try await APIClient.shared.request(path: "api/v1/users/profile/\(profile.id)", method: "PATCH")
             try await login.refreshUser(); dismiss()
         } catch { self.error = error.localizedDescription }
     }

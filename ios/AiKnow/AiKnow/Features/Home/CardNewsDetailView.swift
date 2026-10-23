@@ -22,24 +22,8 @@ struct CardNewsDetailView: View {
             else {
                 TabView(selection: $currentSlide) {
                     ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 20) {
-                                if APIClient.shared.mediaURL(slide.imgUrl) != nil {
-                                    RemoteImage(raw: slide.imgUrl).clipShape(RoundedRectangle(cornerRadius: 20))
-                                        .overlay(alignment: .bottomTrailing) {
-                                            Button { showImage = true } label: {
-                                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                                    .frame(width: 44, height: 44)
-                                                    .background(.regularMaterial, in: Circle())
-                                            }.buttonStyle(.plain).padding(8)
-                                                .accessibilityLabel("이미지 확대")
-                                        }
-                                }
-                                if let title = slide.title { Text(title).font(.title.bold()).fixedSize(horizontal: false, vertical: true) }
-                                if let content = slide.content { Text(content).font(.body).lineSpacing(5).fixedSize(horizontal: false, vertical: true) }
-                            }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 26)).padding(16)
-                        }.tag(index).accessibilityIdentifier("story.page.\(index)")
+                        ReadingPage(slide: slide, expandImage: { showImage = true })
+                            .tag(index).accessibilityIdentifier("story.page.\(index)")
                     }
                 }.tabViewStyle(.page(indexDisplayMode: .never))
                 // Keep pagination outside the scrollable content so it never covers text.
@@ -139,6 +123,50 @@ struct CardNewsDetailView: View {
             card = result; store.remember(result); slides = content.sorted { $0.sequence < $1.sequence }; currentSlide = 0
         } catch { self.error = error.localizedDescription }
     }
+}
+
+/// Allocate the full page between an uncropped image and naturally sized text.
+/// Long text grows the scroll content instead of shrinking or clipping the text.
+private struct ReadingPage: View {
+    let slide: StorySlide
+    let expandImage: () -> Void
+    @State private var textHeight: CGFloat = 180
+    var body: some View {
+        GeometryReader { geometry in
+            let width = max(1, geometry.size.width - 24)
+            let height = max(1, geometry.size.height - 16)
+            let imageHeight = max(min(width * 0.75, 260), height - textHeight)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    if APIClient.shared.mediaURL(slide.imgUrl) != nil {
+                        RemoteImage(raw: slide.imgUrl, aspectRatio: width / imageHeight)
+                            .frame(width: width, height: imageHeight)
+                            .overlay(alignment: .bottomTrailing) {
+                                Button(action: expandImage) {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .frame(width: 44, height: 44).background(.regularMaterial, in: Circle())
+                                }.buttonStyle(.plain).padding(12).accessibilityLabel("이미지 확대")
+                            }
+                    }
+                    VStack(alignment: .leading, spacing: 16) {
+                        if let title = slide.title { Text(title).font(.title.bold()).fixedSize(horizontal: false, vertical: true) }
+                        if let content = slide.content {
+                            Text(content).font(.title3).lineSpacing(6).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("story.body.\(slide.id)")
+                        }
+                    }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+                        .background { GeometryReader { text in Color.clear.preference(key: ReadingTextHeight.self, value: text.size.height) } }
+                }.frame(width: width, alignment: .leading).frame(minHeight: height, alignment: .top)
+                    .background(AppPalette.surface).clipShape(RoundedRectangle(cornerRadius: 24))
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+            }.onPreferenceChange(ReadingTextHeight.self) { if abs(textHeight - $0) > 1 { textHeight = $0 } }
+        }
+    }
+}
+
+private struct ReadingTextHeight: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 private struct CardImageViewer: View {
