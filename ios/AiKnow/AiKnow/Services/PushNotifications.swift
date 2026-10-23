@@ -134,83 +134,62 @@ final class PushNotifications {
 
 struct PushSettingsView: View {
     @State private var push = PushNotifications.shared
-    @State private var allowed = false
-    @State private var settingTime = Date()
-    @State private var settingsLoading = true
-    @State private var settingsLoaded = false
-    @State private var saving = false
-    @State private var settingsError: String?
-    @State private var saved = false
+    @State private var preferences = NotificationPreferences()
+    @State private var requestingPermission = false
+    @Environment(\.scenePhase) private var scenePhase
     private var seoul: TimeZone { TimeZone(identifier: "Asia/Seoul")! }
     private var calendar: Calendar { var value = Calendar(identifier: .gregorian); value.timeZone = seoul; return value }
-
+    private var selectedTime: Date {
+        let parts = (preferences.value?.settingTime ?? "09:00:00").split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return Date() }
+        return calendar.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: Date()) ?? Date()
+    }
     var body: some View {
         Form {
-            Section("매일 카드뉴스 알림") {
-                if settingsLoading { ProgressView("알림 설정을 불러오는 중…") }
-                Toggle("매일 알림 받기", isOn: $allowed)
-                    .disabled(!settingsLoaded || saving)
-                DatePicker("받는 시간 (한국 시간)", selection: $settingTime, displayedComponents: .hourAndMinute)
-                    .environment(\.timeZone, seoul).disabled(!settingsLoaded || saving)
-                Button(saving ? "저장 중…" : "알림 설정 저장") { Task { await saveSettings() } }
-                    .disabled(!settingsLoaded || saving)
-                if saved { Text("저장했습니다.").foregroundStyle(.green) }
-                if let settingsError { RequestFailureView(message: settingsError) { Task { await loadSettings() } } }
-                if allowed && push.authorization == .denied {
-                    Text("기기의 알림 권한도 허용해야 알림을 받을 수 있습니다.").font(.footnote)
+            Section {
+                Toggle("매일 카드 알림", isOn: Binding(get: { preferences.value?.isAllowed ?? false }, set: { enabled in
+                    Task { await changePermission(enabled) }
+                }))
+                .accessibilityIdentifier("notifications.daily")
+                .disabled(preferences.value == nil || requestingPermission)
+                if preferences.value?.isAllowed == true {
+                    DatePicker("받는 시간", selection: Binding(get: { selectedTime }, set: { date in
+                        preferences.setTime(String(format: "%02d:%02d:00", calendar.component(.hour, from: date), calendar.component(.minute, from: date)))
+                    }), displayedComponents: .hourAndMinute)
+                    .environment(\.timeZone, seoul)
+                    .accessibilityIdentifier("notifications.time")
                 }
+            } footer: {
+                Text("하루 한 번, 새로운 AI 이야기를 보내드려요. 시간은 한국 시간 기준이에요.")
             }
-            Section("푸시 알림") {
-                LabeledContent("기기 알림 권한", value: push.permissionDescription)
-                Text(push.status).font(.footnote).foregroundStyle(.secondary)
-                Button("알림 허용") { Task { await push.requestPermission() } }
-                    .disabled(push.authorization != .notDetermined)
-                Button("iOS 알림 설정 열기") {
-                    if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
-                }
-                Button("등록 다시 시도") { Task { await push.refresh() } }
-                if let title = push.lastNotificationTitle {
-                    LabeledContent("최근 연 알림", value: title)
-                }
+            if preferences.loading { ProgressView() }
+            if let error = preferences.error { Text(error).font(.footnote).foregroundStyle(.red).accessibilityIdentifier("notifications.error") }
+            if push.authorization == .denied && preferences.value?.isAllowed == true {
+                Section {
+                    Button("아이폰 설정에서 알림 켜기", action: openSettings)
+                } footer: { Text("아이폰에서 알림이 꺼져 있어요.") }
             }
-            #if DEBUG
-            Section("개발용 테스트") {
-                Button("FCM 테스트 토큰 복사") {
-                    UIPasteboard.general.string = push.token
-                }
-                .disabled(push.token == nil)
-                Text("Firebase 콘솔의 테스트 메시지 수신자로 붙여 넣으세요.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
-            #endif
         }
-        .navigationTitle("알림 설정")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await push.refresh(); await loadSettings() }
-        .onChange(of: allowed) { _, _ in saved = false }
-        .onChange(of: settingTime) { _, _ in saved = false }
+        .navigationTitle("알림 설정").navigationBarTitleDisplayMode(.inline)
+        .task { await push.refresh(); await preferences.load() }
+        .refreshable { await push.refresh(); await preferences.load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await push.refresh() } }
+        }
     }
-    private func loadSettings() async {
-        settingsLoading = true; settingsError = nil
-        defer { settingsLoading = false }
-        do {
-            let settings: NotificationSetting = try await APIClient.shared.decode("api/v1/notification-setting")
-            let components = settings.settingTime.split(separator: ":").compactMap { Int($0) }
-            guard components.count >= 2,
-                  let time = calendar.date(bySettingHour: components[0], minute: components[1], second: 0, of: Date()) else { throw APIError.invalidResponse }
-            allowed = settings.isAllowed; settingTime = time; settingsLoaded = true
-        } catch { settingsError = error.localizedDescription }
+    private func changePermission(_ enabled: Bool) async {
+        guard !requestingPermission else { return }
+        if enabled {
+            requestingPermission = true
+            defer { requestingPermission = false }
+            await push.refresh()
+            if push.authorization == .notDetermined { await push.requestPermission() }
+            if push.authorization == .denied { openSettings(); return }
+            guard [.authorized, .provisional, .ephemeral].contains(push.authorization) else { return }
+        }
+        preferences.setAllowed(enabled)
     }
-    private func saveSettings() async {
-        saving = true; saved = false; settingsError = nil
-        defer { saving = false }
-        do {
-            let time = String(format: "%02d:%02d:00", calendar.component(.hour, from: settingTime), calendar.component(.minute, from: settingTime))
-            let _: NotificationSetting = try await APIClient.shared.decode("api/v1/notification-setting", method: "PUT",
-                body: JSONEncoder().encode(NotificationSetting(settingTime: time, isAllowed: allowed)))
-            saved = true
-            if allowed && push.authorization == .notDetermined { await push.requestPermission() }
-        } catch { settingsError = error.localizedDescription }
+    private func openSettings() {
+        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
     }
-
 }

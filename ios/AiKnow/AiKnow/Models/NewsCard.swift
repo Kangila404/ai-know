@@ -45,11 +45,6 @@ struct Notice: Decodable, Identifiable {
     let publishedAt: String?
 }
 struct NoticePage: Decodable { let content: [Notice]; let last: Bool }
-struct NotificationSetting: Codable {
-    var settingTime: String
-    var isAllowed: Bool
-}
-
 enum AppTab: Hashable { case today, archive, profile, admin }
 
 @MainActor @Observable
@@ -166,12 +161,13 @@ struct RemoteImage: View {
 
     var body: some View {
         let url = APIClient.shared.mediaURL(raw)
+        let bundled = BuiltInAvatar.image(for: raw)
         // The placeholder and loaded image have the same bounds. An image's intrinsic
         // size must never determine a ScrollView's width or move the text below it.
         Color.indigo.opacity(0.06)
             .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay {
-                if let image {
+                if let image = bundled ?? image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .background(imageBackground).accessibilityHidden(true)
                 }
@@ -185,7 +181,7 @@ struct RemoteImage: View {
             .clipped()
             .task(id: "\(url?.absoluteString ?? "")|\(maxPixelSize)|\(retry)") {
                 image = nil; failed = false
-                guard let url else { return }
+                guard bundled == nil, let url else { return }
                 do {
                     let loaded = try await ImageLoader.shared.image(at: url, maxPixelSize: maxPixelSize)
                     try Task.checkCancellation()
@@ -194,5 +190,15 @@ struct RemoteImage: View {
                     if !Task.isCancelled { failed = true }
                 }
             }
+    }
+}
+
+/// Versioned paths also work on the web once the static server assets are deployed.
+/// Native clients draw the identical bundled PNG without waiting for the network.
+enum BuiltInAvatar {
+    static let choices = [("lumi", "루미"), ("mori", "모리"), ("nova", "노바"), ("orbi", "오르비"), ("pico", "피코")]
+    static func image(for raw: String?) -> UIImage? {
+        guard let raw, let choice = choices.first(where: { raw == "/avatars/\($0.0)-v1.png" }) else { return nil }
+        return UIImage(named: "Avatar-\(choice.0)")
     }
 }

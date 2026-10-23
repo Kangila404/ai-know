@@ -7,10 +7,9 @@ struct CardNewsDetailView: View {
     @State private var currentSlide = 0
     @State private var loading = true
     @State private var error: String?
-    @State private var savingRead = false
     @State private var showImage = false
+    @State private var showSources = false
     @Environment(StoryStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     init(card: NewsCard) { cardID = card.id; _card = State(initialValue: card) }
     init(cardID: Int64) { self.cardID = cardID }
@@ -25,7 +24,6 @@ struct CardNewsDetailView: View {
                     ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 20) {
-                                Text("\(index + 1) / \(slides.count)").font(.caption.bold()).foregroundStyle(AppPalette.accent)
                                 if APIClient.shared.mediaURL(slide.imgUrl) != nil {
                                     RemoteImage(raw: slide.imgUrl).clipShape(RoundedRectangle(cornerRadius: 20))
                                         .overlay(alignment: .bottomTrailing) {
@@ -39,14 +37,12 @@ struct CardNewsDetailView: View {
                                 }
                                 if let title = slide.title { Text(title).font(.title.bold()).fixedSize(horizontal: false, vertical: true) }
                                 if let content = slide.content { Text(content).font(.body).lineSpacing(5).fixedSize(horizontal: false, vertical: true) }
-                                if let credit = slide.imageCredit { Text(credit).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-                                if let url = APIClient.shared.mediaURL(slide.imageSourceUrl) { Link("이미지 출처", destination: url).font(.caption) }
                             }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
                                 .background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 26)).padding(16)
-                        }.tag(index)
+                        }.tag(index).accessibilityIdentifier("story.page.\(index)")
                     }
                 }.tabViewStyle(.page(indexDisplayMode: .never))
-                // UIKit's page indicator overlays the scrollable card and its credits.
+                // Keep pagination outside the scrollable content so it never covers text.
                 // Reserve a separate row so all of the card can be read by scrolling.
                 HStack(spacing: 7) {
                     if slides.count <= 10 {
@@ -55,32 +51,38 @@ struct CardNewsDetailView: View {
                                 .frame(width: 6, height: 6)
                         }
                     } else { Text("\(currentSlide + 1) / \(slides.count)").font(.caption) }
-                }.frame(height: 16).accessibilityElement(children: .ignore)
+                }.frame(height: 24).padding(.bottom, 8).accessibilityIdentifier("story.pagination").accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(slides.count)장 중 \(currentSlide + 1)번째 카드")
-                if let card, let url = APIClient.shared.mediaURL(card.sourceUrl) {
-                    Link(card.sourceTitle ?? "원문 보기", destination: url).font(.caption).lineLimit(2).padding(.horizontal)
-                }
-                Button {
-                    if currentSlide == slides.count - 1, let card {
-                        savingRead = true
-                        Task { if await store.markRead(card) { dismiss() }; savingRead = false }
-                    } else { withAnimation { currentSlide += 1 } }
-                } label: {
-                    Label(currentSlide == slides.count - 1 ? "다 읽었어요" : "다음 카드", systemImage: "arrow.right")
-                        .frame(maxWidth: .infinity).padding(8)
-                }.disabled(savingRead).buttonStyle(.borderedProminent).padding(.horizontal, 25).padding(.bottom)
+                    .accessibilityAdjustableAction { direction in
+                        withAnimation {
+                            if direction == .increment { currentSlide = min(slides.count - 1, currentSlide + 1) }
+                            else if direction == .decrement { currentSlide = max(0, currentSlide - 1) }
+                        }
+                    }
+
             }
         }.background(AppPalette.background)
             .navigationTitle("카드 뉴스").navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .tabBar)
             .task(id: cardID) { await load() }
             .task(id: "\(slides.map(\.id)):\(currentSlide)") { await preloadNextSlide() }
+            .task(id: "read:\(slides.count):\(currentSlide)") {
+                guard !loading, !slides.isEmpty, currentSlide == slides.count - 1, let card, !store.current(card).read else { return }
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                    try Task.checkCancellation()
+                    _ = await store.markRead(card)
+                } catch { }
+            }
+            .sheet(isPresented: $showSources) { sourcesSheet }
             .sheet(isPresented: $showImage) {
                 if slides.indices.contains(currentSlide), let url = APIClient.shared.mediaURL(slides[currentSlide].imgUrl) {
                     CardImageViewer(url: url)
                 }
             }
             .toolbar {
+                Button { showSources = true } label: { Image(systemName: "info.circle") }
+                    .accessibilityLabel("출처 및 이미지 정보").disabled(loading || card == nil)
                 if let card {
                     let current = store.current(card)
                     Button { Task { await store.toggleLike(current) } } label: {
@@ -89,6 +91,33 @@ struct CardNewsDetailView: View {
                         .accessibilityLabel(current.liked ? "좋아요 취소" : "좋아요")
                 }
             }
+    }
+    private var sourcesSheet: some View {
+        NavigationStack {
+            List {
+                if let card {
+                    if let url = APIClient.shared.mediaURL(card.sourceUrl) {
+                        Section("참고 자료") { Link(card.sourceTitle ?? "원문 보기", destination: url) }
+                    }
+                    if card.titleImageCredit != nil || card.titleImageSourceUrl != nil {
+                        Section("표지 이미지") {
+                            if let credit = card.titleImageCredit { Text(credit).font(.subheadline) }
+                            if let url = APIClient.shared.mediaURL(card.titleImageSourceUrl) { Link("이미지 출처", destination: url) }
+                        }
+                    }
+                }
+                ForEach(Array(slides.enumerated()), id: \.element.id) { index, slide in
+                    if slide.imageCredit != nil || slide.imageSourceUrl != nil {
+                        Section("\(index + 1)번째 이미지") {
+                            if let title = slide.title { Text(title).font(.subheadline.weight(.medium)) }
+                            if let credit = slide.imageCredit { Text(credit).font(.footnote).foregroundStyle(.secondary) }
+                            if let url = APIClient.shared.mediaURL(slide.imageSourceUrl) { Link("이미지 출처", destination: url) }
+                        }
+                    }
+                }
+            }.navigationTitle("출처 및 이미지 정보").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("닫기") { showSources = false } } }
+        }.presentationDetents([.medium, .large])
     }
     private func preloadNextSlide() async {
         guard slides.indices.contains(currentSlide), slides.indices.contains(currentSlide + 1) else { return }

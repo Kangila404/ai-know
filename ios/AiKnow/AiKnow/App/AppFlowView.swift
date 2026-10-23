@@ -24,7 +24,7 @@ struct AppFlowView: View {
                 }
             case .app:
                 RootTabView()
-                    .task { await PushNotifications.shared.requestPermission() }
+                    .task { await PushNotifications.shared.refresh() }
             }
         }
         .animation(.snappy, value: screen)

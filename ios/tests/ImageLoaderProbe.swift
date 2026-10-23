@@ -4,6 +4,12 @@ import UIKit
 @main
 struct ImageLoaderProbe {
     static func main() async throws {
+        let original = URL(string: "https://aiknow.kro.kr/media/generated/" + String(repeating: "a", count: 64) + ".png")!
+        let advertised = URL(string: original.absoluteString + "?preview=1280")!
+        precondition(ImageLoader.requestURL(original, maxPixelSize: 320) == original, "Old deployments must not incur a second request")
+        precondition(ImageLoader.requestURL(advertised, maxPixelSize: 320).query == "preview=320")
+        precondition(ImageLoader.requestURL(advertised, maxPixelSize: 1280) == advertised)
+        precondition(ImageLoader.requestURL(advertised, maxPixelSize: 4096) == original, "Zoom must use the original")
         let base = URL(string: "http://127.0.0.1:18090")!
         let loader = ImageLoader()
         let run = UUID().uuidString

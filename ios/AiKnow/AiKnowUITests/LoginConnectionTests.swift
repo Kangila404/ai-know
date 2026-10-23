@@ -30,7 +30,17 @@ final class ContentConnectionTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["서버 슬라이드"].waitForExistence(timeout: 15))
         app.buttons["좋아요"].tap()
         XCTAssertTrue(app.buttons["좋아요 취소"].waitForExistence(timeout: 10))
-        app.buttons["다 읽었어요"].tap()
+        XCTAssertFalse(app.buttons["다음 카드"].exists)
+        XCTAssertFalse(app.staticTexts["AI 생성 검증 이미지"].exists)
+        app.buttons["출처 및 이미지 정보"].tap()
+        XCTAssertTrue(app.staticTexts["AI 생성 검증 이미지"].waitForExistence(timeout: 10))
+        app.buttons["닫기"].tap()
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["두 번째 슬라이드"].waitForExistence(timeout: 10))
+        app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["마지막 슬라이드"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 3)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.staticTexts["읽음"].waitForExistence(timeout: 10))
         app.buttons["좋아요"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["API 연결 검증 카드"].waitForExistence(timeout: 10))
@@ -43,17 +53,27 @@ final class ContentConnectionTests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.buttons["프로필 편집"].tap()
-        XCTAssertTrue(app.buttons["테스트 프로필"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["루미"].waitForExistence(timeout: 10))
         let nickname = app.textFields["닉네임 (20자 이내)"]
         nickname.tap(); nickname.typeText(" 수정"); app.buttons["입력 완료"].tap()
-        app.buttons["테스트 프로필"].tap()
+        app.buttons["루미"].tap()
         app.buttons["저장"].tap()
-        XCTAssertTrue(app.staticTexts["저장했습니다."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["알림 설정"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["화면 모드"].exists)
+        app.buttons["알림 설정"].tap()
+        let toggle = app.switches["notifications.daily"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["알림 설정 저장"].exists)
+        XCTAssertFalse(app.buttons["알림 허용"].exists)
+        XCTAssertFalse(app.buttons["등록 다시 시도"].exists)
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        if springboard.alerts.firstMatch.waitForExistence(timeout: 5) {
+            for label in ["Allow", "허용"] where springboard.alerts.buttons[label].exists { springboard.alerts.buttons[label].tap() }
+        }
+        XCTAssertTrue(app.datePickers["notifications.time"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.buttons["알림 설정"].tap()
-        XCTAssertTrue(app.buttons["알림 설정 저장"].waitForExistence(timeout: 10))
-        app.buttons["알림 설정 저장"].tap()
-        XCTAssertTrue(app.staticTexts["저장했습니다."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.datePickers["notifications.time"].waitForExistence(timeout: 10))
         app.terminate()
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["오늘"].waitForExistence(timeout: 30))
@@ -350,7 +370,7 @@ final class LoginBrandingTests: XCTestCase {
                       "Run with ios/tests/test_login_ui.py")
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["-appearance", mode, "-AppleLanguages", "(ko)", "-AppleLocale", "ko_KR"]
+        app.launchArguments = ["-AppleLanguages", "(ko)", "-AppleLocale", "ko_KR"]
         app.launch()
         for label in ["Google 로그인", "카카오 로그인", "login.apple"] {
             XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 20))
@@ -370,76 +390,46 @@ final class LoginBrandingTests: XCTestCase {
     }
 }
 
-// Explicit opt-in inspection of a real session. Only opens/scrolls published cards;
-// the server may count those opens. Never likes, marks read or edits content.
+// Opt-in production inspection. Opens count as views; reaching the final slide marks read.
 final class ProductionLayoutInspectionTests: XCTestCase {
-    @MainActor
-    func testInspectPublishedCards() throws {
+    override func setUpWithError() throws {
         try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18089/")!)) == nil,
                       "Start the local inspection marker on port 18089 first")
         continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launch()
-        XCTAssertTrue(app.tabBars.buttons["아카이브"].waitForExistence(timeout: 30))
-        capture("production-today", app)
-        app.tabBars.buttons["아카이브"].tap()
-        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "archive.card.")).firstMatch
-        XCTAssertTrue(first.waitForExistence(timeout: 30))
-        capture("production-archive-initial", app)
-        Thread.sleep(forTimeInterval: 5)
-        capture("production-archive-loaded", app)
-        first.tap()
-        XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30) || app.buttons["다 읽었어요"].exists)
-        for index in 0..<10 {
-            capture("production-slide-\(index + 1)-initial", app)
-            Thread.sleep(forTimeInterval: 8)
-            capture("production-slide-\(index + 1)-loaded", app)
-            app.swipeUp()
-            capture("production-slide-\(index + 1)-bottom", app)
-            if !app.buttons["다음 카드"].exists { break }
-            app.buttons["다음 카드"].tap()
-        }
-        XCTAssertTrue(app.buttons["다 읽었어요"].exists)
-        // Return without marking read. Reopen to inspect cache reuse.
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(first.waitForExistence(timeout: 15))
-        first.tap()
-        XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30) || app.buttons["다 읽었어요"].exists)
-        capture("production-revisit", app)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.tabBars.buttons["관리자"].exists)
     }
-    @MainActor
-    func testArtworkZoomInBothAppearances() throws {
-        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18089/")!)) == nil,
-                      "Start the local inspection marker on port 18089 first")
-        continueAfterFailure = false
-        for mode in ["light", "dark"] {
-            let app = XCUIApplication()
-            app.launchArguments = ["-appearance", mode]
-            app.launch()
-            XCTAssertTrue(app.tabBars.buttons["아카이브"].waitForExistence(timeout: 30))
-            app.tabBars.buttons["아카이브"].tap()
-            let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "archive.card.")).firstMatch
-            XCTAssertTrue(first.waitForExistence(timeout: 30)); first.tap()
-            XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30))
-            for _ in 0..<3 {
-                app.buttons["다음 카드"].tap()
-                Thread.sleep(forTimeInterval: 1)
-            }
-            capture("\(mode)-long-diagram", app)
-            let expand = try XCTUnwrap(app.buttons.matching(identifier: "이미지 확대").allElementsBoundByIndex.first(where: { $0.isHittable }))
-            expand.tap()
-            let zoom = app.scrollViews["image.zoom"]
-            XCTAssertTrue(zoom.waitForExistence(timeout: 30))
-            capture("\(mode)-image-fit", app)
-            zoom.pinch(withScale: 3, velocity: 1)
-            capture("\(mode)-image-zoom", app)
-            app.buttons["닫기"].tap()
-            XCTAssertTrue(app.buttons["다음 카드"].exists)
-            app.navigationBars.buttons.element(boundBy: 0).tap()
-            XCTAssertTrue(app.tabBars.buttons["관리자"].exists)
-        }
+    @MainActor func testReadingAndSettings() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.tabBars.buttons["아카이브"].firstMatch.waitForExistence(timeout: 30))
+        app.tabBars.buttons["아카이브"].firstMatch.tap()
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "archive.card.")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 30)); first.tap()
+        let pages = app.descendants(matching: .any).matching(NSPredicate(format: "label MATCHES %@", "[0-9]+장 중 [0-9]+번째 카드")).firstMatch
+        XCTAssertTrue(pages.waitForExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["다음 카드"].exists)
+        XCTAssertFalse(app.buttons["다 읽었어요"].exists)
+        Thread.sleep(forTimeInterval: 2); capture("reading-clean", app)
+        app.buttons["출처 및 이미지 정보"].tap()
+        XCTAssertTrue(app.navigationBars["출처 및 이미지 정보"].waitForExistence(timeout: 10))
+        capture("reading-sources", app); app.buttons["닫기"].tap()
+        let firstPage = pages.label
+        app.swipeLeft(); Thread.sleep(forTimeInterval: 1)
+        XCTAssertNotEqual(pages.label, firstPage)
+        capture("reading-swiped", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.tabBars.buttons["마이"].firstMatch.tap()
+        XCTAssertFalse(app.buttons["화면 모드"].exists)
+        app.buttons["프로필 편집"].tap()
+        for name in ["루미", "모리", "노바", "오르비", "피코"] { XCTAssertTrue(app.buttons[name].waitForExistence(timeout: 15)) }
+        capture("profile-grid", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["알림 설정"].tap()
+        XCTAssertTrue(app.switches["notifications.daily"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["알림 설정 저장"].exists)
+        XCTAssertFalse(app.buttons["등록 다시 시도"].exists)
+        XCTAssertFalse(app.buttons["알림 허용"].exists)
+        capture("notification-settings", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.tabBars.buttons["관리자"].firstMatch.exists)
     }
     @MainActor private func capture(_ name: String, _ app: XCUIApplication) {
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

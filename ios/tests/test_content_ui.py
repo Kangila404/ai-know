@@ -16,7 +16,7 @@ state = {"nickname": "연결 테스트", "onboardingCompleted": False, "userId":
 card = {"id": 9001, "title": "API 연결 검증 카드", "keyPoints": ["서버에서 받은 핵심 내용"],
         "publicationDate": "2026-10-07", "categories": [{"id": 1, "name": "기술"}], "liked": False, "read": False}
 notice = {"id": 1, "title": "API 공지", "content": "서버에서 받은 공지 본문", "publishedAt": "2026-10-07T00:00:00Z"}
-profiles = [{"id": 1, "name": "테스트 프로필", "imgUrl": ""}]
+profiles = [{"id": i + 1, "name": n, "imgUrl": f"/avatars/{k}-v1.png"} for i, (k,n) in enumerate([("lumi","루미"),("mori","모리"),("nova","노바"),("orbi","오르비"),("pico","피코")])]
 settings = {"settingTime": "09:00:00", "isAllowed": False}
 checks = set()
 
@@ -56,7 +56,7 @@ class Handler(BaseHTTPRequestHandler):
                 value = [card] if card["liked"] else []; checks.add("liked-filter")
         elif path == "/api/v1/cardNews/cardSlides":
             assert query.get("cardNewsId") == ["9001"]
-            value = [{"id": 1, "title": "서버 슬라이드", "content": "API에서 받은 카드 본문", "sequence": 1}]
+            value = [{"id": i + 1, "title": title, "content": "API에서 받은 카드 본문", "sequence": i + 1, "imgUrl": "/avatars/lumi-v1.png", "imageCredit": "AI 생성 검증 이미지" if i == 0 else None} for i, title in enumerate(["서버 슬라이드", "두 번째 슬라이드", "마지막 슬라이드"])]
             checks.add("slides")
         elif path == "/api/v1/cardNews/9001/like" and method == "PATCH":
             card["liked"] = body["liked"]; value = {"liked": card["liked"]}; checks.add("like")

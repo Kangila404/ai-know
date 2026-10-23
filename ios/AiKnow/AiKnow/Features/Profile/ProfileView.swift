@@ -2,14 +2,13 @@ import SwiftUI
 
 struct ProfileView: View {
     @State private var login = AuthSession.shared
-    @AppStorage("appearance") private var appearance = "system"
     @State private var confirmingWithdrawal = false
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     HStack(spacing: 14) {
-                        RemoteImage(raw: login.user?.profile?.imgUrl, aspectRatio: 1, maxPixelSize: 192, imageBackground: .clear).frame(width: 54, height: 54).clipShape(Circle())
+                        ProfileAvatar(raw: login.user?.profile?.imgUrl, size: 54)
                         VStack(alignment: .leading, spacing: 5) {
                             Text("\(login.user?.nickname ?? "사용자")님").font(.headline)
                             Text("AI와 함께 더 나은 내일을 만들어가요!").font(.caption).foregroundStyle(.secondary)
@@ -20,13 +19,6 @@ struct ProfileView: View {
                     NavigationLink { NoticeListView() } label: { Label("공지사항", systemImage: "megaphone") }
                     NavigationLink { PushSettingsView() } label: { Label("알림 설정", systemImage: "bell") }
                     NavigationLink { ProfileInfoView() } label: { Label("프로필 편집", systemImage: "person.text.rectangle") }
-                }
-                Section("화면 모드") {
-                    Picker("화면 모드", selection: $appearance) {
-                        Text("시스템 설정").tag("system")
-                        Text("라이트").tag("light")
-                        Text("다크").tag("dark")
-                    }
                 }
                 Section {
                     Button("로그아웃") { Task { await login.logout() } }.disabled(login.busy)
@@ -110,7 +102,8 @@ private struct ProfileInfoView: View {
     @State private var loading = true
     @State private var saving = false
     @State private var error: String?
-    @State private var saved = false
+    @Environment(\.dismiss) private var dismiss
+    private var hasChanges: Bool { nickname.trimmingCharacters(in: .whitespacesAndNewlines) != login.user?.nickname || selected != login.user?.profile?.id }
     var body: some View {
         Form {
             if loading { ProgressView() }
@@ -119,26 +112,35 @@ private struct ProfileInfoView: View {
                     .focused($editingNickname)
                     .submitLabel(.done)
                     .onSubmit { editingNickname = false }
-                    .onChange(of: nickname) { _, value in if value.count > 20 { nickname = String(value.prefix(20)) }; saved = false }
+                    .onChange(of: nickname) { _, value in if value.count > 20 { nickname = String(value.prefix(20)) } }
             }
             Section("프로필 이미지") {
                 if profiles.isEmpty && !loading { Text("선택할 수 있는 이미지가 없습니다.").foregroundStyle(.secondary) }
-                ForEach(profiles) { profile in
-                    Button { selected = profile.id; saved = false } label: {
-                        HStack {
-                            RemoteImage(raw: profile.imgUrl, aspectRatio: 1, maxPixelSize: 192, imageBackground: .clear).frame(width: 44, height: 44).clipShape(Circle())
-                            Text(profile.name).foregroundStyle(.primary)
-                            Spacer()
-                            if selected == profile.id { Image(systemName: "checkmark").foregroundStyle(.indigo) }
-                        }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 12)], spacing: 20) {
+                    ForEach(profiles) { profile in
+                        Button { selected = profile.id } label: {
+                            VStack(spacing: 8) {
+                                ProfileAvatar(raw: profile.imgUrl, size: 72)
+                                    .padding(4)
+                                    .overlay(Circle().stroke(selected == profile.id ? AppPalette.accent : .clear, lineWidth: 3))
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if selected == profile.id {
+                                            Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette)
+                                                .foregroundStyle(.white, AppPalette.accent).font(.title3)
+                                        }
+                                    }
+                                Text(profile.name).font(.caption.weight(.medium)).foregroundStyle(.primary)
+                            }.frame(maxWidth: .infinity).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityLabel(profile.name)
+                            .accessibilityAddTraits(selected == profile.id ? .isSelected : [])
                     }
-                }
+                }.padding(.vertical, 12)
+
             }
-            if let error { Section { RequestFailureView(message: error) { Task { await load() } } } }
+            if let error { Section { Text(error).font(.footnote).foregroundStyle(.red) } }
             Section {
                 Button(saving ? "저장 중…" : "저장") { Task { await save() } }
-                    .disabled(loading || saving || nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if saved { Text("저장했습니다.").foregroundStyle(.green) }
+                    .disabled(loading || saving || !hasChanges || nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -148,7 +150,7 @@ private struct ProfileInfoView: View {
                 Button("입력 완료") { editingNickname = false }
             }
         }
-        .navigationTitle("프로필 편집").navigationBarTitleDisplayMode(.inline).disabled(saving).task { await load() }
+        .navigationTitle("프로필 편집").navigationBarTitleDisplayMode(.inline).disabled(saving).task { await load() }.refreshable { await load() }
     }
     private func load() async {
         loading = true; error = nil; defer { loading = false }
@@ -159,14 +161,32 @@ private struct ProfileInfoView: View {
         } catch { self.error = error.localizedDescription }
     }
     private func save() async {
-        saving = true; error = nil; saved = false; defer { saving = false }
+        saving = true; error = nil; defer { saving = false }
         do {
             struct Nickname: Encodable { let nickname: String }
-            _ = try await APIClient.shared.request(path: "api/v1/users/nickname", method: "PATCH", body: JSONEncoder().encode(Nickname(nickname: nickname.trimmingCharacters(in: .whitespacesAndNewlines))))
+            let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed != login.user?.nickname {
+                _ = try await APIClient.shared.request(path: "api/v1/users/nickname", method: "PATCH", body: JSONEncoder().encode(Nickname(nickname: trimmed)))
+            }
             if let selected, selected != login.user?.profile?.id {
                 _ = try await APIClient.shared.request(path: "api/v1/users/profile/\(selected)", method: "PATCH")
             }
-            try await login.refreshUser(); saved = true
+            try await login.refreshUser(); dismiss()
         } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct ProfileAvatar: View {
+    let raw: String?
+    let size: CGFloat
+    var body: some View {
+        Group {
+            if let raw, !raw.isEmpty {
+                RemoteImage(raw: raw, aspectRatio: 1, maxPixelSize: 320, imageBackground: .clear)
+            } else {
+                Circle().fill(AppPalette.accent.opacity(0.12))
+                    .overlay { Image(systemName: "person.fill").font(.system(size: size * 0.45)).foregroundStyle(AppPalette.accent) }
+            }
+        }.frame(width: size, height: size).clipShape(Circle())
     }
 }

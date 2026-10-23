@@ -35,7 +35,7 @@ actor ImageLoader {
         if let cached = images.object(forKey: key as NSString) { return cached }
         if let pending = decodes[key] { return try await pending.value }
         let task = Task { [self] in
-            let data = try await data(at: url)
+            let data = try await data(at: Self.requestURL(url, maxPixelSize: pixels))
             return try await Task.detached(priority: .userInitiated) {
                 guard let source = CGImageSourceCreateWithData(data as CFData,
                     [kCGImageSourceShouldCache: false] as CFDictionary),
@@ -54,6 +54,18 @@ actor ImageLoader {
         let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? pixels * pixels * 4
         images.setObject(result, forKey: key as NSString, cost: cost)
         return result
+    }
+
+    nonisolated static func requestURL(_ url: URL, maxPixelSize: Int) -> URL {
+        // Only opt in when the server advertises a preview URL in its API response.
+        // Older deployments keep using their original URLs with no extra request.
+        guard url.path.range(of: "^/media/generated/[a-f0-9]{64}\\.png$", options: .regularExpression) != nil,
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              parts.queryItems?.contains(where: { $0.name == "preview" && ["320", "1280"].contains($0.value ?? "") }) == true else { return url }
+        var query = (parts.queryItems ?? []).filter { $0.name != "preview" }
+        if maxPixelSize < 4_096 { query.append(URLQueryItem(name: "preview", value: maxPixelSize <= 320 ? "320" : "1280")) }
+        parts.queryItems = query.isEmpty ? nil : query
+        return parts.url ?? url
     }
 
     private func data(at url: URL) async throws -> Data {

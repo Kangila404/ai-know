@@ -4,6 +4,19 @@ SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세�
 
 **현재 Debug/Release 모두 실제 로그인을 사용합니다. 개발 미리보기와 가짜 ADMIN 계정은 제거했으며 서버가 ADMIN으로 응답하는 계정에만 관리자 탭이 표시됩니다.**
 
+## 2026-10-23 읽기·프로필·알림 화면 정리 (TestFlight 미업로드)
+
+- 카드의 다음/완료 버튼을 제거했습니다. 좌우 스와이프 또는 VoiceOver 페이지 조절로 이동하고, 마지막 카드를 2초 동안 보면 읽음 API를 호출합니다. 출처·생성 크레딧·참고 링크는 상단 정보 버튼의 시트에서 확인합니다.
+- 화면 모드 선택을 제거하고 iPhone 시스템 설정을 따릅니다. 프로필 편집은 루미·모리·노바·오르비·피코 5종 선택 그리드이며, 변경된 닉네임/프로필만 저장한 뒤 편집 화면을 닫습니다.
+- 알림 토글과 시간은 250ms 동안 변경을 모아 순서대로 자동 저장합니다. 실패하면 마지막 저장값으로 되돌리고 오류를 표시합니다. 화면을 떠나도 진행 중인 저장을 마칩니다. 저장/등록 재시도/권한 요청 버튼과 개발용 토큰 표시는 제거했습니다. 처음 알림을 켤 때 OS 권한을 요청하고, 이미 차단한 경우에만 iPhone 설정으로 안내합니다.
+- 기본 프로필 5종은 운영 관리자 API로 중복 없이 등록했습니다. 새 앱은 동일 PNG를 번들에서 즉시 표시합니다. 기존 앱/웹에서 새 프로필 URL을 읽으려면 서버의 정적 리소스와 V9 마이그레이션을 배포해야 합니다. V9는 기존 등록 항목을 덮어쓰지 않습니다.
+- 서버 개선안은 원본 PNG를 보존하면서 320/1280px JPEG와 32MiB 메모리 캐시를 제공합니다. API가 `?preview=1280`을 반환한 경우에만 새 앱이 목록용 320px·본문용 1280px·확대용 원본으로 나눠 요청합니다. 아직 해당 API를 배포하지 않은 서버에서는 기존 URL을 그대로 사용합니다.
+- 실제 운영 원본 3,028,143바이트는 첫 바이트 0.93초, 전체 다운로드 3.21초였습니다. 같은 파일의 로컬 서버 변환 결과는 320px 39,223바이트, 1280px 373,748바이트, 최초 변환 약 0.33초였습니다. 운영 서버 배포 후의 전송/화면 표시 시간은 아직 측정하지 않았습니다.
+
+검증: 운영 로그인 상태의 iPhone 16e/iOS 26.3에서 시스템 라이트·다크 전환, 실제 카드 스와이프·출처 시트·프로필 5종·간소화된 알림 화면과 ADMIN 탭을 확인했습니다. iPhone SE 3세대/iOS 18의 격리 HTTP UI 테스트에서 스와이프·출처 열기·읽음·좋아요·프로필/닉네임·알림 자동 저장 등 12개 API 요청 항목을 확인했습니다. 알림 저장 모델과 이미지 로더 회귀 테스트도 통과했습니다. 서버 이미지/모바일 콘텐츠/프로필 권한 테스트 및 실제 로컬 MySQL 8.4 마이그레이션 6개 테스트를 통과했습니다. Debug 시뮬레이터와 Release iOS 빌드(서명 제외)를 통과했으며 두 빌드의 API 주소는 `https://aiknow.kro.kr`입니다. 실기기 푸시 수신과 새 버전 TestFlight 업로드는 이번 변경에서 수행하지 않았습니다.
+
+알림 저장 모델 검증: `xcrun swiftc -parse-as-library ios/AiKnow/AiKnow/Services/APIClient.swift ios/AiKnow/AiKnow/Services/NotificationPreferences.swift ios/tests/NotificationPreferencesProbe.swift -o /tmp/aiknow-notification-probe && /tmp/aiknow-notification-probe`. 빠른 연속 변경, 순차 저장, 실패 복구, 화면 해제 후 저장 완료를 검사합니다. 기본 프로필 PNG는 저장소 루트에서 `xcrun swift ios/scripts/generate_avatars.swift`로 재생성합니다.
+
 ## 2026-10-23 운영 이미지·레이아웃 점검 (TestFlight 6 이후 수정)
 
 - 운영 서버 `https://aiknow.kro.kr`에 실제 로그인한 iPhone 16e / iOS 26.3 시뮬레이터에서 아카이브의 `[AI 이론] LLM은 어떻게 문장을 이어갈까?` 게시물과 슬라이드 5장을 확인했습니다. 이미지 로딩 전 영역이 줄어드는 현상, 페이지 표시와 출처의 겹침, 투명 도식의 다크 모드 가독성을 수정했습니다.
@@ -21,13 +34,13 @@ SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세�
 1. 로컬 Firebase 설정 파일을 `AiKnow/AiKnow.xcodeproj/GoogleService-Info.plist`에 둡니다. Firebase의 iOS 앱 Bundle ID는 `org.aiknow.AiKnow`여야 합니다. 이 파일은 Git에서 제외됩니다.
 2. Xcode에서 `AiKnow/AiKnow.xcodeproj`를 엽니다. Swift Package Manager가 FirebaseMessaging, GoogleSignIn 9.2.0, KakaoSDKUser 2.29.0과 관련 의존성을 내려받습니다. Package.resolved는 저장소에 포함해 SDK 버전을 고정합니다.
 3. Signing & Capabilities의 Team은 `SS32PHC392`, Bundle ID는 `org.aiknow.AiKnow`로 설정되어 있습니다. Sign in with Apple, Push Notifications, Background Modes / Remote notifications가 프로젝트에 설정되어 있습니다. Xcode에 해당 Team 계정이 로그인되어 있어야 하며, 두 capability가 포함된 앱 전용 provisioning profile을 사용해야 합니다.
-4. iPhone을 실행 대상으로 선택하고 실행합니다. 앱 진입 시 또는 마이 → 알림 설정에서 알림 권한을 허용합니다.
+4. iPhone을 실행 대상으로 선택하고 실행합니다. 마이 → 알림 설정에서 매일 카드 알림을 켜고 OS 알림 권한을 허용합니다.
 
 ## 푸시 테스트
 
 - Firebase Console → 프로젝트 설정 → Cloud Messaging → iOS 앱에 APNs 인증 키(.p8), Key ID, Team ID를 등록합니다. Apple Developer App ID에서도 Push Notifications가 활성화되어 있어야 합니다.
-- Debug 앱의 마이 → 알림 설정 → FCM 테스트 토큰 복사를 누릅니다.
-- Firebase Console의 Messaging 테스트 메시지 수신자에 토큰을 붙여 넣어 전송합니다. 전경에서는 배너·소리로 표시되고, 배경에서는 iOS가 알림을 표시합니다. 알림을 누르면 앱이 열리며 최근 연 알림 제목을 알림 설정에서 확인할 수 있습니다.
+- 실제 로그인한 기기에서 매일 카드 알림을 켭니다. FCM 토큰은 인증된 세션으로 `/api/v1/device-tokens`에 자동 등록됩니다.
+- 서버의 승인된 발송 경로 또는 Firebase Console에서 테스트 메시지를 보냅니다. 토큰은 사용자 설정 화면에 노출하지 않습니다. 전경에서는 배너·소리로 표시되고, 배경에서는 iOS가 알림을 표시합니다. `cardNewsId`가 있으면 알림을 눌러 해당 카드를 엽니다.
 - 실제 기기의 수신 여부로 최종 검증합니다. 서명 없이 수행한 Simulator 빌드는 APNs 전달 검증을 대신하지 않습니다.
 
 ## 서버 토큰 등록
@@ -237,7 +250,7 @@ Production 재시험에서는 연결된 실제 iPhone의 새 IOS 기기 등록�
 
 당시 사용자 관리 API는 없어 준비 중으로 표시했으며, 2026-10-23 최신 main의 계정 관리 API와 화면을 반영했습니다. 프로필 이미지 URL은 현재 서버가 20자로 제한하므로 해당 제한을 안내하고 준수합니다. `/internal/v1/...` 수집·생성 예약·이미지 업로드는 n8n/서버 전용 인증을 사용하는 내부 API이며 앱에 내부 키를 넣거나 직접 노출하지 않습니다. 앱의 이미지 복구는 ADMIN 인증이 적용된 `/api/v1/admin/generations/{id}/recover-image`를 사용합니다.
 
-마이 → 프로필 편집에서 닉네임과 서버에 등록된 프로필 이미지를 변경할 수 있습니다. 마이 → 화면 모드에서 시스템/라이트/다크를 선택합니다. 카드·입력창·본문·관리자 Form은 시스템 배경/텍스트 색상으로 전환됩니다.
+마이 → 프로필 편집에서 닉네임과 서버에 등록된 프로필 이미지를 변경할 수 있습니다. 밝은/어두운 화면은 iPhone 시스템 설정을 따릅니다. 카드·입력창·본문·관리자 Form은 시스템 배경/텍스트 색상으로 전환됩니다.
 
 이번 변경의 검증 범위:
 - Debug Simulator 빌드 성공. `PreviewAdminTests`의 일반 사용자(관리자 탭 미노출·프로필/닉네임 저장·미리보기 종료), 관리자 검수(수정·승인·이력), 공지 생성/목록 반영·생성 응답 복구 시나리오 통과. 공지/복구 테스트에서 발견한 상단 버튼 터치 영역 겹침과 키보드 접근 문제를 수정 후 재검증했습니다.
