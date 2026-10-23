@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { numericValues, assertSupportedNumbers, parseVisualJson, normalizeImagePlan } from './draft-validation.mjs';
+import { numericValues, assertSupportedNumbers, assertContextualNumbers, parseVisualJson, normalizeImagePlan } from './draft-validation.mjs';
 import { evidenceCatalog, resolveEvidence, evidenceRequest } from './evidence-catalog.mjs';
 import { koreanPattern, koreanDraftSchema, assertKoreanText, validateKoreanDraft } from './korean-draft.mjs';
 import { draftLimits, applyDraftLimits, assertEvidence } from './draft-contract.mjs';
@@ -8,7 +8,7 @@ const file = process.argv[2] ?? new URL('./workflows/ai-know-news-draft.json', i
 const wf = JSON.parse(fs.readFileSync(file, 'utf8'));
 const begin = '// BEGIN NORMALIZED EVIDENCE HELPERS';
 const end = '// END NORMALIZED EVIDENCE HELPERS';
-const helpers = `${begin}\n${draftLimits.toString()}\n${applyDraftLimits.toString()}\n${assertEvidence.toString()}\n${numericValues.toString()}\n${assertSupportedNumbers.toString()}\n${parseVisualJson.toString()}\n${normalizeImagePlan.toString()}\n${koreanPattern.toString()}\n${koreanDraftSchema.toString()}\n${assertKoreanText.toString()}\n${validateKoreanDraft.toString()}\n${evidenceCatalog.toString()}\n${resolveEvidence.toString()}\n${evidenceRequest.toString()}\n${end}\n`;
+const helpers = `${begin}\n${draftLimits.toString()}\n${applyDraftLimits.toString()}\n${assertEvidence.toString()}\n${numericValues.toString()}\n${assertSupportedNumbers.toString()}\n${assertContextualNumbers.toString()}\n${parseVisualJson.toString()}\n${normalizeImagePlan.toString()}\n${koreanPattern.toString()}\n${koreanDraftSchema.toString()}\n${assertKoreanText.toString()}\n${validateKoreanDraft.toString()}\n${evidenceCatalog.toString()}\n${resolveEvidence.toString()}\n${evidenceRequest.toString()}\n${end}\n`;
 let updated = 0;
 for (const node of wf.nodes) {
   let code = node.parameters?.jsCode;
@@ -89,6 +89,10 @@ for (const node of wf.nodes) {
   code = code.replace(
     "d.evidence.map(q=>q.quote).join(' '), '제목/요약');",
     "d.evidence.map(q=>q.quote).join(' '), '제목/요약', s.docs.filter(doc=>d.evidence.some(q=>q.sourceId===doc.id)).map(doc=>doc.text).join(' '));");
+  code = code.replace(/    assertSupportedNumbers\(\[x.title,x.content,semanticData\][^\n]+/,
+    "    assertContextualNumbers([x.title,x.content,semanticData].join(' '), x.evidence, '슬라이드 '+x.sequence, s.docs.filter(doc=>x.sourceIds.includes(doc.id)), s.evidenceCatalog||evidenceCatalog(s.docs), s.visualWarnings??=[]);");
+  code = code.replace(/  assertSupportedNumbers\(\[d.title,d.summary\][^\n]+/,
+    "  assertContextualNumbers([d.title,d.summary].join(' '), d.evidence, '제목/요약', s.docs.filter(doc=>d.evidence.some(q=>q.sourceId===doc.id)), s.evidenceCatalog||evidenceCatalog(s.docs), s.visualWarnings??=[]);");
   node.parameters.jsCode = code;
   updated++;
 }

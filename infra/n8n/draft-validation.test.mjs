@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { numericValues, assertSupportedNumbers, parseVisualJson, normalizeImagePlan } from './draft-validation.mjs';
+import { numericValues, assertSupportedNumbers, assertContextualNumbers, parseVisualJson, normalizeImagePlan } from './draft-validation.mjs';
 
 test('English money and Korean magnitude notation compare by value', () => {
   assertSupportedNumbers('시리즈 A 2,000만 달러, 시드 500만 달러, 총 2,500만 달러',
@@ -56,6 +56,24 @@ test('English singular measurements support translated digits without treating e
   assert.throws(() => assertSupportedNumbers('2년', 'nearly a year', 'slide'), /2/);
   assert.throws(() => assertSupportedNumbers('1년', 'a few years', 'slide'), /1/);
   assert.throws(() => assertSupportedNumbers('1년', 'half a year', 'slide'), /1/);
+});
+
+test('neighboring evidence can supply a quantity with an explicit review warning', () => {
+  const catalog = [
+    {sourceId:'source-1',quote:'The company raised $20 million.'},
+    {sourceId:'source-1',quote:'The funding will support the project.'},
+    {sourceId:'source-1',quote:'The project is still under development.'},
+    {sourceId:'source-1',quote:'An unrelated team raised $50 million.'},
+  ];
+  const docs=[{id:'source-1',text:catalog.map(q=>q.quote).join(' ')}];
+  const evidence=[catalog[1]], warnings=[];
+  assertContextualNumbers('2,000만 달러를 유치했습니다.', evidence, 'slide', docs, catalog, warnings);
+  assert.ok(evidence.some(q=>q.quote===catalog[0].quote));
+  assert.equal(warnings[0].code,'NUMERIC_EVIDENCE_EXPANDED');
+  assert.throws(()=>assertContextualNumbers('5,000만 달러', [catalog[1]], 'slide', docs, catalog, []), /50000000/);
+  assert.throws(()=>assertContextualNumbers('30억 달러', [catalog[1]], 'slide', docs, catalog, []), /3000000000/);
+  const other=catalog.map((q,i)=>({...q,sourceId:i===0?'another-source':q.sourceId}));
+  assert.throws(()=>assertContextualNumbers('2,000만 달러', [other[1]], 'slide', docs, other, []), /20000000/);
 });
 
 test('decode at most one redundant JSON string layer without evaluating code', () => {
