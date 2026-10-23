@@ -21,12 +21,16 @@ export function readWorkflowEnvironment(env) {
   };
   if (!/^[0-3]$/.test(env.AIKNOW_MAX_IMAGE_GENERATIONS ?? ''))
     throw new Error('AIKNOW_MAX_IMAGE_GENERATIONS must be 0-3');
+  const automation = env.AIKNOW_AUTOMATION_ENABLED ?? 'false';
+  if (!['true', 'false'].includes(automation)) throw new Error('AIKNOW_AUTOMATION_ENABLED must be true or false');
+  if (automation === 'true' && env.AIKNOW_DRY_RUN !== 'false') throw new Error('Automation requires AIKNOW_DRY_RUN=false');
   return {
     serverBaseUrl: url('AIKNOW_SERVER_BASE_URL'),
     media: { mode: env.AIKNOW_ENV === 'local' ? 'local' : 'mounted',
       publicBaseUrl: url('AIKNOW_MEDIA_PUBLIC_BASE_URL', env.AIKNOW_ENV === 'prod') },
     dryRun: bool('AIKNOW_DRY_RUN'), allowImageGeneration: bool('AIKNOW_ALLOW_IMAGE_GENERATION'),
     maxImageGenerations: Number(env.AIKNOW_MAX_IMAGE_GENERATIONS),
+    automationEnabled: automation === 'true',
   };
 }
 
@@ -34,6 +38,9 @@ export function configureWorkflow(source, env) {
   const settings = readWorkflowEnvironment(env);
   if (!settings) return source;
   const wf = structuredClone(source);
+  const schedule = wf.nodes.find(n => n.id === '659c223d-51ad-44ed-a722-1d2cc0e2ac41');
+  if (schedule?.type !== 'n8n-nodes-base.scheduleTrigger') throw new Error('Missing daily schedule trigger');
+  schedule.disabled = !settings.automationEnabled;
   const config = wf.nodes.find(n => n.name === '실행 설정');
   if (!config) throw new Error('Missing execution settings node');
   for (const field of ['dryRun', 'allowImageGeneration', 'maxImageGenerations']) {

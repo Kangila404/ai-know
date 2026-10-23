@@ -66,11 +66,17 @@ OpenAI Credential은 별도로 연결합니다. `check`는 인증정보를 쓰�
 로컬처럼 Compose에 `server`가 없으면 기존 동작을 유지합니다. 선택적으로 배포 프로세스의
 `N8N_INGEST_TOKEN` 환경변수를 전달하면 같은 자동 연결을 사용할 수 있습니다.
 
-가져온 워크플로는 **게시되지 않은 초안**입니다. JSON 한 개에 환경별 `.env` 값을 적용해서 가져오며 오전 9시 트리거는 비활성화되어 있습니다.
+기본적으로 가져온 워크플로는 **게시되지 않은 초안**입니다. JSON 한 개에 환경별 `.env` 값을 적용해서 가져오며 오전 9시 트리거는 비활성화되어 있습니다.
 로컬 예제는 `dryRun: false`, `allowImageGeneration: true`, 생성 최대 1장입니다. 배포 예제는 점검 모드로 시작합니다.
 수집만 점검하려면 `AIKNOW_DRY_RUN=true`로 바꾸고 `apply`하세요. `false`로 수동 실행하면 OpenAI 호출 비용이 발생합니다.
 환경변수를 수정한 후에는 컨테이너 재시작만 하지 말고 `deploy.ps1 apply` / `deploy.sh apply`로 워크플로에도 반영합니다.
-실제 자동 실행은 별도 작업입니다. 내용을 확인하고 수동 테스트한 뒤, 의도한 설정으로 바꾸고 스케줄 노드를 활성화해 Publish해야 합니다.
+실제 자동 실행은 수동 테스트 후 `AIKNOW_DRY_RUN=false`, `AIKNOW_AUTOMATION_ENABLED=true`를 서버 env에 설정하고 `apply`하여 켭니다.
+이 명시적 설정이 있을 때만 매일 오전 9시(Asia/Seoul) 트리거를 켜고 현재 버전을 게시합니다.
+다음 배포에도 같은 설정을 유지하면 새 버전을 게시하며, `deploy.sh`가 n8n을 재시작해 스케줄을 등록합니다.
+UI에서 별도로 편집한 내용을 자동 게시하지 않습니다. 충돌이 있으면 변경 내용을 검토해 배포 기준과 일치시켜야 합니다.
+끄려면 `AIKNOW_AUTOMATION_ENABLED=false`로 바꾸고 다시 `apply`합니다.
+이미지 생성은 별도로 `AIKNOW_ALLOW_IMAGE_GENERATION=true`로 켜며 실행당 `AIKNOW_MAX_IMAGE_GENERATIONS` 한도를 지킵니다.
+검색 실패로 후보 확인이 끝나지 않은 경우에는 기존대로 유료 생성하지 않습니다. 자동 실행 결과도 공개 게시가 아닌 서버 검수 대기(PENDING)로 저장합니다.
 배포 도구 자체는 뉴스 수집, OpenAI 호출, 이미지 생성 또는 서버 API 전송을 실행하지 않습니다.
 
 ## JSON 변경 반영
