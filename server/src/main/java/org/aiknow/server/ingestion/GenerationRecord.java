@@ -16,6 +16,7 @@ public class GenerationRecord {
     @Lob @Column(nullable = false, columnDefinition = "MEDIUMTEXT") private String requestJson;
     @Lob @Column(columnDefinition = "MEDIUMTEXT") private String responseJson;
     @Lob @Column(columnDefinition = "MEDIUMTEXT") private String recoveredResponseJson;
+    @Lob @Column(columnDefinition = "MEDIUMTEXT") private String contextJson;
     @Column(nullable = false) private Instant createdAt;
 
     static GenerationRecord create(String key, String url, String task, String hash, String request) {
@@ -26,4 +27,5 @@ public class GenerationRecord {
     }
     void complete(String response) { responseJson = response; }
     void recover(String response) { recoveredResponseJson = response; }
+    void attachContext(String context) { contextJson = context; }
 }

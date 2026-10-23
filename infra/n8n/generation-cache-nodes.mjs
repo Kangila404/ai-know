@@ -6,6 +6,21 @@ export function generationNodes(baseUrl, credentials) {
       options: { timeout: 30000, redirect: { redirect: { followRedirects: false } },
         response: { response: { fullResponse: true, responseFormat: 'json' } } } } });
   return [
+    http('aiknow-selection-context', '기존 이미지 선택 조회', [1000, 1200], '/internal/v1/generation/selection-context',
+      '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,draftJson:JSON.stringify($json.draft)}) }}'),
+    code('aiknow-selection-restore', '기존 이미지 선택 복원', [1224, 1200], `const r=$input.first().json;
+if(r.statusCode!==200||!['NONE','RESTORE','BLOCKED'].includes(r.body?.decision)) throw new Error('이미지 선택 기록 조회 실패. 검색이나 유료 호출을 재시도하지 않습니다.');
+const before=$('작업 결정').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));
+s.selectionLookupChecked=true;
+if(r.body.decision==='RESTORE') {
+  const context=JSON.parse(r.body.contextJson);
+  if(context.version!==1||!Array.isArray(context.assets)||context.assets.length>5) throw new Error('잘못된 이미지 선택 복구 데이터');
+  s.assets=context.assets;s.assetIndex=0;s.selectionRequest=JSON.parse(r.body.requestJson);
+} else if(r.body.decision==='BLOCKED') {
+  s.phase='stop';s.status='blocked';s.reason=r.body.reason;s.cacheClaim={id:r.body.id};
+}
+s.audit.push({event:'selection_context',detail:{decision:r.body.decision,id:r.body.id}});
+return [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];`),
     http('aiknow-generation-existing', 'DB 기존 기사 조회', [400, 272], '/internal/v1/generation/existing',
       '={{ JSON.stringify({sourceUrls: $json.candidates.map(c => c.sourceUrl)}) }}'),
     code('aiknow-generation-filter', '저장된 기사 제외', [624, 272], `const r=$input.first().json;
@@ -18,11 +33,17 @@ s.candidates=unprocessed.slice(0,s.config.maxCandidates);
 s.audit.push({event:'existing_submissions',detail:r.body});
 return [{json:s,pairedItem:{item:0}}];`),
     http('aiknow-generation-claim', '모델 호출 예약 또는 캐시 조회', [1000, 736], '/internal/v1/generation/claim',
-      '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,task:$json.task,requestJson:JSON.stringify($json.request)}) }}'),
+      '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,task:$json.task,requestJson:JSON.stringify($json.request),...($json.task === "image_selection" ? {contextJson:JSON.stringify({version:1,draft:$json.draft,assets:$json.assets})} : {})}) }}'),
     code('aiknow-generation-prepare', '모델 호출 준비', [1224, 736], `const r=$input.first().json;
 if(r.statusCode!==200||!['CALL','REPLAY','BLOCKED'].includes(r.body?.decision)) throw new Error('모델 호출 예약 실패. 유료 재시도하지 않습니다.');
 const before=$('작업 결정').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));
 s.cacheClaim=r.body;s.cacheRoute={CALL:0,REPLAY:1,BLOCKED:2}[r.body.decision];
+// A concurrent run may have reserved first after our initial lookup. Use its exact snapshot.
+if(s.task==='image_selection'&&r.body.decision==='REPLAY') {
+  const context=JSON.parse(r.body.contextJson||'null');
+  if(context?.version!==1||!Array.isArray(context.assets)) throw new Error('기존 이미지 후보 복구가 필요합니다. 유료 재호출하지 않습니다.');
+  s.assets=context.assets;
+}
 s.counters.paidTextCalls=(s.counters.paidTextCalls||0)+(r.body.decision==='CALL'?1:0);
 s.counters.textCacheHits=(s.counters.textCacheHits||0)+(r.body.decision==='REPLAY'?1:0);
 if(r.body.decision==='BLOCKED'){s.phase='stop';s.status='blocked';s.reason=r.body.reason;}
@@ -45,6 +66,7 @@ export function generationConnections() {
   const e = node => ({ node, type: 'main', index: 0 });
   const chain = (a,b) => [a,{ main:[[e(b)]] }];
   return Object.fromEntries([
+    chain('기존 이미지 선택 조회','기존 이미지 선택 복원'), chain('기존 이미지 선택 복원','작업 결정'),
     chain('최근 기사와 중복 검사','DB 기존 기사 조회'), chain('DB 기존 기사 조회','저장된 기사 제외'), chain('저장된 기사 제외','작업 결정'),
     chain('모델 호출 예약 또는 캐시 조회','모델 호출 준비'), chain('모델 호출 준비','모델 캐시 처리 경로'),
     ['모델 캐시 처리 경로',{main:[[e('텍스트 생성 API')],[e('저장된 모델 응답 재사용')],[e('점검 또는 정상 종료')]]}],

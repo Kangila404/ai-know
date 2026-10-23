@@ -70,6 +70,7 @@ export function importPayload(source, current) {
     // but only for the exact API paths on that same backend.
     const suffix = { 'aiknow-image-upload': '/internal/v1/images', 'aiknow-storage-check': '/internal/v1/images/storage',
       'aiknow-generation-existing': '/internal/v1/generation/existing', 'aiknow-generation-claim': '/internal/v1/generation/claim',
+      'aiknow-selection-context': '/internal/v1/generation/selection-context',
       'aiknow-generation-save': '/internal/v1/generation/response',
       'aiknow-image-claim': '/internal/v1/generation/claim', 'aiknow-image-persist': '/internal/v1/images' }[node.id];
     const ingestion = current?.nodes.find(n => n.id === 'aiknow-server-import' && n.type === 'n8n-nodes-base.httpRequest');

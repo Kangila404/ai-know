@@ -43,6 +43,12 @@ setConstant('IMAGE_SELECTION_SCHEMA',schema);
 const start=code.indexOf("  if (s.phase==='search') {"), stop=code.indexOf("  if (s.phase==='assets') {",start);
 if(start<0||stop<0)throw new Error('Search controller boundary missing');
 code=code.slice(0,start)+`  if (s.phase==='search') {
+    if (!s.selectionLookupChecked) {s.route=6;break;}
+    if (s.selectionRequest) {
+      s.request=s.selectionRequest;delete s.selectionRequest;s.task='image_selection';s.route=1;
+      s.counters.textCalls++;if(s.counters.textCalls>6)throw new Error('텍스트 호출 상한 초과');
+      break;
+    }
     if (s.assetIndex<s.assets.length) {
       const a=s.assets[s.assetIndex];
       a.searches ??= imageSearchPlan(a); a.searchIndex ??= 0;
@@ -104,6 +110,7 @@ if(imageSlides<Math.ceil(slides.length*0.8))output.validation.warnings.push({cod
 
 const old='Commons 이미지 검색',current='관련 이미지 검색';
 const search=wf.nodes.find(n=>n.name===old||n.name===current);search.name=current;
+search.parameters.options.timeout=60000;
 search.notes='Commons + Openverse, 검색어 2개 × 제공자 2개 × 각 12개. 라이선스·관련성·원출처 확인 후 사용.';
 if(wf.connections[old]){wf.connections[current]=wf.connections[old];delete wf.connections[old];}
 for(const conn of Object.values(wf.connections))for(const edges of conn.main||[])for(const e of edges)if(e.node===old)e.node=current;

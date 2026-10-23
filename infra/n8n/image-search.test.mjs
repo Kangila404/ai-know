@@ -55,7 +55,7 @@ test('only reviewed high-confidence alternatives can replace a failed source pag
 const workflow=JSON.parse(fs.readFileSync(new URL('./workflows/ai-know-news-draft.json',import.meta.url),'utf8'));
 const runController=state=>new Function('$input',workflow.nodes.find(n=>n.name==='작업 결정').parameters.jsCode)({first:()=>({json:state})})[0].json;
 test('controller exhausts search before selecting; suitable existing images bypass generation',()=>{
-  const state={phase:'search',config:{allowImageGeneration:true,maxImageGenerations:3,dryRun:false},
+  const state={phase:'search',selectionLookupChecked:true,config:{allowImageGeneration:true,maxImageGenerations:3,dryRun:false},
     counters:{transitions:0,commonsCalls:0,imageCalls:0},assets:[{key:'topic',searchQuery:'model | computer',candidates:[]}],assetIndex:0,audit:[]};
   let next=runController(state);assert.equal(next.route,2);assert.equal(next.searchRequest.provider,'commons');
   next.assets[0].searchIndex=1;next=runController(next);assert.equal(next.searchRequest.provider,'openverse');

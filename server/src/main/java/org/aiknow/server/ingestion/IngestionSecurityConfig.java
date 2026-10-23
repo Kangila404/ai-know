@@ -39,6 +39,7 @@ public class IngestionSecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/internal/v1/images/storage").hasRole("INGEST")
                 .requestMatchers(HttpMethod.POST, "/internal/v1/card-news/import", "/internal/v1/images").hasRole("INGEST")
                 .requestMatchers(HttpMethod.POST, "/internal/v1/generation/existing", "/internal/v1/generation/claim", "/internal/v1/generation/response").hasRole("INGEST")
+                .requestMatchers(HttpMethod.POST, "/internal/v1/generation/selection-context", "/internal/v1/generation/selection-context/recover").hasRole("INGEST")
                 .anyRequest().denyAll())
             .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> res.setStatus(401))
                 .accessDeniedHandler((req, res, ex) -> res.setStatus(403)))
