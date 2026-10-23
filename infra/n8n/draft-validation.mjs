@@ -1,3 +1,5 @@
+import { assertEvidence } from './draft-contract.mjs';
+
 // Embedded in Code nodes: compare numeric values after notation conversion.
 // This checks numeric evidence presence, not the meaning/attribution of a claim.
 export function numericValues(input) {
@@ -38,10 +40,48 @@ export function numericValues(input) {
   });
 }
 
-export function assertSupportedNumbers(text, evidence, context) {
-  const supported = new Set(numericValues(evidence));
-  const missing = [...new Set(numericValues(text).filter(value => !supported.has(value)))];
+export function assertSupportedNumbers(text, evidence, context, sourceText = '') {
+  // A digit-prefixed mixed-case name (1Password, 23andMe) is not a quantity.
+  // Recognize only names attested in the source, not arbitrary model output.
+  // Source context establishes names only; numeric claims still need quoted evidence.
+  const token = /(?<![A-Za-z0-9_.-])\d+[A-Za-z]+(?![A-Za-z0-9_-])/g;
+  const unit = /^\d+(?:hundred|thousand|million|billion|trillion|years?|months?|weeks?|days?|hours?|minutes?|seconds?|percent|kg|mg|gb|mb|km|cm|mm|hz|mhz|ghz)$/i;
+  const names = new Set([...String(sourceText + ' ' + evidence).matchAll(token)]
+    .map(match => match[0]).filter(name => /[A-Z]/.test(name) && /[a-z]/.test(name) && !unit.test(name))
+    .map(name => name.toLowerCase()));
+  const quantities = value => numericValues(String(value ?? '').replace(token,
+    name => names.has(name.toLowerCase()) ? ' ' : name));
+  const supported = new Set(quantities(evidence));
+  const missing = [...new Set(quantities(text).filter(value => !supported.has(value)))];
   if (missing.length) throw new Error(`${context}: 인용 근거에 없는 수치가 있습니다 (${missing.join(', ')}).`);
+}
+
+export function assertContextualNumbers(text, quotes, context, docs, catalog, warnings) {
+  const sourceText = docs.map(doc => doc.text).join(' ');
+  const quoted = quotes.map(q => q.quote).join(' ');
+  try { assertSupportedNumbers(text, quoted, context, sourceText); return; }
+  catch (originalError) {
+    // A model may select the next sentence of a paragraph. Expand by just one
+    // neighboring evidence sentence, never by every number in the article.
+    const clean = value => String(value ?? '').replace(/\s+/g, ' ').trim();
+    const neighbors = [];
+    for (const q of quotes) {
+      const index = catalog.findIndex(item => item.sourceId === q.sourceId && clean(item.quote) === clean(q.quote));
+      if (index < 0) continue;
+      for (const next of [catalog[index - 1], catalog[index + 1]]) {
+        if (next?.sourceId === q.sourceId && !quotes.some(item => item.sourceId === next.sourceId && item.quote === next.quote)
+          && !neighbors.some(item => item.sourceId === next.sourceId && item.quote === next.quote))
+          neighbors.push({ sourceId: next.sourceId, quote: next.quote });
+      }
+    }
+    if (!neighbors.length) throw originalError;
+    try { assertSupportedNumbers(text, quoted + ' ' + neighbors.map(q => q.quote).join(' '), context, sourceText); }
+    catch { throw originalError; }
+    assertEvidence([...quotes, ...neighbors], docs, docs.map(doc => doc.id), context);
+    quotes.push(...neighbors);
+    warnings.push({ code: 'NUMERIC_EVIDENCE_EXPANDED', context,
+      reason: '인용문 앞뒤의 원문 근거를 함께 확인했습니다. 관리자 검수에서 수치의 주체와 의미를 확인하세요.' });
+  }
 }
 
 export function parseVisualJson(raw) {

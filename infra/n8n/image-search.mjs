@@ -95,7 +95,12 @@ export function imageShortlist(asset) {
 
 export function imageSelectionPayload(state) {
   return {articleTitle: state.draft.title.slice(0,200), articleSummary: state.draft.summary.slice(0,1000),
-    assets: state.assets.map(a => ({assetKey:a.key,purpose:a.description.slice(0,240),
+    // Use editorial text, not a planned illustration's composition, as the search acceptance criterion.
+    // Old cached drafts may still describe an exact scene in visual.description / asset.description.
+    assets: state.assets.map(a => ({assetKey:a.key,purpose:((state.draft.slides || [])
+      .filter(slide => slide.visual?.assetKey === a.key)
+      .map(slide => imageText(slide.title) + ': ' + imageText(slide.content)).join(' / ')
+      || imageText(state.draft.title) + ': ' + imageText(state.draft.summary)).slice(0,360),
       candidates:imageShortlist(a).map(c=>({candidateId:c.candidateId,title:c.title.slice(0,120),description:c.description.slice(0,200)}))}))};
 }
 
