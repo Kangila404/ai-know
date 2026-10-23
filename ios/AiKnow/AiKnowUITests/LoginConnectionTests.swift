@@ -184,7 +184,7 @@ final class AdminAPIConnectionTests: XCTestCase {
     }
     @MainActor private func row(_ text: String, _ app: XCUIApplication) -> XCUIElement {
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10)); return row
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription); return row
     }
     @MainActor func testAReviewAndPublication() throws {
         let app = try launch()
@@ -235,6 +235,74 @@ final class AdminAPIConnectionTests: XCTestCase {
         app.buttons["입력 완료"].tap()
         let recovery = app.buttons["응답 복구"]; reveal(recovery, app); recovery.tap(); app.buttons["복구"].tap()
         XCTAssertTrue(app.staticTexts["복구했습니다."].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testEUserAdministration() throws {
+        let app = try launch()
+        app.buttons["계정 목록·권한 관리"].tap()
+        _ = row("검증 사용자", app)
+        app.buttons["더 보기"].tap()
+        row("내 관리자 계정", app).tap()
+        XCTAssertTrue(app.switches["admin.account.suspended"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.switches["admin.account.suspended"].isEnabled)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["admin.users.role"].tap(); app.buttons["일반 사용자"].tap()
+        app.buttons["admin.users.state"].tap(); app.buttons["정상"].tap()
+        let search = app.searchFields.firstMatch
+        if !search.isHittable { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("검증")
+        app.keyboards.buttons["Search"].firstMatch.tap()
+        row("검증 사용자", app).tap()
+        let save = app.buttons["변경 사항 저장"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10)); XCTAssertFalse(save.isEnabled)
+        func edit() {
+            let picker = app.buttons["admin.account.role"]; reveal(picker, app); picker.tap()
+            app.buttons.matching(identifier: "관리자").matching(NSPredicate(format: "isSelected == false")).firstMatch.tap()
+            let suspended = app.switches["admin.account.suspended"]
+            suspended.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            XCTAssertEqual(suspended.value as? String, "1")
+            let input = field("admin.account.reason", app); reveal(input, app); input.tap()
+            if (input.value as? String)?.contains("HTTP") != true { input.typeText("HTTP 계정 검증") }
+            app.buttons["입력 완료"].tap()
+            reveal(save, app); save.tap(); app.buttons["변경 적용"].tap()
+        }
+        edit()
+        let reload = app.buttons["계정 다시 조회"]
+        XCTAssertTrue(reload.waitForExistence(timeout: 10))
+        XCTAssertFalse(save.isEnabled, app.debugDescription)
+        reveal(reload, app); reload.tap()
+        XCTAssertTrue(app.buttons["admin.account.role"].waitForExistence(timeout: 10))
+        edit()
+        XCTAssertTrue(app.staticTexts["저장했습니다"].waitForExistence(timeout: 10))
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "account-management"; capture.lifetime = .keepAlways; add(capture)
+        let history = app.buttons["변경 이력"]; reveal(history, app); history.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "ACCOUNT_UPDATE")).firstMatch.waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testFAnalytics() throws {
+        let app = try launch()
+        app.buttons["조회수·운영 현황"].tap()
+        XCTAssertTrue(app.staticTexts["전체 조회수, 1234회"].waitForExistence(timeout: 10))
+        _ = row("통계 첫 카드", app)
+        let capture = XCTAttachment(screenshot: app.screenshot()); capture.name = "analytics-summary"; capture.lifetime = .keepAlways; add(capture)
+        let more = app.buttons["더 보기"]; reveal(more, app); more.tap()
+        let second = row("통계 둘째 카드", app); reveal(second, app)
+        app.swipeDown(); app.swipeDown()
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 10)); search.tap(); search.typeText("검색")
+        app.keyboards.buttons["Search"].firstMatch.tap()
+        let result = row("검색 통계 카드", app); reveal(result, app); result.tap()
+        XCTAssertTrue(app.navigationBars["카드뉴스 수정"].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor func testGReadyArticle() throws {
+        let app = try launch()
+        app.buttons["카드뉴스 관리"].tap(); row("최초 발송 전 카드", app).tap()
+        XCTAssertTrue(app.navigationBars["카드뉴스 수정"].waitForExistence(timeout: 10))
+        let notice = app.staticTexts["최초 발송 전 콘텐츠는 공개 상태를 변경할 수 없습니다."]
+        reveal(notice, app)
+        XCTAssertFalse(app.buttons["숨김"].exists)
+        XCTAssertFalse(app.buttons["복원"].exists)
         app.terminate()
     }
     @MainActor func testDRoleChangesUpdateRightmostTab() throws {

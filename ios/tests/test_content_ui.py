@@ -42,7 +42,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/users/profile/1" and method == "PATCH":
             state["profile"] = profiles[0]; checks.add("profile")
         elif path == "/api/v1/profile": value = profiles
-        elif path in ("/api/v1/cardNews/today", "/api/v1/cardNews/9001"): value = card
+        elif path in ("/api/v1/cardNews/today", "/api/v1/cardNews/9001"):
+            value = card
+            if path.endswith("/9001"): checks.add("card-open")
         elif path == "/api/v1/cardNews/categories": value = card["categories"]
         elif path == "/api/v1/cardNews":
             value = [card]
@@ -89,7 +91,7 @@ if __name__ == "__main__":
                 "-configuration", "Debug", "-destination", f"platform=iOS Simulator,id={args.device}", "-jobs", "2",
                 "-only-testing:AiKnowUITests/ContentConnectionTests", "AIKNOW_API_BASE_URL=http://localhost:18081",
                 "ONLY_ACTIVE_ARCH=YES", "test"], cwd=root, stdout=log, stderr=subprocess.STDOUT)
-        expected = {"onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings"}
+        expected = {"card-open", "onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings"}
         print("UI test exit:", result.returncode, "Verified:", ", ".join(sorted(checks)), "Missing:", ", ".join(sorted(expected - checks)))
         assert result.returncode == 0 and checks >= expected
     finally:

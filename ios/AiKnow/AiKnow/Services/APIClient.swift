@@ -77,7 +77,8 @@ final class APIClient {
         guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else { throw APIError.configuration }
         if !query.isEmpty { components.queryItems = query }
         guard let url = components.url else { throw APIError.configuration }
-        var request = URLRequest(url: url)
+        // Account permissions and card-open counts must reach the server on each request.
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.httpMethod = method
         request.httpBody = body
         request.timeoutInterval = 20
