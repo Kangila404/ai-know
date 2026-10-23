@@ -17,6 +17,9 @@ import java.util.Optional;
 
 @Repository
 public interface CardNewsRepository extends JpaRepository<CardNews,Long> {
+    long countByPublicationStatus(PublicationStatus status);
+    @Query("select c from CardNews c where :query = '' or locate(:query, lower(c.title)) > 0")
+    org.springframework.data.domain.Page<CardNews> searchForAnalytics(String query, Pageable pageable);
     @Query("""
         select c from CardNews c
         where c.inspectionStatus = org.aiknow.server.cardNews.domain.InspectionStatus.APPROVED

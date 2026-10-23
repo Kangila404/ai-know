@@ -11,9 +11,8 @@ struct AdminHomeView: View {
                     }
                 }
                 Section("사용자 관리") {
-                    Label("사용자 관리 준비 중", systemImage: "person.2")
-                    Text("현재 서버에는 사용자 목록·권한 변경 API가 없습니다. 계정 관리는 API가 추가된 뒤 제공됩니다.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    NavigationLink { AdminUsersView() } label: { Label("계정 목록·권한 관리", systemImage: "person.2") }
+                    NavigationLink { AdminAnalyticsView() } label: { Label("조회수·운영 현황", systemImage: "chart.bar") }
                 }
             }.navigationTitle("관리자")
         }

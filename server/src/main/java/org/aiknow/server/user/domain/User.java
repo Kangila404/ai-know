@@ -32,6 +32,13 @@ public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @jakarta.persistence.Version private long version;
+    @Column(nullable = false) private boolean suspended;
+
+    public void updateAdministration(UserRole role, boolean suspended) {
+        this.userRole = role;
+        this.suspended = suspended;
+    }
 
     @Column(name = "user_id", unique = true, nullable = false)
     private String userId;

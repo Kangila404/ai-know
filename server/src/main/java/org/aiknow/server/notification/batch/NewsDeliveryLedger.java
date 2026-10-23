@@ -29,7 +29,7 @@ public class NewsDeliveryLedger {
         var setting = settings.findByUserId(delivery.getUserId()).orElse(null);
         var localNow = now.atZone(properties.zone());
         if (token == null || !token.isActive() || !token.getUserId().equals(delivery.getUserId())
-            || !users.existsById(delivery.getUserId()) || setting == null || !setting.isAllowed()
+            || !users.existsByIdAndSuspendedFalse(delivery.getUserId()) || setting == null || !setting.isAllowed()
             || !localNow.toLocalDate().equals(delivery.getDeliveryDate())) {
             delivery.cancel();
             return Optional.empty();

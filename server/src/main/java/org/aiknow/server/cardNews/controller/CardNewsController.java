@@ -42,8 +42,10 @@ public class CardNewsController {
     }
 
     @GetMapping("/{id}")
-    public CardNewsResponse getCard(@PathVariable Long id, @AuthenticationPrincipal String userId) {
-        return cardNewsService.getCard(id, userId);
+    public CardNewsResponse getCard(@PathVariable Long id, @AuthenticationPrincipal String userId,
+        jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        return cardNewsService.openCard(id, userId);
     }
     @PutMapping("/{id}/read")
     public ResponseEntity<Void> markRead(@PathVariable Long id, @AuthenticationPrincipal String userId) {
