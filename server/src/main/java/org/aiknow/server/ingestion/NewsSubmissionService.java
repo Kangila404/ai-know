@@ -28,6 +28,7 @@ public class NewsSubmissionService {
     private final UserRepository users;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final org.aiknow.server.notification.batch.NewsDeliveryProperties deliveryProperties;
     private final org.aiknow.server.storage.ImageStorage imageStorage;
     private final org.aiknow.server.editorial.EditorialAuditService editorialAudit;
 
@@ -96,6 +97,8 @@ public class NewsSubmissionService {
         var selected = categories.findAllById(categoryIds);
         if (selected.size() != categoryIds.size()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "존재하지 않는 카테고리입니다.");
         var article = prepareApproved(read(submission), request.contentType(), selected);
+        if (request.contentType() == ContentType.AI_THEORY)
+            article.publishTheoryForArchive(clock.instant().atZone(deliveryProperties.zone()).toLocalDate());
         news.saveAndFlush(article);
         submission.approve(article.getId(), reviewerId(reviewer), clock.instant());
         editorialAudit.record("SUBMISSION", id, "APPROVE", reviewer, "관리자 승인", null, Receipt.from(submission));

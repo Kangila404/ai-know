@@ -37,7 +37,7 @@ class MySQLMigrationTests {
             .baselineOnMigrate(false).cleanDisabled(true);
     }
     @Test void newDatabaseMigratesOnceAndHibernateValidatesAllEntities() {
-        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(7);
+        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(8);
         assertThat(flyway.migrate().migrationsExecuted).isZero(); flyway.validate();
         try (var context = new SpringApplicationBuilder(ServerApplication.class).profiles("test").run(
             "--server.port=0", "--spring.datasource.url=" + url, "--spring.datasource.username=" + user,
@@ -55,7 +55,7 @@ class MySQLMigrationTests {
         }
         assertThatThrownBy(() -> config().load().migrate()).isInstanceOf(FlywayException.class);
         var adopted = config().baselineVersion("1").load(); adopted.baseline();
-        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(6);
+        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(7);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement();
              var rs = s.executeQuery("SELECT nickname FROM users WHERE user_id='migration-fixture'")) {
             assertThat(rs.next()).isTrue(); assertThat(rs.getString(1)).isEqualTo("preserved");
@@ -66,7 +66,7 @@ class MySQLMigrationTests {
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement()) {
             s.execute("INSERT INTO news_generation_record(attempt_key,source_url,task,request_hash,request_json,response_json,created_at,version) VALUES(REPEAT('a',64),'https://example.test/legacy','image_selection',REPEAT('b',64),'{}','{\"original\":true}',NOW(),0)");
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(4);
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
              var r=s.executeQuery("SELECT request_json,response_json,context_json FROM news_generation_record")) {
             assertThat(r.next()).isTrue(); assertThat(r.getString(1)).isEqualTo("{}");
@@ -85,7 +85,7 @@ class MySQLMigrationTests {
             java.util.List.of(new org.aiknow.server.ingestion.NewsImportRequest.Slide(1, "Slide", "Content", "text", image)));
         var received = service.receive(draft);
         var request = new org.aiknow.server.ingestion.NewsSubmissionService.Approve(
-            org.aiknow.server.cardNews.domain.ContentType.AI_THEORY, java.util.List.of());
+            org.aiknow.server.cardNews.domain.ContentType.NEWS, java.util.List.of());
         var approved = service.approve(received.id(), request, reviewer.getUserId());
         assertThat(approved.status()).isEqualTo(org.aiknow.server.cardNews.domain.InspectionStatus.APPROVED);
         assertThat(service.approve(received.id(), request, reviewer.getUserId()).cardNewsId()).isEqualTo(approved.cardNewsId());
@@ -103,17 +103,42 @@ class MySQLMigrationTests {
 
     @Test void publicationDateUpgradePreservesPublishedDatesAndAllowsReadyContent() throws Exception {
         config().target("5").load().migrate();
-        String insert = "INSERT INTO card_news(title,created_at,updated_at,inspection_status,content_type,publication_status,publication_date) VALUES('fixture',NOW(),NOW(),'APPROVED','AI_THEORY','READY',%s)";
+        String insert = "INSERT INTO card_news(title,created_at,updated_at,inspection_status,content_type,publication_status,publication_date) VALUES('fixture',NOW(),NOW(),'APPROVED','NEWS','READY',%s)";
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement()) {
             s.execute(insert.formatted("'2026-10-22'"));
             assertThatThrownBy(() -> s.execute(insert.formatted("NULL"))).isInstanceOf(SQLException.class);
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(3);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement()) {
             s.execute(insert.formatted("NULL"));
             try (var rs = s.executeQuery("SELECT publication_date FROM card_news ORDER BY id")) {
                 assertThat(rs.next()).isTrue(); assertThat(rs.getDate(1).toLocalDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 22));
                 assertThat(rs.next()).isTrue(); assertThat(rs.getDate(1)).isNull();
+            }
+        }
+    }
+
+    @Test void theoryArchiveUpgradeOnlyPublishesApprovedReadyTheory() throws Exception {
+        config().target("7").load().migrate();
+        try (var c=DriverManager.getConnection(url,user,password);
+             var s=c.prepareStatement("INSERT INTO card_news(title,inspection_status,content_type,publication_status,created_at,updated_at,approved_at) VALUES(?,?,?,?,NOW(),NOW(),'2026-10-22 18:00:00')")) {
+            for (var row : new String[][] {{"eligible","APPROVED","AI_THEORY","READY"}, {"news","APPROVED","NEWS","READY"},
+                {"pending","PENDING","AI_THEORY","READY"},{"hidden","APPROVED","AI_THEORY","HIDDEN"},
+                {"published","APPROVED","AI_THEORY","PUBLISHED"}}) {
+                for (int i=0; i<row.length; i++) s.setString(i+1,row[i]);
+                s.executeUpdate();
+            }
+        }
+        assertThat(config().load().migrate().migrationsExecuted).isOne();
+        assertThat(config().load().migrate().migrationsExecuted).isZero();
+        try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
+             var r=s.executeQuery("SELECT title,publication_status,publication_date,version,first_used_at,last_used_at FROM card_news ORDER BY id")) {
+            assertThat(r.next()).isTrue(); assertThat(r.getString(2)).isEqualTo("PUBLISHED");
+            assertThat(r.getDate(3).toLocalDate()).isEqualTo(java.time.LocalDate.of(2026,10,23));
+            assertThat(r.getLong(4)).isEqualTo(1); assertThat(r.getTimestamp(5)).isNull(); assertThat(r.getTimestamp(6)).isNull();
+            for (var state : java.util.List.of("READY","READY","HIDDEN","PUBLISHED")) {
+                assertThat(r.next()).isTrue(); assertThat(r.getString(2)).isEqualTo(state);
+                assertThat(r.getDate(3)).isNull(); assertThat(r.getLong(4)).isZero();
             }
         }
     }
