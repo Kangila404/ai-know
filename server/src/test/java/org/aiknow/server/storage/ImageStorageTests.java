@@ -85,4 +85,56 @@ class ImageStorageTests {
         var disabled = new ImageStorage(false, "", "", "", "mounted", new org.springframework.mock.env.MockEnvironment());
         assertThatThrownBy(disabled::verifyWritable).isInstanceOf(ResponseStatusException.class);
     }
+
+    @Test void previewsAreSmallerCacheableAndLeaveOriginalUntouched() throws Exception {
+        var original = new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_ARGB);
+        var random = new java.util.Random(42);
+        for (int y = 0; y < 1200; y++) for (int x = 0; x < 1600; x++) original.setRGB(x, y, random.nextInt() | 0xff000000);
+        original.setRGB(0, 0, 0); // transparent corner is composited onto white
+        var out = new ByteArrayOutputStream(); ImageIO.write(original, "png", out);
+        byte[] bytes = out.toByteArray();
+        String result = mvc.perform(multipart("/internal/v1/images").file(upload(bytes)).header("Authorization", AUTH))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String key = mapper.readTree(result).get("key").asText();
+        String path = "/media/generated/" + key;
+        byte[] small = mvc.perform(get(path).param("preview", "320"))
+            .andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"))
+            .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("immutable")))
+            .andReturn().getResponse().getContentAsByteArray();
+        BufferedImage decoded = ImageIO.read(new java.io.ByteArrayInputStream(small));
+        assertThat(decoded.getWidth()).isEqualTo(320); assertThat(decoded.getHeight()).isEqualTo(240);
+        assertThat(small.length).isLessThan(bytes.length / 5);
+        mvc.perform(get(path).param("preview", "320")).andExpect(content().bytes(small));
+        mvc.perform(get(path).param("preview", "1280")).andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"));
+        mvc.perform(get(path).param("preview", "9999")).andExpect(status().isBadRequest());
+        mvc.perform(get(path)).andExpect(content().bytes(bytes));
+        assertThat(MediaUrls.preview("https://aiknow.kro.kr" + path)).endsWith("?preview=1280");
+        assertThat(MediaUrls.preview("https://example.com/logo.png?signature=abc")).isEqualTo("https://example.com/logo.png?signature=abc");
+    }
+
+    @Test void bundledAvatarsArePublicAndReadable() throws Exception {
+        for (String key : java.util.List.of("lumi", "mori", "nova", "orbi", "pico")) {
+            byte[] data = mvc.perform(get("/avatars/" + key + "-v1.png"))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/png"))
+                .andReturn().getResponse().getContentAsByteArray();
+            assertThat(ImageIO.read(new java.io.ByteArrayInputStream(data)).getWidth()).isEqualTo(512);
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "AIKNOW_IMAGE_SAMPLE", matches = ".+")
+    void measureRequestedImageSample() throws Exception {
+        byte[] original = Files.readAllBytes(Path.of(System.getenv("AIKNOW_IMAGE_SAMPLE")));
+        String result = mvc.perform(multipart("/internal/v1/images").file(upload(original)).header("Authorization", AUTH))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String key = mapper.readTree(result).get("key").asText();
+        for (int size : new int[]{320, 1280}) {
+            long start = System.nanoTime();
+            byte[] data = mvc.perform(get("/media/generated/" + key).param("preview", String.valueOf(size)))
+                .andExpect(status().isOk()).andExpect(content().contentType("image/jpeg"))
+                .andReturn().getResponse().getContentAsByteArray();
+            System.out.printf("IMAGE_SAMPLE original=%d preview=%d bytes=%d local_transform_ms=%.1f%n", original.length, size, data.length, (System.nanoTime() - start) / 1_000_000d);
+            assertThat(data.length).isLessThan(original.length);
+        }
+    }
 }

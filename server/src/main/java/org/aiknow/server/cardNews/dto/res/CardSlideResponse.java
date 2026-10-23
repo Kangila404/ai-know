@@ -18,7 +18,7 @@ public record CardSlideResponse(
         return new CardSlideResponse(
                 cardSlides.getId(),
                 cardSlides.getTitle(),
-                cardSlides.getImgUrl(),
+                org.aiknow.server.storage.MediaUrls.preview(cardSlides.getImgUrl()),
                 cardSlides.getContent(),
                 cardSlides.getSequence(),
                 cardSlides.getLayout(), cardSlides.getImageOrigin(), cardSlides.getImageSourceUrl(), cardSlides.getImageCredit()
