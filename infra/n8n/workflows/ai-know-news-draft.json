@@ -727,7 +727,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "parameters": {
-        "jsCode": "const r=$input.first().json;\nif(r.statusCode!==200||!['CALL','REPLAY','BLOCKED'].includes(r.body?.decision)) throw new Error('모델 호출 예약 실패. 유료 재시도하지 않습니다.');\nconst before=$('작업 결정').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));\ns.cacheClaim=r.body;s.cacheRoute={CALL:0,REPLAY:1,BLOCKED:2}[r.body.decision];\n// A concurrent run may have reserved first after our initial lookup. Use its exact snapshot.\nif(s.task==='image_selection'&&r.body.decision==='REPLAY') {\n  const context=JSON.parse(r.body.contextJson||'null');\n  if(context?.version!==1||!Array.isArray(context.assets)) throw new Error('기존 이미지 후보 복구가 필요합니다. 유료 재호출하지 않습니다.');\n  s.assets=context.assets;\n}\ns.counters.paidTextCalls=(s.counters.paidTextCalls||0)+(r.body.decision==='CALL'?1:0);\ns.counters.textCacheHits=(s.counters.textCacheHits||0)+(r.body.decision==='REPLAY'?1:0);\nif(r.body.decision==='BLOCKED'){s.phase='stop';s.status='blocked';s.reason=r.body.reason;}\ns.audit.push({event:'generation_cache',detail:{decision:r.body.decision,id:r.body.id}});\nreturn [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];"
+        "jsCode": "const r=$input.first().json;\nif(r.statusCode!==200||!['CALL','REPLAY','BLOCKED'].includes(r.body?.decision)) throw new Error('모델 호출 예약 실패. 유료 재시도하지 않습니다.');\nconst before=$('작업 결정').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));\ns.cacheClaim=r.body;s.cacheRoute={CALL:0,REPLAY:1,BLOCKED:2}[r.body.decision];\n// A concurrent run may have reserved first after our initial lookup. Use its exact snapshot.\nif(s.task==='image_selection'&&r.body.decision==='REPLAY') {\n  const context=JSON.parse(r.body.contextJson||'null');\n  if(context?.version!==1||!Array.isArray(context.assets)) throw new Error('기존 이미지 후보 복구가 필요합니다. 유료 재호출하지 않습니다.');\n  s.assets=context.assets;\n}\ns.counters.paidTextCalls=(s.counters.paidTextCalls||0)+(r.body.decision==='CALL'?1:0);\ns.counters.textCacheHits=(s.counters.textCacheHits||0)+(r.body.decision==='REPLAY'?1:0);\nif(r.body.decision==='BLOCKED'){\n  s.phase='stop';s.status='blocked';s.reason=r.body.reason;\n  // A reserved draft belongs to its original execution. Leave it intact and try\n  // the next bounded candidate instead of blocking every scheduled run on it.\n  if(s.task==='draft'&&Number.isInteger(s.candidateIndex)&&s.candidateIndex>=0\n      &&s.candidateIndex+1<s.candidates?.length){\n    s.audit.push({event:'reserved_draft_skipped',detail:{sourceUrl:s.current.sourceUrl,id:r.body.id,reason:r.body.reason}});\n    s.phase='candidate';s.cacheRoute=3;delete s.status;delete s.reason;\n  }\n}\ns.audit.push({event:'generation_cache',detail:{decision:r.body.decision,id:r.body.id}});\nreturn [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];"
       }
     },
     {
@@ -741,7 +741,7 @@
       ],
       "parameters": {
         "mode": "expression",
-        "numberOutputs": 3,
+        "numberOutputs": 4,
         "output": "={{ $json.cacheRoute }}"
       }
     },
@@ -1429,6 +1429,13 @@
         [
           {
             "node": "점검 또는 정상 종료",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "작업 결정",
             "type": "main",
             "index": 0
           }
