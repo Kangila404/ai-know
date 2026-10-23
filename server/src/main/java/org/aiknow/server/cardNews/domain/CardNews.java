@@ -63,13 +63,22 @@ public class CardNews extends BaseEntity {
     private java.time.Instant firstUsedAt;
     private java.time.Instant lastUsedAt;
 
+    public void publishTheoryForArchive(LocalDate date) {
+        if (contentType != ContentType.AI_THEORY || inspectionStatus != InspectionStatus.APPROVED)
+            throw new IllegalStateException("Only approved theory can be published directly to the archive");
+        if (publicationStatus == PublicationStatus.READY) {
+            publicationStatus = PublicationStatus.PUBLISHED;
+            publicationDate = date;
+        }
+    }
+
     public void publishForDelivery(LocalDate date, java.time.Instant now) {
         if (publicationStatus == PublicationStatus.HIDDEN) throw new IllegalStateException("Hidden content cannot be delivered");
         if (publicationStatus == PublicationStatus.READY) {
             publicationStatus = PublicationStatus.PUBLISHED;
             publicationDate = date;
-            firstUsedAt = now;
         }
+        if (firstUsedAt == null) firstUsedAt = now;
         lastUsedAt = now;
     }
 
