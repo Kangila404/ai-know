@@ -46,11 +46,20 @@ if(s.task==='image_selection'&&r.body.decision==='REPLAY') {
 }
 s.counters.paidTextCalls=(s.counters.paidTextCalls||0)+(r.body.decision==='CALL'?1:0);
 s.counters.textCacheHits=(s.counters.textCacheHits||0)+(r.body.decision==='REPLAY'?1:0);
-if(r.body.decision==='BLOCKED'){s.phase='stop';s.status='blocked';s.reason=r.body.reason;}
+if(r.body.decision==='BLOCKED'){
+  s.phase='stop';s.status='blocked';s.reason=r.body.reason;
+  // A reserved draft belongs to its original execution. Leave it intact and try
+  // the next bounded candidate instead of blocking every scheduled run on it.
+  if(s.task==='draft'&&Number.isInteger(s.candidateIndex)&&s.candidateIndex>=0
+      &&s.candidateIndex+1<s.candidates?.length){
+    s.audit.push({event:'reserved_draft_skipped',detail:{sourceUrl:s.current.sourceUrl,id:r.body.id,reason:r.body.reason}});
+    s.phase='candidate';s.cacheRoute=3;delete s.status;delete s.reason;
+  }
+}
 s.audit.push({event:'generation_cache',detail:{decision:r.body.decision,id:r.body.id}});
 return [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];`),
     { id: 'aiknow-generation-route', name: '모델 캐시 처리 경로', type: 'n8n-nodes-base.switch', typeVersion: 3.2, position: [1448, 736],
-      parameters: { mode: 'expression', numberOutputs: 3, output: '={{ $json.cacheRoute }}' } },
+      parameters: { mode: 'expression', numberOutputs: 4, output: '={{ $json.cacheRoute }}' } },
     code('aiknow-generation-replay', '저장된 모델 응답 재사용', [1672, 848], `const s=$input.first().json;
 if(s.cacheClaim?.decision!=='REPLAY') throw new Error('재사용 가능한 응답이 없습니다.');
 return [{json:JSON.parse(s.cacheClaim.responseJson),pairedItem:{item:0}}];`),
@@ -69,7 +78,7 @@ export function generationConnections() {
     chain('기존 이미지 선택 조회','기존 이미지 선택 복원'), chain('기존 이미지 선택 복원','작업 결정'),
     chain('최근 기사와 중복 검사','DB 기존 기사 조회'), chain('DB 기존 기사 조회','저장된 기사 제외'), chain('저장된 기사 제외','작업 결정'),
     chain('모델 호출 예약 또는 캐시 조회','모델 호출 준비'), chain('모델 호출 준비','모델 캐시 처리 경로'),
-    ['모델 캐시 처리 경로',{main:[[e('텍스트 생성 API')],[e('저장된 모델 응답 재사용')],[e('점검 또는 정상 종료')]]}],
+    ['모델 캐시 처리 경로',{main:[[e('텍스트 생성 API')],[e('저장된 모델 응답 재사용')],[e('점검 또는 정상 종료')],[e('작업 결정')]]}],
     chain('텍스트 생성 API','모델 원본 응답 보관'), chain('모델 원본 응답 보관','보관 후 응답 검증'),
     chain('보관 후 응답 검증','텍스트 응답 검증'), chain('저장된 모델 응답 재사용','텍스트 응답 검증'),
   ]);
