@@ -15,3 +15,9 @@ Thumbs.db
 # Xcode user-specific state
 **/xcuserdata/
 **/*.xcuserstate
+
+# Local Firebase app configuration
+**/GoogleService-Info.plist
+
+# Python test caches
+**/__pycache__/
