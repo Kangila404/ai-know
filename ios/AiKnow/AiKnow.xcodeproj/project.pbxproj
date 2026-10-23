@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DBF763911D2F4CF6B776ACC9 /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C21D16125A4A078847130E /* ImageLoader.swift */; };
         AD10000000000000000000001 = {isa = PBXBuildFile; fileRef = AD20000000000000000000001; };
 		A10000000000000000000001 /* AiKnowApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* AiKnowApp.swift */; };
 		A10000000000000000000002 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* RootTabView.swift */; };
@@ -38,6 +39,7 @@ AC10000000000000000000002 = {isa = PBXBuildFile; fileRef = AC2000000000000000000
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A0C21D16125A4A078847130E /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Services/ImageLoader.swift; sourceTree = SOURCE_ROOT; };
         AD20000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnow/Features/Admin/AdminOperations.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000001 /* AiKnowApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiKnowApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
@@ -84,6 +86,7 @@ AC20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text; p
 		A40000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				A0C21D16125A4A078847130E /* ImageLoader.swift */,
 				A40000000000000000000002 /* AiKnow */,
                 AC20000000000000000000001,
                 AC20000000000000000000002,
@@ -298,6 +301,7 @@ AC20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text; p
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DBF763911D2F4CF6B776ACC9 /* ImageLoader.swift in Sources */,
 				A10000000000000000000001 /* AiKnowApp.swift in Sources */,
 				A10000000000000000000002 /* RootTabView.swift in Sources */,
 				A10000000000000000000003 /* NewsCard.swift in Sources */,

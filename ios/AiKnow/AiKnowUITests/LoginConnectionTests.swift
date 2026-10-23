@@ -369,3 +369,82 @@ final class LoginBrandingTests: XCTestCase {
         app.terminate()
     }
 }
+
+// Explicit opt-in inspection of a real session. Only opens/scrolls published cards;
+// the server may count those opens. Never likes, marks read or edits content.
+final class ProductionLayoutInspectionTests: XCTestCase {
+    @MainActor
+    func testInspectPublishedCards() throws {
+        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18089/")!)) == nil,
+                      "Start the local inspection marker on port 18089 first")
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["아카이브"].waitForExistence(timeout: 30))
+        capture("production-today", app)
+        app.tabBars.buttons["아카이브"].tap()
+        let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "archive.card.")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 30))
+        capture("production-archive-initial", app)
+        Thread.sleep(forTimeInterval: 5)
+        capture("production-archive-loaded", app)
+        first.tap()
+        XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30) || app.buttons["다 읽었어요"].exists)
+        for index in 0..<10 {
+            capture("production-slide-\(index + 1)-initial", app)
+            Thread.sleep(forTimeInterval: 8)
+            capture("production-slide-\(index + 1)-loaded", app)
+            app.swipeUp()
+            capture("production-slide-\(index + 1)-bottom", app)
+            if !app.buttons["다음 카드"].exists { break }
+            app.buttons["다음 카드"].tap()
+        }
+        XCTAssertTrue(app.buttons["다 읽었어요"].exists)
+        // Return without marking read. Reopen to inspect cache reuse.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(first.waitForExistence(timeout: 15))
+        first.tap()
+        XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30) || app.buttons["다 읽었어요"].exists)
+        capture("production-revisit", app)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.tabBars.buttons["관리자"].exists)
+    }
+    @MainActor
+    func testArtworkZoomInBothAppearances() throws {
+        try XCTSkipIf((try? Data(contentsOf: URL(string: "http://localhost:18089/")!)) == nil,
+                      "Start the local inspection marker on port 18089 first")
+        continueAfterFailure = false
+        for mode in ["light", "dark"] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-appearance", mode]
+            app.launch()
+            XCTAssertTrue(app.tabBars.buttons["아카이브"].waitForExistence(timeout: 30))
+            app.tabBars.buttons["아카이브"].tap()
+            let first = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "archive.card.")).firstMatch
+            XCTAssertTrue(first.waitForExistence(timeout: 30)); first.tap()
+            XCTAssertTrue(app.buttons["다음 카드"].waitForExistence(timeout: 30))
+            for _ in 0..<3 {
+                app.buttons["다음 카드"].tap()
+                Thread.sleep(forTimeInterval: 1)
+            }
+            capture("\(mode)-long-diagram", app)
+            let expand = try XCTUnwrap(app.buttons.matching(identifier: "이미지 확대").allElementsBoundByIndex.first(where: { $0.isHittable }))
+            expand.tap()
+            let zoom = app.scrollViews["image.zoom"]
+            XCTAssertTrue(zoom.waitForExistence(timeout: 30))
+            capture("\(mode)-image-fit", app)
+            zoom.pinch(withScale: 3, velocity: 1)
+            capture("\(mode)-image-zoom", app)
+            app.buttons["닫기"].tap()
+            XCTAssertTrue(app.buttons["다음 카드"].exists)
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            XCTAssertTrue(app.tabBars.buttons["관리자"].exists)
+        }
+    }
+    @MainActor private func capture(_ name: String, _ app: XCUIApplication) {
+        let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot.name = name; shot.lifetime = .keepAlways; add(shot)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = name + "-tree"; tree.lifetime = .keepAlways; add(tree)
+    }
+}

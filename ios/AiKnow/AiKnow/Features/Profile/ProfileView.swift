@@ -9,7 +9,7 @@ struct ProfileView: View {
             List {
                 Section {
                     HStack(spacing: 14) {
-                        RemoteImage(raw: login.user?.profile?.imgUrl).frame(width: 54, height: 54).clipShape(Circle())
+                        RemoteImage(raw: login.user?.profile?.imgUrl, aspectRatio: 1, maxPixelSize: 192, imageBackground: .clear).frame(width: 54, height: 54).clipShape(Circle())
                         VStack(alignment: .leading, spacing: 5) {
                             Text("\(login.user?.nickname ?? "사용자")님").font(.headline)
                             Text("AI와 함께 더 나은 내일을 만들어가요!").font(.caption).foregroundStyle(.secondary)
@@ -126,7 +126,7 @@ private struct ProfileInfoView: View {
                 ForEach(profiles) { profile in
                     Button { selected = profile.id; saved = false } label: {
                         HStack {
-                            RemoteImage(raw: profile.imgUrl).frame(width: 44, height: 44).clipShape(Circle())
+                            RemoteImage(raw: profile.imgUrl, aspectRatio: 1, maxPixelSize: 192, imageBackground: .clear).frame(width: 44, height: 44).clipShape(Circle())
                             Text(profile.name).foregroundStyle(.primary)
                             Spacer()
                             if selected == profile.id { Image(systemName: "checkmark").foregroundStyle(.indigo) }

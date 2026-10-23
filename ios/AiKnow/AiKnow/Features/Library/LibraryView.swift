@@ -33,7 +33,8 @@ struct LibraryView: View {
                             HStack(spacing: 12) {
                                 NavigationLink { CardNewsDetailView(card: card) } label: {
                                     HStack(spacing: 12) {
-                                        RemoteImage(raw: card.titleImgUrl).frame(width: 80, height: 90).clipShape(RoundedRectangle(cornerRadius: 12))
+                                        RemoteImage(raw: card.titleImgUrl, aspectRatio: 1, maxPixelSize: 320)
+                                            .frame(width: 80, height: 80).clipShape(RoundedRectangle(cornerRadius: 12))
                                         VStack(alignment: .leading, spacing: 6) {
                                             Text(card.date).font(.caption2).foregroundStyle(.secondary)
                                             Text(card.title).font(.subheadline.bold()).foregroundStyle(AppPalette.ink).lineLimit(3)

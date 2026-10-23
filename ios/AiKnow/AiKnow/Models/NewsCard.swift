@@ -156,13 +156,43 @@ struct RequestFailureView: View {
 
 struct RemoteImage: View {
     let raw: String?
+    var aspectRatio: CGFloat = 4 / 3
+    var maxPixelSize = 1_280
+    // Editorial PNGs can contain transparency with black diagram labels/lines.
+    var imageBackground = Color.white
+    @State private var image: UIImage?
+    @State private var failed = false
+    @State private var retry = 0
+
     var body: some View {
-        AsyncImage(url: APIClient.shared.mediaURL(raw)) { phase in
-            if let image = phase.image { image.resizable().scaledToFit() }
-            else {
-                RoundedRectangle(cornerRadius: 16).fill(Color.indigo.opacity(0.1))
-                    .overlay { Image(systemName: "photo").foregroundStyle(.indigo) }
+        let url = APIClient.shared.mediaURL(raw)
+        // The placeholder and loaded image have the same bounds. An image's intrinsic
+        // size must never determine a ScrollView's width or move the text below it.
+        Color.indigo.opacity(0.06)
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .overlay {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFit()
+                        .background(imageBackground).accessibilityHidden(true)
+                }
+                else if url == nil { Image(systemName: "photo").foregroundStyle(.secondary).accessibilityLabel("이미지 없음") }
+                else if failed {
+                    Button { retry += 1 } label: {
+                        Image(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44)
+                    }.buttonStyle(.plain).accessibilityLabel("이미지 다시 불러오기")
+                } else { ProgressView().accessibilityLabel("이미지 불러오는 중") }
             }
-        }
+            .clipped()
+            .task(id: "\(url?.absoluteString ?? "")|\(maxPixelSize)|\(retry)") {
+                image = nil; failed = false
+                guard let url else { return }
+                do {
+                    let loaded = try await ImageLoader.shared.image(at: url, maxPixelSize: maxPixelSize)
+                    try Task.checkCancellation()
+                    image = loaded
+                } catch {
+                    if !Task.isCancelled { failed = true }
+                }
+            }
     }
 }
