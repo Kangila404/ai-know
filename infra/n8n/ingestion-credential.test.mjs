@@ -51,7 +51,7 @@ test('first deployment provisions one credential and binds every internal API wi
   assert.equal(db.credentials.size, 1);
   const internal = db.workflow.nodes.filter(n => typeof n.parameters?.url === 'string'
     && n.parameters.url.startsWith('http://server:8080/internal/'));
-  assert.equal(internal.length, 8);
+  assert.equal(internal.length, 9);
   const [credential] = db.credentials.values();
   for (const node of internal) assert.equal(node.credentials.httpHeaderAuth.id, credential.id);
   for (const node of db.workflow.nodes.filter(n => !internal.includes(n))) {

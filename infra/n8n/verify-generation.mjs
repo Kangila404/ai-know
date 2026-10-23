@@ -122,10 +122,46 @@ function verifyImage(nonce) {
   assert.equal(imageRecovered.runData['저장 확인 후 URL 기록'][0].data.main[0][0].json.httpStatus,202);
   console.log('PASS generated image: immediate multipart upload/cache -> interrupted import -> replay stored image -> PENDING without another generation');
 }
+function verifySelectionResume(nonce) {
+  const selectionResume=workflow('selection-resume-'+nonce,'sourced'),selectionInterrupted=structuredClone(selectionResume);
+  code(selectionInterrupted,'서버 검수 대기 저장',"throw new Error('Simulated failure after paid image selection');");
+  const selectionStopped=execute(selectionInterrupted);assert.ok(selectionStopped.error);
+  assert.ok(selectionStopped.runData['모델 원본 응답 보관'].length>=2);
+  // If the resumed workflow contacts either search or paid model again, fail immediately.
+  code(selectionResume,'관련 이미지 검색',"throw new Error('Search must be skipped when restoring original selection');");
+  code(selectionResume,'텍스트 생성 API',"throw new Error('Paid requests must be skipped during selection resume');");
+  const selectionRestored=execute(selectionResume);assert.ok(!selectionRestored.error,selectionRestored.error?.message);
+  assert.equal(selectionRestored.runData['관련 이미지 검색'],undefined);
+  assert.equal(selectionRestored.runData['텍스트 생성 API'],undefined);
+  assert.equal(selectionRestored.runData['저장 확인 후 URL 기록'][0].data.main[0][0].json.httpStatus,202);
+  assert.equal(selectionRestored.runData['서버 요청 변환'][0].data.main[0][0].json.request.slides.filter(s=>s.image).length,4);
+  console.log('PASS selection resume: original candidates/request/response restored -> PENDING, zero search or paid calls');
+  const legacy=workflow('legacy-selection-'+nonce,'sourced');
+  legacy.id=JSON.parse(fs.readFileSync(new URL('./workflows/ai-know-news-draft.json',import.meta.url),'utf8')).id;
+  legacy.nodes.find(n=>n.id==='aiknow-generation-claim').parameters.jsonBody=
+    '={{ JSON.stringify({sourceUrl:$json.current.sourceUrl,task:$json.task,requestJson:JSON.stringify($json.request)}) }}';
+  code(legacy,'서버 검수 대기 저장',"throw new Error('Legacy failure after selection');");
+  const original=execute(legacy);assert.ok(original.error);
+  const selection=original.runData['모델 호출 준비'].map(r=>r.data.main[0][0].json).find(s=>s.task==='image_selection');
+  assert.equal(selection.cacheClaim.decision,'CALL');
+  const updated=workflow('legacy-selection-'+nonce,'sourced');updated.id=legacy.id;
+  code(updated,'관련 이미지 검색',"throw new Error('Legacy recovery must not search again');");
+  code(updated,'텍스트 생성 API',"throw new Error('Legacy recovery must not make a paid call');");
+  const blocked=execute(updated);assert.ok(!blocked.error,blocked.error?.message);
+  assert.equal(blocked.runData['점검 또는 정상 종료'][0].data.main[0][0].json.status,'blocked');
+  const recovery=spawnSync(process.execPath,[new URL('./recover-selection-context.mjs',import.meta.url).pathname,String(selection.cacheClaim.id)],
+    {encoding:'utf8',input:'local-image-smoke-test-token-32-characters',env:{...process.env,AIKNOW_SERVER_BASE_URL:base},timeout:45000});
+  assert.equal(recovery.status,0,recovery.stderr);assert.match(recovery.stdout,/"contextRecovered":true/);
+  const resumed=execute(updated);assert.ok(!resumed.error,resumed.error?.message);
+  assert.equal(resumed.runData['관련 이미지 검색'],undefined);assert.equal(resumed.runData['텍스트 생성 API'],undefined);
+  assert.equal(resumed.runData['저장 확인 후 URL 기록'][0].data.main[0][0].json.httpStatus,202);
+  console.log('PASS legacy recovery: original SQLite CALL state -> hash-checked context attachment -> zero paid calls -> PENDING');
+}
 try{
   const f=path.join(temp,'credential.json');fs.writeFileSync(f,JSON.stringify([credential]),{mode:0o600});cli(['import:credentials','--input='+f]);
   const nonce=Date.now().toString();
   if(process.argv.includes('--image-only')) { verifyImage(nonce); }
+  else if(process.argv.includes('--selection-only')) { verifySelectionResume(nonce); }
   else {
   const valid=workflow('valid-'+nonce),first=execute(valid);
   assert.ok(!first.error,first.error?.message);
@@ -166,7 +202,8 @@ try{
   assert.ok(output.run.audit.some(a=>a.event==='license_rejected'));
   assert.equal(output.run.counters.openverseCalls,4);assert.equal(output.run.counters.commonsCalls,4);
   console.log('PASS image-first graph: two providers -> relevance selection -> rejected primary -> verified alternative -> 4/5 images + cover -> PENDING');
+  verifySelectionResume(nonce);
   verifyImage(nonce);
-  console.log(JSON.stringify({passed:10,paidApiCalls:0,productionDatabaseWrites:0,firstReceipt:receipt}));
+  console.log(JSON.stringify({passed:12,paidApiCalls:0,productionDatabaseWrites:0,firstReceipt:receipt}));
   }
 }finally{fs.rmSync(temp,{recursive:true,force:true});}

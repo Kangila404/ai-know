@@ -11,4 +11,10 @@ public class GenerationRecordWriter {
     public GenerationRecord insert(String key, String url, String task, String hash, String request) {
         return records.saveAndFlush(GenerationRecord.create(key, url, task, hash, request));
     }
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public GenerationRecord insert(String key, String url, String task, String hash, String request, String context) {
+        var record = GenerationRecord.create(key, url, task, hash, request);
+        record.attachContext(context);
+        return records.saveAndFlush(record);
+    }
 }
