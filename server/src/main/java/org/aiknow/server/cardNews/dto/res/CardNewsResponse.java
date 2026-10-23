@@ -26,7 +26,7 @@ public record CardNewsResponse(
         return new CardNewsResponse(
                 cardNews.getId(),
                 cardNews.getTitle(),
-                cardNews.getTitleImgUrl(),
+                org.aiknow.server.storage.MediaUrls.preview(cardNews.getTitleImgUrl()),
                 List.copyOf(cardNews.getKeyPoints()),
                 cardNews.getSummary(), cardNews.getSourceTitle(), cardNews.getSourceUrl(), cardNews.getSourcePublishedAt(),
                 cardNews.getTitleImageOrigin(), cardNews.getTitleImageSourceUrl(), cardNews.getTitleImageCredit(),
