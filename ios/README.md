@@ -279,3 +279,12 @@ Xcode Debug와 TestFlight 모두 실제 소셜 로그인/서버 세션을 사용
 - `test_login_ui.py`는 라이트/다크 버튼과 인증 challenge 연결, 이전 미리보기 인자로도 로그인 우회가 되지 않는지 검사합니다. `test_admin_ui.py`는 별도 HTTP fixture의 ADMIN↔USER 응답에 따라 탭이 갱신되는지 검사합니다. 테스트용 HTTP 서버는 앱 배포물에 포함되지 않습니다.
 
 미리보기 삭제 후 검증: 인증/세션/CSRF/multipart APIClient 회귀 테스트, 라이트/다크 로그인 화면과 기존 인자를 통한 우회 차단 3개 UI 테스트, HTTP ADMIN→USER→ADMIN 응답에 따른 탭 갱신 테스트를 통과했습니다. 실제 다른 사용자의 운영 계정 권한은 조회하거나 변경하지 않았습니다.
+
+
+### 2026-10-23 TestFlight 업로드 — 1.0 (4)
+
+개발 미리보기 제거와 소셜 로그인 버튼 통일을 포함한 버전 1.0 빌드 4를 업로드했습니다. 15:27 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했으며 업로드 메타데이터의 빌드 번호도 4로 확인했습니다. Apple의 업로드 수락까지 확인했으며 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
+
+Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니다. 최종 일반 Debug 빌드와 Release 아카이브의 API 주소는 `https://aiknow.kro.kr`입니다. App Store 배포 IPA의 코드 서명, Bundle ID/Team, Production APNs, Sign in with Apple 및 디버깅 비활성화를 검증했습니다. 최종 실행 파일에 개발 미리보기 코드/진입 인자가 없는 것도 확인했습니다. 실제 다른 사용자의 계정 권한과 이번 빌드의 실기기 로그인·푸시는 아직 검증하지 않았습니다.
+
+아카이브와 업로드 로그는 로컬 `.local/testflight/2026-10-23-build-4/`에, 최종 로그인 라이트/다크 화면은 `.local/login-no-preview-evidence/final-{light,dark}.png`에 보관합니다.
