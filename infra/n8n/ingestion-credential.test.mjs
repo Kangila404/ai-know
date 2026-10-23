@@ -28,7 +28,12 @@ function harness(t) {
       fs.writeFileSync(option('output'), JSON.stringify(db.workflow ? [db.workflow] : []));
     } else if (args[0] === 'import:workflow') {
       [db.workflow] = JSON.parse(fs.readFileSync(option('input'), 'utf8'));
+      db.workflow.versionId = 'imported-version-' + db.calls.length;
       db.workflow.shared = [{ role: 'workflow:owner', projectId: 'owner-project' }];
+    } else if (args[0] === 'publish:workflow') {
+      assert.equal(option('id'), db.workflow.id);
+      db.workflow.active = true;
+      db.workflow.activeVersionId = db.workflow.versionId;
     } else if (args[0] === 'import:credentials') {
       const [credential] = JSON.parse(fs.readFileSync(option('input'), 'utf8'));
       db.credentials.set(credential.id, credential);
@@ -63,6 +68,22 @@ test('first deployment provisions one credential and binds every internal API wi
   assert.ok(!JSON.stringify(db.workflow).includes(token));
   assert.ok(!fs.readFileSync(path.join(dir, 'state', `${filename}.state.json`), 'utf8').includes(token));
   assert.ok(db.tempFiles.every(file => !fs.existsSync(file)));
+});
+
+test('opt-in automation publishes the reviewed import, survives apply and refuses unreviewed UI edits', t => {
+  const {db,runtime,apply}=harness(t);
+  runtime.env.AIKNOW_DRY_RUN='false';
+  runtime.env.AIKNOW_AUTOMATION_ENABLED='true';
+  apply();
+  assert.equal(db.workflow.active,true);
+  assert.equal(db.workflow.activeVersionId,db.workflow.versionId);
+  assert.equal(db.workflow.nodes.find(n=>n.type==='n8n-nodes-base.scheduleTrigger').disabled,false);
+  db.calls=[];apply();
+  assert.ok(!db.calls.some(a=>a[0]==='publish:workflow'||a[0]==='import:workflow'));
+  db.workflow.active=false;db.workflow.activeVersionId=null;
+  apply();assert.equal(db.workflow.active,true);
+  db.workflow.name='Unreviewed edit';
+  assert.throws(apply,/reviewed deployment definition/);
 });
 
 test('stdin token provisions credentials when sudo removed the caller environment', t => {

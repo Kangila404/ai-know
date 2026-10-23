@@ -33,3 +33,14 @@ test('prod env rejects HTTP media and malformed flags before deployment, routes 
   assert.match(prod.nodes.find(n => n.id === 'aiknow-storage-check-done').parameters.jsCode, /"mode":"mounted"/);
   assert.notEqual(fingerprint(prod), fingerprint(configureWorkflow(source(), env)));
 });
+
+test('automation is an explicit opt-in with real execution mode and a Seoul daily schedule', () => {
+  assert.throws(()=>configureWorkflow(source(),{...env,AIKNOW_AUTOMATION_ENABLED:'yes'}),/true or false/);
+  assert.throws(()=>configureWorkflow(source(),{...env,AIKNOW_AUTOMATION_ENABLED:'true',AIKNOW_DRY_RUN:'true'}),/DRY_RUN=false/);
+  const enabled=configureWorkflow(source(),{...env,AIKNOW_AUTOMATION_ENABLED:'true'});
+  const schedule=enabled.nodes.find(n=>n.type==='n8n-nodes-base.scheduleTrigger');
+  assert.equal(schedule.disabled,false);
+  assert.equal(schedule.parameters.rule.interval[0].triggerAtHour,9);
+  assert.equal(enabled.settings.timezone,'Asia/Seoul');
+  assert.equal(source().nodes.find(n=>n.type==='n8n-nodes-base.scheduleTrigger').disabled,true);
+});
