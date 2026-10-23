@@ -38,12 +38,15 @@ struct RootTabView: View {
                     }
                     .tag(AppTab.profile)
                 if AuthSession.shared.isAdmin {
-                    AdminHomeView().tabItem { Label("관리자", systemImage: "checkmark.shield") }.tag(AppTab.admin)
+                    AdminHomeView().tabItem { Label("관리자", systemImage: "checkmark.shield") }.tag(AppTab.admin).accessibilityIdentifier("tab.admin")
                 }
             }
         }
         .tint(AppPalette.accent)
         .environment(store)
+        .onChange(of: AuthSession.shared.isAdmin) { _, isAdmin in
+            if !isAdmin && store.selectedTab == .admin { store.selectedTab = .profile }
+        }
         .task(id: PushNotifications.shared.pendingCardID) {
             if let id = PushNotifications.shared.pendingCardID {
                 pushed = PushDestination(id: id)

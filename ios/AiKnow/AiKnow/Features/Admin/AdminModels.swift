@@ -8,6 +8,10 @@ struct Submission: Decodable, Identifiable {
     let version: Int64?
     let draft: EditorialDraft?
     let reviewNote: String?
+    let reviewedBy: Int64?
+    let reviewedAt: String?
+    let publicationStatus: String?
+    let contentType: String?
 }
 struct EditorialImage: Codable, Hashable {
     var url: String
@@ -15,8 +19,14 @@ struct EditorialImage: Codable, Hashable {
     var sourceUrl: String?
     var credit: String?
     var valid: Bool {
-        guard let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme ?? ""), url.count <= 2048 else { return false }
-        return origin == "GENERATED" || ((sourceUrl ?? "").hasPrefix("https://") && !(credit ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        guard let parsed = URL(string: url), ["http", "https"].contains(parsed.scheme ?? ""),
+              parsed.host != nil, url.utf16.count <= 2048, ["SOURCE", "GENERATED"].contains(origin),
+              (credit ?? "").utf16.count <= 500 else { return false }
+        if let sourceUrl {
+            guard let source = URL(string: sourceUrl), source.scheme == "https", source.host != nil,
+                  sourceUrl.utf16.count <= 2048 else { return false }
+        }
+        return origin == "GENERATED" || (sourceUrl != nil && !(credit ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 }
 struct EditorialSlide: Codable, Hashable {
@@ -35,13 +45,20 @@ struct EditorialDraft: Codable {
     var keyPoints: [String]?
     var titleImage: EditorialImage?
     var slides: [EditorialSlide]
-    var valid: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && title.count <= 200 &&
-        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && summary.count <= 5000 &&
-        (titleImage?.valid ?? true) && (1...10).contains(slides.count) &&
-        (keyPoints ?? []).count <= 10 && (keyPoints ?? []).allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 1000 } &&
-        slides.allSatisfy { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.title.count <= 200 && !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.content.count <= 5000 && ($0.image?.valid ?? true) }
+    var validationMessage: String? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || title.utf16.count > 200 { return "제목을 1~200자로 입력해 주세요." }
+        if summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || summary.utf16.count > 5000 { return "요약을 1~5,000자로 입력해 주세요." }
+        if (keyPoints ?? []).count > 10 || !(keyPoints ?? []).allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.utf16.count <= 1000 }) { return "핵심 포인트는 각각 1,000자 이내로 최대 10개까지 입력할 수 있습니다." }
+        if !(titleImage?.valid ?? true) { return "대표 이미지 URL과 출처를 확인해 주세요. 출처 URL은 HTTPS, 출처 표기는 500자 이내여야 합니다." }
+        if !(1...10).contains(slides.count) { return "슬라이드는 1~10장이 필요합니다." }
+        for (index, slide) in slides.enumerated() {
+            if slide.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || slide.title.utf16.count > 200 || slide.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || slide.content.utf16.count > 5000 { return "슬라이드 \(index + 1)의 제목(200자 이내)과 본문(5,000자 이내)을 확인해 주세요." }
+            if (slide.layout ?? "").utf16.count > 100 { return "슬라이드 \(index + 1)의 레이아웃은 100자 이내로 입력해 주세요." }
+            if !(slide.image?.valid ?? true) { return "슬라이드 \(index + 1)의 이미지 URL과 출처를 확인해 주세요." }
+        }
+        return nil
     }
+    var valid: Bool { validationMessage == nil }
 }
 struct AdminArticle: Decodable, Identifiable {
     let version: Int64
@@ -78,6 +95,11 @@ struct Generation: Decodable, Identifiable {
     let requestJson: String?
     let responseJson: String?
     let recoveredResponseJson: String?
+    let contextJson: String?
+    var statusText: String {
+        if recovered == true || recoveredResponseJson != nil { return "복구됨" }
+        return responseSaved == true || responseJson != nil ? "응답 저장됨" : "응답 대기"
+    }
 }
 struct EditorialHistory: Decodable, Identifiable {
     let id: Int64

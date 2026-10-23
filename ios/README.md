@@ -239,3 +239,29 @@ Debug 로그인 화면의 ‘화면 미리보기’ / ‘관리자 미리보기�
 아카이브와 업로드 로그는 `.local/testflight/2026-10-08-build-2/`에 보관합니다. App Store 배포용 IPA를 별도로 내보내 서명, Production APNs, Sign in with Apple, Bundle ID/Team을 검증했습니다. 최종 실행 파일에 개발 미리보기 진입 코드와 표시 문자열이 없는 것도 확인했습니다.
 
 API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가 준비되지 않았으므로 실제 로그인/API 사용은 서버 배포 후 가능합니다. Debug의 로그인 없는 미리보기는 TestFlight에 포함되지 않습니다.
+
+### 2026-10-23 서버 API와 관리자 화면 정리
+
+최신 `main`의 서버·수집 변경과 `develop`의 iOS 변경을 함께 반영했습니다. 앱용 `/api/v1/...` 경로는 기존 세션·CSRF 계약을 유지합니다. 신규 `/internal/v1/generation/selection-context` 및 `/selection-context/recover`는 서버 전용 수집 권한이 필요하므로 iOS에 내부 인증키나 직접 실행 버튼을 추가하지 않습니다. ADMIN용 생성 상세 API가 반환하는 `contextJson`은 생성 복구 화면의 ‘이미지 선택 참고 자료’에서 확인할 수 있습니다.
+
+- 관리자 탭은 `/api/v1/users`의 `userRole == ADMIN`일 때 탭 맨 오른쪽에 나타납니다. 앱이 다시 활성화되거나 마이 화면을 당겨 새로고침하면 권한을 다시 조회합니다. 관리자 권한이 해제되면 열린 관리자 탭에서 마이로 이동합니다.
+- 뉴스 검수의 반려 사유·검수 시각·검수자·게시 상태를 표시하고 승인된 카드 관리로 이동할 수 있습니다. 콘텐츠 미리보기와 서버 제한에 맞춘 입력 오류 안내를 제공합니다.
+- 생성 기록에는 응답 대기/저장/복구 상태와 원본 응답·복구 응답·이미지 선택 참고 자료를 표시합니다. 내부 유료 생성 실행은 제공하지 않습니다.
+- 편집 화면의 ‘입력 완료’로 키보드를 닫고 저장·검수 작업을 계속할 수 있습니다.
+- 사용자 전체 목록/정지/권한 변경은 현재 서버에 API가 없어 준비 중입니다. 프로필 이미지는 서버에서 등록한 항목을 선택하는 방식이며 관리자 이미지 주소의 20자 제한을 유지합니다.
+
+관리자 API UI 검증은 `python3 ios/tests/test_admin_ui.py --device <UDID>`로 실행합니다. 별도 HTTP 서버에서 세션 쿠키·CSRF·ADMIN 역할·버전·변경 사유·요청 본문을 검사하며 검수, 카드 공개 상태, 공지/프로필 CRUD, 생성 복구와 탭 권한 갱신을 조작합니다. 실제 운영 계정·콘텐츠는 변경하지 않습니다. `--only <test method>`로 특정 시나리오만 재실행할 수 있습니다. 기존 일반 사용자 흐름은 `test_content_ui.py`로 검증합니다. 테스트 후 일반 Xcode 빌드로 테스트용 API 주소를 복원해야 합니다.
+
+
+소셜 로그인 버튼은 SF Symbols 대체 아이콘을 제거하고 공식 리소스를 사용합니다. 이미지는 원본의 색상·비율을 유지하며 Google은 라이트/다크 리소스를 전환합니다. Google·카카오의 접근성 레이블은 한국어이며 Apple 버튼은 시스템의 현지화 레이블을 사용합니다.
+
+- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 ZIP](https://developers.google.com/static/identity/images/signin-assets.zip)에서 iOS/PNG @4x/{Light,Dark}/`Theme=…, Show text=Yes, Shape=Square, Platform=iOS@4x.png`를 그대로 사용합니다. 버튼에 포함된 영문 문구와 서체도 원본입니다. 공식 SVG의 마스크/필터가 iOS 에셋 렌더러에서 깨지는 것을 확인해 제공된 최고 해상도 PNG를 사용합니다.
+- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)를 그대로 사용합니다.
+- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)을 사용합니다. 버튼 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
+
+`python3 ios/tests/test_login_ui.py --device <UDID>`는 세 제공자를 반환하는 별도 HTTP fixture에서 밝은/어두운 로그인 화면을 캡처하고 각 버튼이 해당 제공자의 challenge API와 CSRF 처리로 연결되는지 검사합니다. 실제 Google·카카오·Apple 계정 로그인 성공을 대신하는 검증은 아닙니다. 운영 로그인 버튼 노출은 서버의 `/api/v1/auth/social/providers` 응답을 따릅니다.
+
+
+2026-10-23 검증: 관리자 검수·게시 숨김/복원, 공지/프로필 CRUD, 생성 응답 복구, ADMIN↔USER 탭 갱신의 4개 UI 시나리오는 수정 후 개별 재실행을 포함해 통과했습니다. 일반 사용자 HTTP UI 테스트도 11개 요청 항목을 모두 검증했습니다. APIClient 인증·세션·CSRF·multipart 회귀 테스트와 `node scripts/validate-infra.mjs`도 통과했습니다. 운영 `https://aiknow.kro.kr/health-check`와 로그인 제공자 목록은 정상 응답했으며 현재 제공자는 GOOGLE/KAKAO입니다. 실제 운영 관리자 계정으로 쓰기, 실제 이미지 복구 업로드, 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 재검증하지 않았습니다.
+
+로그인 버튼 UI 테스트는 라이트/다크 2개 시나리오와 APPLE/GOOGLE/KAKAO challenge 연결을 통과했습니다. Google SVG 렌더링 문제는 공식 PNG 원본으로 교체했으며, 마지막 일반 Debug 빌드에서 운영 API 주소와 최종 라이트/다크 버튼 렌더링을 별도로 확인했습니다. 화면 캡처는 `.local/login-branding-evidence/final-production-{light,dark}.png`에 있습니다.

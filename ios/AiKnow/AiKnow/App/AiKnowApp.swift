@@ -28,7 +28,10 @@ struct AiKnowApp: App {
                 }
                 .task { await PushNotifications.shared.refresh() }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { Task { await PushNotifications.shared.refresh() } }
+                    if phase == .active { Task {
+                        await AuthSession.shared.refreshAccountIfSignedIn()
+                        await PushNotifications.shared.refresh()
+                    } }
                 }
         }
     }
