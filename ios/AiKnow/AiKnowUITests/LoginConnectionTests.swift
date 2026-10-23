@@ -193,6 +193,9 @@ final class AdminAPIConnectionTests: XCTestCase {
         reason(app); apply("수정 저장", app)
         reason(app); apply("반려", app)
         reason(app); apply("재검수로 돌리기", app)
+        let type = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "콘텐츠 유형")).firstMatch
+        reveal(type, app); type.tap(); app.buttons["AI 이론"].tap()
+        XCTAssertTrue(app.staticTexts["승인된 AI 이론은 아카이브에 바로 공개됩니다."].exists)
         apply("승인", app)
         let approved = app.buttons["승인된 카드 관리"]; reveal(approved, app); approved.tap()
         XCTAssertTrue(app.navigationBars["카드뉴스 수정"].waitForExistence(timeout: 10))

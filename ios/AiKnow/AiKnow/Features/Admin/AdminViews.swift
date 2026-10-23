@@ -175,7 +175,7 @@ struct EditorialDetailView: View {
                         }
                         Button("승인") { action = "approve" }.disabled(selected.count > 10)
                         Button("반려", role: .destructive) { action = "reject" }.disabled(!hasReason)
-                        Text("승인된 콘텐츠는 발송 대기 상태가 됩니다.").font(.caption).foregroundStyle(.secondary)
+                        Text(contentType == "AI_THEORY" ? "승인된 AI 이론은 아카이브에 바로 공개됩니다." : "승인된 뉴스는 최초 발송까지 대기합니다.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if kind == .submissions && status == "DENIED" { Button("재검수로 돌리기") { action = "reopen" }.disabled(!hasReason) }

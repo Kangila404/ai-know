@@ -132,7 +132,7 @@ class Handler(content.Handler):
                 review.update(status="DENIED", reviewNote=body["reason"], reviewedBy=1, reviewedAt="2026-10-23T00:00:00Z")
             if operation == "reopen": review.update(status="PENDING", reviewNote=None)
             if operation == "approve":
-                assert body["contentType"] in ["NEWS", "AI_THEORY"] and isinstance(body["categoryIds"], list)
+                assert body["contentType"] == "AI_THEORY" and isinstance(body["categoryIds"], list)
                 review.update(status="APPROVED", cardNewsId=9002, publicationStatus="PUBLISHED")
             return review
         if resource == "card-news":
