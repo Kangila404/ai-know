@@ -1,0 +1,66 @@
+# AI KNOW Android
+
+Kotlin + Jetpack Compose로 만든 별도 Android 네이티브 클라이언트입니다. iOS SwiftUI 앱과 같은 서버·계정·콘텐츠 API를 사용합니다. iOS 코드를 Android에서 실행하거나 WebView로 감싸는 방식이 아닙니다.
+
+## 개발 환경
+
+- Android Studio에서 **이 디렉터리(`android/`)** 를 엽니다.
+- JDK 17 이상(로컬 검증 JDK 21), Android SDK 36, Gradle wrapper 사용.
+- 이 PC의 기존 IDE는 `D:\android_studio`, SDK는 `D:\Android\Sdk`입니다. 개인 SDK 경로는 Git에서 제외되는 `local.properties`에만 둡니다.
+- AGP 8.13.2 / Kotlin 및 Compose compiler 2.2.21. 의존성 버전은 `app/build.gradle.kts`에 고정합니다.
+
+```powershell
+.\gradlew.bat :app:assembleDemoDebug :app:assembleLiveDebug :app:testLiveDebugUnitTest
+.\gradlew.bat :app:lintLiveDebug
+.\gradlew.bat :app:connectedDemoDebugAndroidTest
+```
+
+## 바로 화면 확인
+
+Build Variants에서 **demoDebug** 선택 후 Run합니다. 앱 이름은 AI KNOW, 패키지는 `org.aiknow.android.demo`입니다. `데모 둘러보기` → 온보딩 → 오늘/아카이브/마이/관리자를 확인합니다. 데모는 별도 `src/demo` 소스와 로컬 이미지·JSON만 사용하며 운영 서버, 실제 로그인, 유료 생성, 푸시 발송을 호출하지 않습니다. 지원하지 않는 데모 쓰기는 성공처럼 표시하지 않습니다.
+
+`demoRelease`는 비활성화돼 배포용 AAB에 데모 인증 코드가 포함되지 않습니다. 본 서비스는 **liveDebug/liveRelease**, 패키지는 **`org.aiknow.android`** 입니다. 설정이 없는 live 빌드에서는 로그인 제공자 버튼이 비활성화되고 준비 중임을 안내합니다. 인증 우회는 없습니다.
+
+## 구조와 기능
+
+- `ui/`: Material 3 NavigationBar, TopAppBar, 카드/목록, HorizontalPager, ModalBottomSheet, TimeInput, Dialog, 다크 모드, 시스템 글자 크기, 뒤로 가기.
+- `data/`: OkHttp + Kotlin coroutines, JSON API, 세션 쿠키/CSRF 계약. 사용자 API 응답 캐시를 끄고 ADMIN 권한을 복귀 시 재조회합니다. 401은 로그아웃, 409는 재조회 안내, 실패한 쓰기는 자동 재전송하지 않습니다.
+- `SessionVault`: 서버 JSESSIONID를 Android Keystore AES-GCM으로 암호화해 보관합니다. 계정 백업을 비활성화하며 OAuth ID 토큰은 자체 저장하지 않습니다. 쿠키는 API origin에만 보냅니다.
+- `auth/`: Google Credential Manager, Kakao SDK. 서버 challenge nonce를 그대로 전달하고 ID token을 기존 세션 API에 교환합니다.
+- `notifications/`: FCM 등록/해제, ANDROID 설치 UUID, Android 13+ 알림 권한, 알림의 cardNewsId로 상세 이동. 설정 전에는 Firebase를 강제로 초기화하지 않습니다.
+- 이미지: 별도 Coil 3 메모리/디스크 캐시, 원본이 아닌 서버 320/1280 preview, 화면 크기에 맞는 디코딩, 다음 카드 한 장 미리 구성. 외부 이미지 호스트로 인증 쿠키를 보내지 않습니다.
+
+사용자: 오늘 카드, 아카이브 검색/카테고리/좋아요/페이지, 카드 넘김·출처·좋아요·읽음, 닉네임/아바타, 알림 시간, 공지, 화면 모드, 로그아웃/탈퇴.
+
+관리자: 콘텐츠 상태별 검수·내용/이미지 출처 수정·승인/반려/재검수, 카드 목록·수정·숨김/복원, 사용자 검색·권한·정지, 전체/카드별 조회 통계, 공지/프로필 CRUD, 변경 이력. 생성 응답 JSON 복구는 ‘개발자 도구’에 분리했습니다. iOS의 PNG 파일 직접 업로드 복구는 아직 Android에 포함하지 않았으며 일반 콘텐츠 편집에서는 이미지 URL/출처를 수정합니다.
+
+## 실제 로그인 및 푸시 연결에 필요한 설정
+
+`app-config.properties.example`을 `app-config.properties`로 복사하고 아래 **공개 클라이언트 식별자**를 입력합니다. OAuth secret/서버 내부 키/서비스 계정 JSON은 앱에 넣지 않습니다.
+
+1. **Google**: 기존 iOS/서버와 같은 Google Cloud 프로젝트에 Android OAuth 클라이언트를 추가합니다. 패키지 `org.aiknow.android`, 테스트/배포 서명의 SHA-1/SHA-256을 등록합니다. `GOOGLE_WEB_CLIENT_ID`에는 **서버가 이미 허용하는 웹 클라이언트 ID**를 넣습니다. Android 클라이언트 ID를 넣는 항목이 아닙니다. 서버의 계정 연결 정책은 그대로 유지합니다.
+2. **Kakao**: 기존 Kakao 앱에 Android 플랫폼을 추가하고 패키지/키해시를 등록합니다. 네이티브 앱 키를 `KAKAO_NATIVE_APP_KEY`에 넣고 OpenID Connect를 활성화합니다. 서버의 허용 audience에 해당 앱 키가 포함되는지 확인합니다.
+3. **Firebase**: 기존 FCM 프로젝트에 Android 앱을 추가하고 다운로드한 `google-services.json`을 `app/google-services.json`에 둡니다(Git 제외). Google services plugin은 파일이 있을 때만 적용됩니다. 새 프로젝트를 별도로 만들면 서버 FCM 서비스 계정과 달라 전송이 실패할 수 있습니다.
+4. **Play Console**: 앱 생성, 업로드 키와 Play App Signing 인증서 등록, 개인정보처리방침·Data safety·테스트 트랙 설정이 필요합니다. 실제 키가 없는 상태에서 임의 서명으로 스토어 배포하지 않습니다. `signingReport`로 개발 서명을 확인할 수 있습니다.
+
+Apple 로그인은 iOS 네이티브 인증 전용입니다. Android에서 Apple 계정을 지원하려면 별도 웹 Services ID/리다이렉트/서버 인증 연결이 필요하며 현재 Android 로그인 버튼에는 노출하지 않습니다.
+
+## 배포 범위와 주의사항
+
+- `liveRelease`는 프로젝트만으로 production 서명이 생성되지 않습니다. 업로드 키를 로컬/CI secret으로 연결한 다음 `:app:bundleLiveRelease`로 AAB를 생성합니다. 새 기능 때문에 서버나 iOS를 재배포할 필요는 없습니다.
+- 운영 API는 `https://aiknow.kro.kr/`입니다. 실제 계정으로 승인·정지·삭제하면 운영 데이터가 변경됩니다. 자동 UI 테스트는 `demoDebug`에서만 실행합니다.
+- 오늘 카드가 미게시(404)면 아카이브 이동을 안내합니다. 아카이브 이론 승인과 오늘의 발송 배치는 서로 다릅니다.
+- 키 없이 가능한 검증: 컴파일, lint, HTTP 세션/CSRF/오류/이미지 URL 단위 테스트, 데모 UI. 실계정 로그인·푸시 수신·Play 업로드는 설정 후 별도 검증해야 합니다.
+- 데모 이미지의 원본·저작자·라이선스는 `app/src/demo/assets/image-credits.json`과 카드 출처에 남겼습니다.
+
+참고: [Compose](https://developer.android.com/develop/ui/compose), [Google Credential Manager](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation), [Kakao Android](https://developers.kakao.com/docs/en/kakaologin/android).
+
+## 검증 기록 (2026-10-25)
+
+- `assembleDemoDebug`, `assembleLiveDebug`, `testLiveDebugUnitTest`, `lintLiveDebug` 통과. 단위 테스트 6개, lint 오류 0개. 일부 의존성 업데이트와 코드 스타일 권고 경고는 남아 있습니다.
+- D드라이브의 Android Studio에서 프로젝트와 Compose 라이트/다크/큰 글씨 Preview를 열었습니다. D드라이브 SDK의 API 36 Pixel 7 에뮬레이터에서 데모 APK를 실행했습니다.
+- `NavigationTest.readerAndEditorialJourneys` 통과: 온보딩, 아카이브, 카드 넘김, 좋아요, 읽음, 다크 모드, 검수 편집 화면, 승인 후 상태 변경. 이미지 로딩 완료와 오류 자리표시자가 없음을 함께 검사합니다. 운영 데이터에는 접근하지 않습니다.
+- 테스트가 앱 외부 파일 디렉터리에 `01-today.png`부터 `06-approved-dark.png`까지 화면 증거를 저장합니다. 이 PC의 복사본은 저장소 루트 `.local/android-ui-evidence/files/`에 있습니다(Git 제외).
+- Google/Kakao 실계정 인증, 실제 FCM 수신, 운영 관리자 변경, 서명한 Play 배포는 아직 검증하지 않았습니다. 위 설정을 준비한 뒤 실제 기기에서 확인해야 합니다.
+
+데모 이미지 리소스는 숫자 ID 주소로 변환합니다. Coil 3에서 이름 기반 리소스 URI 지원이 제거된 내용은 [공식 변경 기록](https://github.com/coil-kt/coil/blob/main/CHANGELOG.md)에 설명되어 있습니다.
