@@ -385,7 +385,7 @@ AC20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text; p
                 APS_ENVIRONMENT = development;
 				INFOPLIST_FILE = AiKnow/Info.plist;
 				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = SS32PHC392;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -415,7 +415,7 @@ AC20000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = text; p
                 APS_ENVIRONMENT = production;
 				INFOPLIST_FILE = AiKnow/Info.plist;
 				AIKNOW_API_BASE_URL = "https://aiknow.kro.kr";
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = SS32PHC392;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
