@@ -17,7 +17,7 @@ class DemoGateway(context:Context):Gateway {
     private var user=payload("userId" to "demo-admin","nickname" to "AI 탐험가","userRole" to "ADMIN","onboardingCompleted" to false,"profile" to payload("id" to 1,"name" to "루미","imgUrl" to "android.resource://${context.packageName}/${R.drawable.demo_avatar}"))
     private var cards=fixture.array("cards")
     private var setting=payload("settingTime" to "09:00:00","isAllowed" to false)
-    private var submissions=fixture.array("submissions")
+    private var submissions=fixture.array("submissions").map { JsonObject(it.obj()-"contentType") }
     private var notices=listOf(payload("id" to 1,"title" to "AI KNOW에 오신 것을 환영해요","content" to "이 화면은 데모 데이터입니다. 운영 데이터는 변경되지 않습니다.","published" to true,"publishedAt" to "2026-10-25T00:00:00Z"))
     override var onUnauthorized:()->Unit={}
     override fun clearSession(){signedIn=false}
@@ -69,7 +69,7 @@ class DemoGateway(context:Context):Gateway {
             val current=submissions.first{it.number("id")==sid}
             val next=when{
                 method=="PUT"->changed(current,"draft" to b.obj()["draft"],"title" to b.obj()["draft"]?.text("title"),"version" to current.number("version")+1)
-                path.endsWith("approve")->changed(current,"status" to "APPROVED","publicationStatus" to if(b.text("contentType")=="AI_THEORY")"PUBLISHED" else "READY")
+                path.endsWith("approve")->changed(current,"status" to "APPROVED","contentType" to b.text("contentType"),"cardNewsId" to current.number("id"),"publicationStatus" to if(b.text("contentType")=="AI_THEORY")"PUBLISHED" else "READY")
                 path.endsWith("reject")->changed(current,"status" to "DENIED","reviewNote" to b.text("reason"))
                 path.endsWith("reopen")->changed(current,"status" to "PENDING")
                 else->current
@@ -80,5 +80,5 @@ class DemoGateway(context:Context):Gateway {
         if(path.startsWith("api/v1/admin/users/")&&method=="GET")return payload("id" to id,"version" to 0,"userId" to "demo-reader","nickname" to "새로운 독자","role" to "USER","suspended" to false)
         throw ApiException(422,"DEMO_UNSUPPORTED","이 작업은 실제 연결 빌드에서 사용할 수 있습니다.")
     }
-    private fun article(c:JsonElement)=payload("version" to 0,"publicationStatus" to "PUBLISHED","news" to c,"slides" to fixture.obj()["slides"]?.obj()?.get(c.text("id")),"totalViews" to 42,"uniqueViewers" to 9,"approvedAt" to "2026-10-25T00:00:00Z")
+    private fun article(c:JsonElement)=payload("version" to 0,"publicationStatus" to "PUBLISHED","news" to c,"slides" to fixture.obj()["slides"]?.obj()?.get(c.text("id")),"totalViews" to 42,"uniqueViewers" to 9,"approvedAt" to "2026-10-25T00:00:00Z","hasStartedDelivery" to false)
 }

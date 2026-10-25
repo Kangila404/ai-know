@@ -28,11 +28,13 @@ Build Variants에서 **demoDebug** 선택 후 Run합니다. 앱 이름은 AI KNO
 - `SessionVault`: 서버 JSESSIONID를 Android Keystore AES-GCM으로 암호화해 보관합니다. 계정 백업을 비활성화하며 OAuth ID 토큰은 자체 저장하지 않습니다. 쿠키는 API origin에만 보냅니다.
 - `auth/`: Google Credential Manager, Kakao SDK. 서버 challenge nonce를 그대로 전달하고 ID token을 기존 세션 API에 교환합니다.
 - `notifications/`: FCM 등록/해제, ANDROID 설치 UUID, Android 13+ 알림 권한, 알림의 cardNewsId로 상세 이동. 설정 전에는 Firebase를 강제로 초기화하지 않습니다.
-- 이미지: 별도 Coil 3 메모리/디스크 캐시, 원본이 아닌 서버 320/1280 preview, 화면 크기에 맞는 디코딩, 다음 카드 한 장 미리 구성. 외부 이미지 호스트로 인증 쿠키를 보내지 않습니다.
+- 이미지: 별도 Coil 3 메모리/디스크 캐시, 서버가 제공한 320/1280 preview, Commons 래스터 썸네일, 화면 크기에 맞는 디코딩, 다음 카드 한 장 미리 구성. 확대 화면은 원본을 사용하며 외부 이미지 호스트로 인증 쿠키를 보내지 않습니다.
 
 사용자: 오늘 카드, 아카이브 검색/카테고리/좋아요/페이지, 카드 넘김·출처·좋아요·읽음, 닉네임/아바타, 알림 시간, 공지, 화면 모드, 로그아웃/탈퇴.
 
-관리자: 콘텐츠 상태별 검수·내용/이미지 출처 수정·승인/반려/재검수, 카드 목록·수정·숨김/복원, 사용자 검색·권한·정지, 전체/카드별 조회 통계, 공지/프로필 CRUD, 변경 이력. 생성 응답 JSON 복구는 ‘개발자 도구’에 분리했습니다. iOS의 PNG 파일 직접 업로드 복구는 아직 Android에 포함하지 않았으며 일반 콘텐츠 편집에서는 이미지 URL/출처를 수정합니다.
+관리자: 콘텐츠 운영 / 서비스 관리 / 문제 해결 구성, 콘텐츠 유형 직접 선택 후 승인, 슬라이드 추가·삭제·출처 편집, 상태별 카드 관리와 카드별 조회수, 사용자 검색·권한/정지 필터, 공지/프로필 CRUD, 변경 전·후 이력. 생성 복구는 JSON 응답 또는 시스템 사진 선택기를 통한 PNG 업로드를 지원합니다(4096×4096, 변환 후 10MB 이하).
+
+최신 iOS 기준과 의도적인 플랫폼 차이는 [IOS_PARITY.md](IOS_PARITY.md)에 기록합니다. 로고 원본은 iOS 저장소의 `AiKnowLogo`를 공유하며, 화면 구성 요소는 Android Material 3를 사용합니다.
 
 ## 실제 로그인 및 푸시 연결에 필요한 설정
 
@@ -57,10 +59,10 @@ Apple 로그인은 iOS 네이티브 인증 전용입니다. Android에서 Apple 
 
 ## 검증 기록 (2026-10-25)
 
-- `assembleDemoDebug`, `assembleLiveDebug`, `testLiveDebugUnitTest`, `lintLiveDebug` 통과. 단위 테스트 6개, lint 오류 0개. 일부 의존성 업데이트와 코드 스타일 권고 경고는 남아 있습니다.
+- `assembleDemoDebug`, `assembleLiveDebug`, `testLiveDebugUnitTest`, `lintLiveDebug` 통과. 단위 테스트 11개, lint 오류 0개. 세션/CSRF, 이미지 URL 정책, 편집 검증, 조회수 연결, PNG multipart 계약을 검사합니다. 일부 의존성 업데이트와 코드 스타일 권고 경고는 남아 있습니다.
 - D드라이브의 Android Studio에서 프로젝트와 Compose 라이트/다크/큰 글씨 Preview를 열었습니다. D드라이브 SDK의 API 36 Pixel 7 에뮬레이터에서 데모 APK를 실행했습니다.
-- `NavigationTest.readerAndEditorialJourneys` 통과: 온보딩, 아카이브, 카드 넘김, 좋아요, 읽음, 다크 모드, 검수 편집 화면, 승인 후 상태 변경. 이미지 로딩 완료와 오류 자리표시자가 없음을 함께 검사합니다. 운영 데이터에는 접근하지 않습니다.
-- 테스트가 앱 외부 파일 디렉터리에 `01-today.png`부터 `06-approved-dark.png`까지 화면 증거를 저장합니다. 이 PC의 복사본은 저장소 루트 `.local/android-ui-evidence/files/`에 있습니다(Git 제외).
+- `NavigationTest.readerAndEditorialJourneys` 통과: 온보딩, 아카이브, 이미지 확대·출처 시트, 카드 넘김, 좋아요, 마지막 장 자동 읽음과 목록 갱신, 다크 모드, 슬라이드 추가·삭제, 유형 선택 전 승인 차단, 승인 후 카드 관리 이동·조회수. 이미지 로딩 완료와 오류 자리표시자가 없음을 함께 검사합니다. 운영 데이터에는 접근하지 않습니다.
+- 테스트가 앱 외부 파일 디렉터리에 `01-today.png`부터 `07-article-metadata.png`까지 화면 증거를 저장합니다. 이 PC의 복사본은 저장소 루트 `.local/android-ui-evidence/files/`에 있습니다(Git 제외).
 - Google/Kakao 실계정 인증, 실제 FCM 수신, 운영 관리자 변경, 서명한 Play 배포는 아직 검증하지 않았습니다. 위 설정을 준비한 뒤 실제 기기에서 확인해야 합니다.
 
 데모 이미지 리소스는 숫자 ID 주소로 변환합니다. Coil 3에서 이름 기반 리소스 URI 지원이 제거된 내용은 [공식 변경 기록](https://github.com/coil-kt/coil/blob/main/CHANGELOG.md)에 설명되어 있습니다.

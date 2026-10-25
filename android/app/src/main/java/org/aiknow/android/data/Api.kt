@@ -41,6 +41,7 @@ interface Gateway {
     suspend fun request(path: String, method: String = "GET", body: JsonElement? = null, query: Map<String,String> = emptyMap()): JsonElement
     fun clearSession()
     var onUnauthorized: () -> Unit
+    suspend fun recoverImage(id:Long, version:Long, reason:String, png:ByteArray):JsonElement = throw ApiException(422,detail="이 환경에서는 이미지 파일 복구를 지원하지 않습니다.")
 }
 interface CookieStore { fun load(): String?; fun save(cookie: String? ) }
 class SessionCookies(private val origin: HttpUrl, private val store: CookieStore) : CookieJar {
@@ -64,6 +65,15 @@ class HttpGateway(baseUrl: String, private val cookies: SessionCookies) : Gatewa
     private val mutation = Mutex()
     override var onUnauthorized: () -> Unit = {}
     override fun clearSession() = cookies.clear()
+    override suspend fun recoverImage(id:Long,version:Long,reason:String,png:ByteArray):JsonElement = mutation.withLock {
+        require(id>0 && reason.isNotBlank() && reason.length<=2000)
+        require(png.size<=10*1024*1024 && png.take(8)==listOf(137,80,78,71,13,10,26,10).map{it.toByte()}) { "10MB 이하 PNG 이미지가 필요합니다." }
+        val csrf=send("api/v1/auth/csrf","GET",null,emptyMap())
+        val body=MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("version",version.toString()).addFormDataPart("reason",reason)
+            .addFormDataPart("file","recovery.png",png.toRequestBody("image/png".toMediaType())).build()
+        send("api/v1/admin/generations/$id/recover-image","POST",null,emptyMap(),csrf.text("headerName") to csrf.text("token"),body)
+    }
     override suspend fun request(path: String, method: String, body: JsonElement?, query: Map<String,String>): JsonElement {
         require(path.startsWith("api/v1/")) { "Only app API paths are allowed" }
         return if(method == "GET") send(path, method, body, query) else mutation.withLock {
@@ -72,11 +82,11 @@ class HttpGateway(baseUrl: String, private val cookies: SessionCookies) : Gatewa
             send(path, method, body, query, csrf.text("headerName") to csrf.text("token"))
         }
     }
-    private suspend fun send(path: String, method: String, body: JsonElement?, query: Map<String,String>, csrf: Pair<String,String>? = null): JsonElement {
+    private suspend fun send(path: String, method: String, body: JsonElement?, query: Map<String,String>, csrf: Pair<String,String>? = null, upload:RequestBody?=null): JsonElement {
         val url = origin.newBuilder().addPathSegments(path).apply { query.forEach { (k,v) -> addQueryParameter(k,v) } }.build()
         val request = Request.Builder().url(url).header("Accept", "application/json").header("Cache-Control", "no-store")
             .apply { csrf?.let { header(it.first,it.second) } }
-            .method(method, if(method in listOf("GET","HEAD")) null else (body?.toString() ?: "").toRequestBody("application/json".toMediaType())).build()
+            .method(method, if(method in listOf("GET","HEAD")) null else upload ?: (body?.toString() ?: "").toRequestBody("application/json".toMediaType())).build()
         val call = client.newCall(request)
         val response = suspendCancellableCoroutine<Response> { continuation ->
             continuation.invokeOnCancellation { call.cancel() }

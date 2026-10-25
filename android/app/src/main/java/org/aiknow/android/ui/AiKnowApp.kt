@@ -2,6 +2,7 @@
 package org.aiknow.android.ui
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -11,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.*
 import org.aiknow.android.*
+import org.aiknow.android.R
 import org.aiknow.android.data.*
 
 @Composable fun AiKnowApp(model: AppModel) {
@@ -33,11 +36,11 @@ import org.aiknow.android.data.*
 @Composable private fun LoginScreen(model: AppModel) {
     val activity=requireNotNull(LocalActivity.current)
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.Center) {
-        Icon(Icons.Default.AutoAwesome,null,Modifier.size(48.dp),tint=MaterialTheme.colorScheme.primary)
+        Image(painterResource(R.drawable.brand_logo),"AI Know",Modifier.size(82.dp))
         Spacer(Modifier.height(24.dp))
         Text("AI KNOW",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Bold)
-        Text("매일 한 장씩,\nAI를 알아가는 시간",style=MaterialTheme.typography.headlineMedium,modifier=Modifier.padding(vertical=20.dp))
-        Text("오늘의 AI 소식과 꼭 알아야 할 개념을\n짧고 쉬운 카드뉴스로 만나보세요.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("AI를 더 쉽게,\n매일 한 장씩",style=MaterialTheme.typography.headlineMedium,modifier=Modifier.padding(vertical=20.dp))
+        Text("복잡한 AI 이야기를 핵심만 담아 전해드려요.",color=MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(48.dp))
         if(Platform.demo) {
             Text("디자인 확인용 데모 · 운영 계정 및 서버와 분리",style=MaterialTheme.typography.labelMedium)
@@ -46,6 +49,7 @@ import org.aiknow.android.data.*
             model.providers.forEach { provider ->
                 val configured=if(provider=="GOOGLE") BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank() else BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank()
                 OutlinedButton(onClick={model.signIn(activity,provider)},enabled=configured&&!model.busy,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
+                    if(provider=="GOOGLE"){Image(painterResource(R.drawable.google_symbol),null,Modifier.size(20.dp));Spacer(Modifier.width(12.dp))}
                     Text(if(provider=="GOOGLE") "Google로 계속하기" else "카카오로 계속하기")
                 }
                 if(!configured) Text("${if(provider=="GOOGLE") "Google" else "카카오"} 로그인 연결 준비 중",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(bottom=12.dp))
@@ -54,12 +58,14 @@ import org.aiknow.android.data.*
             TextButton(onClick={model.restore()}) { Text("연결 다시 확인") }
         }
         if(model.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=18.dp))
     }
 }
 @Composable private fun Onboarding(model: AppModel) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
-        Text("AI가 낯설어도\n괜찮아요",style=MaterialTheme.typography.displaySmall)
-        listOf("오늘" to "검수된 AI 소식을 카드로 읽어요.","아카이브" to "뉴스와 AI 이론을 찾아보고 좋아요로 모아둬요.","나에게 맞는 알림" to "원하는 시간에 새로운 이야기를 받아요.").forEach { (title,body) ->
+        TextButton(onClick={model.onboarding()},enabled=!model.busy,modifier=Modifier.align(Alignment.End)){Text("건너뛰기")}
+        Text("하루 한 장의\nAI 인사이트",style=MaterialTheme.typography.displaySmall)
+        listOf("오늘" to "복잡한 AI 소식을 카드 한 장으로 쉽고 빠르게 만나보세요.","마음에 드는 이야기는 좋아요로" to "좋아요한 카드와 관심 있는 카테고리를 아카이브에서 다시 볼 수 있어요.","매일 새로운 AI 이야기" to "알림 설정으로 오늘의 카드가 도착했을 때 놓치지 않고 확인해 보세요.").forEach { (title,body) ->
             ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(24.dp)) { SectionTitle(title); Text(body,Modifier.padding(top=12.dp)) } }
         }
         Button(onClick={model.onboarding()},enabled=!model.busy,modifier=Modifier.fillMaxWidth()) { Text("시작하기") }
@@ -87,7 +93,7 @@ import org.aiknow.android.data.*
             composable("notices") { NoticeScreen(model){nav.popBackStack()} }
             composable("admin") { if(model.admin) AdminHome {nav.navigate(it)} }
             composable("admin/{kind}") { e -> if(model.admin) AdminList(model,e.arguments!!.getString("kind")!!,{nav.popBackStack()}) {kind,id->nav.navigate("admin/$kind/$id")} }
-            composable("admin/{kind}/{id}") { e -> if(model.admin) AdminDetail(model,e.arguments!!.getString("kind")!!,e.arguments!!.getString("id")!!.toLong()){nav.popBackStack()} }
+            composable("admin/{kind}/{id}") { e -> if(model.admin) AdminDetail(model,e.arguments!!.getString("kind")!!,e.arguments!!.getString("id")!!.toLong(),back={nav.popBackStack()},openArticle={nav.navigate("admin/articles/$it")}) }
         }
     }
 }

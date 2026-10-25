@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
+import coil3.request.CachePolicy
+import coil3.SingletonImageLoader
+import coil3.network.HttpException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import org.aiknow.android.BuildConfig
@@ -42,16 +45,34 @@ import org.aiknow.android.data.*
     }
 }
 @Composable fun ErrorState(message: String, retry: () -> Unit) = EmptyState("불러오지 못했어요",message,"다시 시도",retry)
-@Composable fun RemoteImage(raw: String?, description: String?, modifier: Modifier = Modifier, thumbnail: Boolean = false) {
+@Composable fun RemoteImage(raw: String?, description: String?, modifier: Modifier = Modifier, thumbnail: Boolean = false, fullResolution: Boolean = false) {
     val context=LocalContext.current
-    val preview=remember(raw,thumbnail) { mediaUrl(raw,BuildConfig.API_BASE_URL,thumbnail) }
-    var original by remember(raw,thumbnail) { mutableStateOf(false) }
-    val url=if(original) raw else preview
-    SubcomposeAsyncImage(model=ImageRequest.Builder(context).data(url).build(),contentDescription=description,
+    val preview=remember(raw,thumbnail,fullResolution) { mediaUrl(raw,BuildConfig.API_BASE_URL,thumbnail,fullResolution) }
+    val source=remember(raw) { mediaUrl(raw,BuildConfig.API_BASE_URL,original=true) }
+    var original by remember(raw,thumbnail,fullResolution) { mutableStateOf(false) }
+    var retry by remember(raw) { mutableIntStateOf(0) }
+    var failure by remember(raw) { mutableStateOf<Throwable?>(null) }
+    val url=if(original) source else preview
+    key(retry,url) { SubcomposeAsyncImage(model=ImageRequest.Builder(context).data(url).apply {
+        if(retry>0) { diskCachePolicy(CachePolicy.WRITE_ONLY); memoryCachePolicy(CachePolicy.WRITE_ONLY); networkCachePolicy(CachePolicy.WRITE_ONLY) }
+        if(fullResolution) size(4096)
+    }.build(),contentDescription=description,
         modifier=modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer),contentScale=ContentScale.Fit,
         loading={ Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp) } },
-        onError={ if(!original && preview != raw && raw?.startsWith("https://")==true) original=true },
-        error={ Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { Icon(Icons.Default.Image, "이미지를 불러오지 못했습니다",tint=MaterialTheme.colorScheme.outline) } })
+        onError={ state ->
+            failure=state.result.throwable
+            val code=(failure as? HttpException)?.response?.code
+            if(!original && preview!=source && source?.startsWith("https://")==true &&
+                (code in listOf(400,404,410,422) || failure is IllegalStateException || failure is IllegalArgumentException)) original=true
+        },
+        error={ Column(Modifier.fillMaxSize().padding(8.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+            Icon(Icons.Default.Image,"이미지를 불러오지 못했습니다",tint=MaterialTheme.colorScheme.outline)
+            if(!thumbnail) {
+                val code=(failure as? HttpException)?.response?.code
+                Text(when(code){403->"이미지 제공처에서 접근을 허용하지 않습니다.";404,410->"이미지 파일이 없거나 주소가 만료됐습니다.";429->"이미지 요청이 많습니다. 잠시 후 다시 시도해 주세요.";else->"이미지 연결 또는 파일 형식을 확인해 주세요."},style=MaterialTheme.typography.bodySmall)
+                TextButton(onClick={url?.let{SingletonImageLoader.get(context).diskCache?.remove(it)};retry++;original=false}){Text("이미지 다시 불러오기")}
+            }
+        } }) }
 }
 @Composable fun SourceLink(label: String, url: String) {
     val uri=LocalUriHandler.current

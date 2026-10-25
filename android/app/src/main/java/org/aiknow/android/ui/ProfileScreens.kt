@@ -48,13 +48,14 @@ import org.aiknow.android.data.*
         }
     }
     confirmation?.let { type -> Confirm(if(type=="withdraw") "계정을 삭제할까요?" else "로그아웃할까요?",if(type=="withdraw") "계정 삭제는 되돌릴 수 없습니다." else "이 기기의 알림 등록도 해제됩니다.",{confirmation=null}){model.signOut(activity,type=="withdraw")} }
-    if(sheet!=null) ModalBottomSheet(onDismissRequest={sheet=null}) {
+    val sheetState=rememberModalBottomSheetState(confirmValueChange={it!=SheetValue.Hidden||!model.busy})
+    if(sheet!=null) ModalBottomSheet(onDismissRequest={if(!model.busy)sheet=null},sheetState=sheetState) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             when(sheet) {
                 "nickname" -> {
                     var name by remember { mutableStateOf(model.user?.text("nickname").orEmpty()) }
                     SectionTitle("닉네임 변경")
-                    OutlinedTextField(name,{name=it.take(20)},Modifier.fillMaxWidth(),label={Text("닉네임 (20자 이내)")},singleLine=true)
+                    OutlinedTextField(name,{name=it.take(20)},Modifier.fillMaxWidth(),label={Text("닉네임 (20자 이내)")},singleLine=true,enabled=!model.busy)
                     Button(onClick={model.action{model.api.request("api/v1/users/nickname","PATCH",payload("nickname" to name.trim()));model.refreshUser();sheet=null}},enabled=name.isNotBlank()&&!model.busy,modifier=Modifier.fillMaxWidth()){Text("저장")}
                 }
                 "avatar" -> { SectionTitle("나를 닮은 프로필"); LoadPane("avatars",{model.api.request("api/v1/profile")}) { data,_ ->

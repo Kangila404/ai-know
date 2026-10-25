@@ -37,7 +37,10 @@ class AiKnowApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: Context): ImageLoader = ImageLoader.Builder(context)
         .components { add(OkHttpNetworkFetcherFactory(callFactory = {
             // Separate client: no API session cookies or OAuth headers on media requests.
-            OkHttpClient.Builder().callTimeout(45,TimeUnit.SECONDS).build()
+            OkHttpClient.Builder().callTimeout(45,TimeUnit.SECONDS)
+                .addInterceptor { chain -> chain.proceed(chain.request().newBuilder()
+                    .header("User-Agent", "AiKnow/1.0 (+https://aiknow.kro.kr)")
+                    .header("Accept", "image/png,image/jpeg,image/webp,image/*;q=0.8").build()) }.build()
         })) }
         .diskCache { DiskCache.Builder().directory(context.cacheDir.resolve("images").toOkioPath()).maxSizeBytes(160L*1024*1024).build() }
         .build()

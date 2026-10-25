@@ -21,6 +21,8 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var pushError by mutableStateOf<String?>(null); private set
     var providers by mutableStateOf<List<String>>(emptyList()); private set
     var pendingCard by mutableStateOf<Long?>(null)
+    var contentRevision by mutableIntStateOf(0); private set
+    fun contentChanged() { contentRevision++ }
     private val prefs = application.getSharedPreferences("appearance",0)
     var appearance by mutableStateOf(prefs.getString("theme","system") ?: "system"); private set
     val admin get() = user?.text("userRole") == "ADMIN"
