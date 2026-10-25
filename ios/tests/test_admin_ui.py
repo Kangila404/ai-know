@@ -16,14 +16,21 @@ checks, failures = set(), []
 draft = {"sourceTitle": "검증 원문", "sourceUrl": "https://example.com/admin-fixture", "publishedAt": "2026-10-23T00:00:00Z",
          "title": "운영 카드", "summary": "관리자 HTTP 연결 검증", "keyPoints": ["API 계약 검증"],
          "slides": [{"sequence": 1, "title": "검증 슬라이드", "content": "운영 카드 본문", "layout": "text"}]}
-review = {"id": 1, "version": 1, "status": "PENDING", "draft": deepcopy(draft), "cardNewsId": None}
+review = {"id": 1, "version": 1, "status": "PENDING", "draft": deepcopy(draft), "cardNewsId": None, "createdAt": "2026-10-23T15:30:00"}
 article = {"version": 7, "publicationStatus": "PUBLISHED", "news": {**content.card, "id": 9002,
            "title": draft["title"], "summary": draft["summary"], "sourceTitle": draft["sourceTitle"], "sourceUrl": draft["sourceUrl"],
            "sourcePublishedAt": draft["publishedAt"], "contentType": "NEWS"},
            "slides": [{"id": 1, **draft["slides"][0]}]}
+article.update(totalViews=321, uniqueViewers=23, approvedAt="2026-10-23T01:00:00Z", hasStartedDelivery=True,
+               firstUsedAt="2026-10-24T00:00:00Z", lastUsedAt="2026-10-24T00:00:00Z")
 ready_article = deepcopy(article)
-ready_article.update(version=0, publicationStatus="READY")
+ready_article.update(version=0, publicationStatus="READY", hasStartedDelivery=False, firstUsedAt=None, lastUsedAt=None)
+# Exercise compatibility with the deployed API that supplies counts only via analytics.
+ready_article.pop("totalViews"); ready_article.pop("uniqueViewers")
 ready_article["news"].update(id=9004, title="최초 발송 전 카드", publicationDate=None)
+hidden_article = deepcopy(article)
+hidden_article.update(publicationStatus="HIDDEN", totalViews=0, uniqueViewers=0)
+hidden_article["news"].update(id=9005, title="숨긴 카드")
 records = {1: {"id": 1, "version": 1, "task": "draft", "sourceUrl": draft["sourceUrl"], "createdAt": "2026-10-23T00:00:00Z",
                "requestJson": '{"prompt":"fixture"}', "responseJson": '{"title":"검증 응답"}',
                "contextJson": '{"source":"저장된 이미지 선택 자료"}'}}
@@ -115,14 +122,12 @@ class Handler(content.Handler):
             if parts[5] == "summary":
                 return {"users": 120, "suspendedUsers": 2, "readyCards": 3, "publishedCards": 42, "totalViews": 1234, "uniqueViewers": 89}
             assert parts[5] == "cards"
-            index = int(query.get("page", ["0"])[0])
-            if index: checks.add("analytics-pagination")
-            search = query.get("query", [""])[0]
-            if search: checks.add("analytics-search")
-            return {"content": [{"id": 9002 + index, "title": "검색 통계 카드" if search else ("통계 첫 카드" if index == 0 else "통계 둘째 카드"), "publicationStatus": "PUBLISHED", "totalViews": 321, "uniqueViewers": 23}], "last": bool(search) or index > 0}
+            assert query.get("query", [""])[0] == ready_article["news"]["title"]
+            checks.add("legacy-card-counts")
+            return page([{"id": 9004, "title": ready_article["news"]["title"], "publicationStatus": "READY", "totalViews": 17, "uniqueViewers": 3}])
         if resource == "news-submissions":
             if ident is None:
-                return page([{"id": 1, "status": review["status"], "cardNewsId": review["cardNewsId"]}] if query.get("status", ["PENDING"])[0] == review["status"] else [])
+                return page([{"id": 1, "status": review["status"], "cardNewsId": review["cardNewsId"], "title": review["draft"]["title"], "createdAt": review["createdAt"]}] if query.get("status", ["PENDING"])[0] == review["status"] else [])
             if method == "GET": return review
             record(review, operation or "edit")
             if method == "PUT":
@@ -136,7 +141,12 @@ class Handler(content.Handler):
                 review.update(status="APPROVED", cardNewsId=9002, publicationStatus="PUBLISHED")
             return review
         if resource == "card-news":
-            if ident is None: return page([article, ready_article])
+            if ident is None:
+                status = query.get("status", [None])[0]
+                assert status in ["PUBLISHED", "READY", "HIDDEN"], "explicit status required"
+                checks.add("cards-" + status)
+                return page([v for v in [article, ready_article, hidden_article] if v["publicationStatus"] == status])
+            if ident == 9005: return hidden_article
             if ident == 9004:
                 assert method == "GET", "READY card must not be hidden or restored"
                 return ready_article
@@ -206,7 +216,7 @@ if __name__ == "__main__":
             'POST /api/v1/admin/news-submissions/1/reject','POST /api/v1/admin/news-submissions/1/reopen','POST /api/v1/admin/news-submissions/1/approve',
             'GET /api/v1/admin/card-news/9002','PUT /api/v1/admin/card-news/9002','POST /api/v1/admin/card-news/9002/hide','POST /api/v1/admin/card-news/9002/restore',
             'GET /api/v1/admin/editorial/history','POST /api/v1/admin/notices','PUT /api/v1/admin/notices/1','DELETE /api/v1/admin/notices/1',
-            'POST /api/v1/admin/profile','PATCH /api/v1/admin/profile/2','DELETE /api/v1/admin/profile/2','POST /api/v1/admin/generations/1/recover'}
+            'POST /api/v1/admin/profile','PATCH /api/v1/admin/profile/6','DELETE /api/v1/admin/profile/6','POST /api/v1/admin/generations/1/recover'}
         if args.only:
             if 'testAReviewAndPublication' not in args.only: expected = {x for x in expected if not any(p in x for p in ['/news-submissions', '/card-news', '/editorial/history'])}
             if 'testBNoticeAndProfileCRUD' not in args.only: expected = {x for x in expected if not any(p in x for p in ['/admin/notices', '/admin/profile'])}
@@ -215,7 +225,7 @@ if __name__ == "__main__":
         if not args.only or 'testEUserAdministration' in args.only:
             expected |= {'users-search', 'users-role-filter', 'users-state-filter', 'users-pagination', 'users-conflict', 'users-reload', 'users-updated', 'users-history', 'GET /api/v1/admin/users/99'}
         if not args.only or 'testFAnalytics' in args.only:
-            expected |= {'GET /api/v1/admin/analytics/summary', 'analytics-pagination', 'analytics-search', 'GET /api/v1/admin/card-news/9002'}
+            expected |= {'cards-PUBLISHED', 'cards-READY', 'cards-HIDDEN', 'legacy-card-counts', 'GET /api/v1/admin/card-news/9002'}
         if not args.only or 'testGReadyArticle' in args.only: expected.add('GET /api/v1/admin/card-news/9004')
         print('UI exit:'  ,result.returncode,'Verified:',len(checks),'Missing:',sorted(expected-checks),'Contract failures:',failures)
         assert result.returncode == 0 and expected <= checks and not failures

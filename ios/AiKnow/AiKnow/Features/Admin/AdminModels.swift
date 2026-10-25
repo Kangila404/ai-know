@@ -4,6 +4,8 @@ struct AdminPage<T: Decodable>: Decodable { let content: [T]; let last: Bool }
 struct Submission: Decodable, Identifiable {
     let id: Int64
     let status: String
+    let title: String?
+    let createdAt: String?
     let cardNewsId: Int64?
     let version: Int64?
     let draft: EditorialDraft?
@@ -65,6 +67,12 @@ struct AdminArticle: Decodable, Identifiable {
     let publicationStatus: String
     let news: NewsCard
     let slides: [StorySlide]
+    let approvedAt: String?
+    let firstUsedAt: String?
+    let lastUsedAt: String?
+    let hasStartedDelivery: Bool?
+    let totalViews: Int64?
+    let uniqueViewers: Int64?
     var id: Int64 { news.id }
     var draft: EditorialDraft? {
         guard let title = news.sourceTitle, let url = news.sourceUrl, let date = news.sourcePublishedAt else { return nil }
@@ -117,7 +125,7 @@ enum AdminKind: String, CaseIterable, Identifiable {
     case submissions, articles, generations, notices, profiles
     var id: String { rawValue }
     var title: String {
-        switch self { case .submissions: return "뉴스 검수"; case .articles: return "카드뉴스 관리"; case .generations: return "생성 복구"; case .notices: return "공지 관리"; case .profiles: return "프로필 이미지 관리" }
+        switch self { case .submissions: return "콘텐츠 검수"; case .articles: return "카드뉴스 관리"; case .generations: return "생성 복구"; case .notices: return "공지 관리"; case .profiles: return "프로필 이미지 관리" }
     }
     var symbol: String {
         switch self { case .submissions: return "checkmark.seal"; case .articles: return "newspaper"; case .generations: return "arrow.clockwise"; case .notices: return "megaphone"; case .profiles: return "person.crop.square" }
@@ -126,9 +134,42 @@ enum AdminKind: String, CaseIterable, Identifiable {
         switch self { case .submissions: return "api/v1/admin/news-submissions"; case .articles: return "api/v1/admin/card-news"; case .generations: return "api/v1/admin/generations"; case .notices: return "api/v1/admin/notices"; case .profiles: return "api/v1/profile" }
     }
     var filters: [String] {
-        switch self { case .submissions: return ["PENDING", "APPROVED", "DENIED"]; case .articles: return ["", "READY", "PUBLISHED", "HIDDEN"]; default: return [] }
+        switch self { case .submissions: return ["PENDING", "APPROVED", "DENIED"]; case .articles: return ["PUBLISHED", "READY", "HIDDEN"]; default: return [] }
     }
 }
 func statusLabel(_ raw: String) -> String {
-    ["": "전체", "PENDING": "검수 대기", "APPROVED": "승인", "DENIED": "반려", "READY": "발송 대기", "PUBLISHED": "게시", "HIDDEN": "숨김", "NEWS": "뉴스", "AI_THEORY": "AI 이론"][raw] ?? raw
+    ["": "전체", "PENDING": "검수 대기", "APPROVED": "승인", "DENIED": "반려", "READY": "발송 대기", "PUBLISHED": "게시 중", "HIDDEN": "숨김", "NEWS": "뉴스", "AI_THEORY": "AI 이론"][raw] ?? raw
+}
+
+func adminDate(_ raw: String?) -> String {
+    guard let raw, !raw.isEmpty else { return "미제공" }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let date = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    if let date {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR"); formatter.timeZone = TimeZone(identifier: "Asia/Seoul")
+        formatter.dateFormat = "yyyy.MM.dd HH:mm"
+        return formatter.string(from: date)
+    }
+    // createdAt is a server-local LocalDateTime, not the original source publication date.
+    return String(raw.prefix(16)).replacingOccurrences(of: "T", with: " ").replacingOccurrences(of: "-", with: ".")
+}
+
+struct CardStatistics: Decodable, Identifiable {
+    let id: Int64; let title: String; let publicationStatus: String; let totalViews: Int64; let uniqueViewers: Int64
+}
+extension AdminArticle {
+    func statistics() async -> CardStatistics? {
+        if let totalViews {
+            return CardStatistics(id: id, title: news.title, publicationStatus: publicationStatus, totalViews: totalViews, uniqueViewers: uniqueViewers ?? 0)
+        }
+        // Existing deployments expose counts through analytics. Fetch only visible cards,
+        // match by ID, and never present an unavailable count as zero.
+        do {
+            let page: AdminPage<CardStatistics> = try await APIClient.shared.decode("api/v1/admin/analytics/cards",
+                query: [URLQueryItem(name: "query", value: news.title), URLQueryItem(name: "size", value: "100")])
+            return page.content.first { $0.id == id }
+        } catch { return nil }
+    }
 }

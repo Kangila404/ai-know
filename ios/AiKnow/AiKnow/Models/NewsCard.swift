@@ -156,7 +156,8 @@ struct RemoteImage: View {
     // Editorial PNGs can contain transparency with black diagram labels/lines.
     var imageBackground = Color.white
     @State private var image: UIImage?
-    @State private var failed = false
+    var showsStatus = false
+    @State private var failure: String?
     @State private var retry = 0
 
     var body: some View {
@@ -172,22 +173,25 @@ struct RemoteImage: View {
                         .background(imageBackground).accessibilityHidden(true)
                 }
                 else if url == nil { Image(systemName: "photo").foregroundStyle(.secondary).accessibilityLabel("이미지 없음") }
-                else if failed {
-                    Button { retry += 1 } label: {
-                        Image(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44)
-                    }.buttonStyle(.plain).accessibilityLabel("이미지 다시 불러오기")
+                else if let failure {
+                    VStack(spacing: 8) {
+                        if showsStatus { Text(failure).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center) }
+                        Button { retry += 1 } label: {
+                            Image(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44)
+                        }.buttonStyle(.plain).accessibilityLabel("이미지 다시 불러오기")
+                    }.padding(8)
                 } else { ProgressView().accessibilityLabel("이미지 불러오는 중") }
             }
             .clipped()
             .task(id: "\(url?.absoluteString ?? "")|\(maxPixelSize)|\(retry)") {
-                image = nil; failed = false
+                image = nil; failure = nil
                 guard bundled == nil, let url else { return }
                 do {
                     let loaded = try await ImageLoader.shared.image(at: url, maxPixelSize: maxPixelSize)
                     try Task.checkCancellation()
                     image = loaded
                 } catch {
-                    if !Task.isCancelled { failed = true }
+                    if !Task.isCancelled { failure = error.localizedDescription }
                 }
             }
     }

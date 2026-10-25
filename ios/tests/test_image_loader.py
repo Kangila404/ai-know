@@ -43,6 +43,8 @@ if __name__ == "__main__":
             status, body, cache = 200, payload, "public, max-age=3600"
             if path == "/counts": body, cache = json.dumps(counts).encode(), "no-store"
             elif path == "/flaky" and counts[path] == 1: status, body, cache = 503, b"", "no-store"
+            elif path == "/cached-error" and counts[path] == 1: status, body = 404, b"missing"
+            elif path == "/cached-html" and counts[path] == 1: body = b"<html>temporary error</html>"
             elif path == "/invalid": body = b"not an image"
             self.send_response(status)
             self.send_header("Content-Type", "image/png" if path != "/counts" else "application/json")
