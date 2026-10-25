@@ -11,9 +11,6 @@ final class APIClient {
     private let baseURL: URL?
     private let persistCookies: Bool
     private var csrf: CSRF?
-    #if DEBUG
-    var previewRequest: ((String, String, Data?, [URLQueryItem]) throws -> Data)?
-    #endif
 
     init(baseURL: URL? = nil, session: URLSession = .shared, persistCookies: Bool = true) {
         self.session = session
@@ -65,9 +62,6 @@ final class APIClient {
     }
 
     func request(path: String, method: String = "GET", body: Data? = nil, query: [URLQueryItem] = [], contentType: String = "application/json") async throws -> Data {
-        #if DEBUG
-        if let previewRequest { return try previewRequest(path, method, body, query) }
-        #endif
         let mutation = !["GET", "HEAD"].contains(method)
         if mutation && csrf == nil { try await refreshCSRF() }
         do { return try await send(path: path, method: method, body: body, csrf: mutation ? csrf : nil, query: query, contentType: contentType) }
@@ -83,7 +77,8 @@ final class APIClient {
         guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else { throw APIError.configuration }
         if !query.isEmpty { components.queryItems = query }
         guard let url = components.url else { throw APIError.configuration }
-        var request = URLRequest(url: url)
+        // Account permissions and card-open counts must reach the server on each request.
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.httpMethod = method
         request.httpBody = body
         request.timeoutInterval = 20

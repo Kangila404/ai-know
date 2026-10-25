@@ -6,13 +6,26 @@ struct AdminHomeView: View {
         NavigationStack {
             List {
                 Section("콘텐츠 운영") {
-                    ForEach(AdminKind.allCases) { kind in
-                        NavigationLink { AdminListView(kind: kind) } label: { Label(kind.title, systemImage: kind.symbol) }
-                    }
+                    NavigationLink { AdminListView(kind: .submissions) } label: {
+                        Label { VStack(alignment: .leading, spacing: 5) {
+                            Text("콘텐츠 검수")
+                            Text("뉴스·AI 이론의 접수 및 승인").font(.caption).foregroundStyle(.secondary)
+                        } } icon: { Image(systemName: "checkmark.seal") }
+                    }.accessibilityLabel("콘텐츠 검수")
+                    NavigationLink { AdminListView(kind: .articles) } label: {
+                        Label { VStack(alignment: .leading, spacing: 5) {
+                            Text("카드뉴스 관리")
+                            Text("게시 중 · 발송 대기 · 숨김").font(.caption).foregroundStyle(.secondary)
+                        } } icon: { Image(systemName: "newspaper") }
+                    }.accessibilityLabel("카드뉴스 관리")
                 }
-                Section("사용자 관리") {
+                Section("서비스 관리") {
+                    NavigationLink { AdminListView(kind: .notices) } label: { Label("공지 관리", systemImage: "megaphone") }
                     NavigationLink { AdminUsersView() } label: { Label("계정 목록·권한 관리", systemImage: "person.2") }
-                    NavigationLink { AdminAnalyticsView() } label: { Label("조회수·운영 현황", systemImage: "chart.bar") }
+                    NavigationLink { AdminListView(kind: .profiles) } label: { Label("프로필 이미지 관리", systemImage: "person.crop.square") }
+                }
+                Section("문제 해결") {
+                    NavigationLink { AdminListView(kind: .generations) } label: { Label("생성 복구", systemImage: "arrow.clockwise") }
                 }
             }.navigationTitle("관리자")
         }
@@ -23,17 +36,38 @@ private struct AdminRow: Identifiable { let id: Int64; let title: String; let su
 struct AdminListView: View {
     let kind: AdminKind
     @State private var rows: [AdminRow] = []
-    @State private var filter = ""
+    @State private var articles: [AdminArticle] = []
+    @State private var filter: String
     @State private var page = 0
     @State private var last = false
     @State private var loading = false
     @State private var error: String?
     @State private var creating = false
     @State private var generation = 0
+    init(kind: AdminKind) {
+        self.kind = kind
+        _filter = State(initialValue: kind.filters.first ?? "")
+    }
+    private var guidance: String {
+        if kind == .submissions { return "뉴스와 AI 이론 모두 이곳에서 검수합니다. 승인할 때 게시·발송 유형을 선택합니다." }
+        switch filter {
+        case "READY": return "아직 사용자에게 공개되지 않은 뉴스입니다. 하루 한 건이 선정되며, 첫 유효 발송 시작 시 자동 게시됩니다. 다음 날 발송이 보장되지는 않습니다."
+        case "HIDDEN": return "아카이브에 노출되지 않는 카드입니다. 숨김 상태에서는 발송되지 않습니다."
+        default: return "현재 아카이브에 공개된 카드입니다. AI 이론은 승인 즉시 게시되며, 뉴스가 없는 날에는 대신 발송될 수 있습니다."
+        }
+    }
     var body: some View {
         List {
             if !kind.filters.isEmpty {
-                Picker("상태", selection: $filter) { ForEach(kind.filters, id: \.self) { Text(statusLabel($0)).tag($0) } }
+                Section {
+                    Picker("상태", selection: $filter) { ForEach(kind.filters, id: \.self) { Text(statusLabel($0)).tag($0) } }
+                        .pickerStyle(.segmented).accessibilityIdentifier("admin.content.status")
+                } footer: { Text(guidance) }
+            }
+            ForEach(articles) { article in
+                NavigationLink { EditorialDetailView(id: article.id, kind: .articles) } label: {
+                    AdminArticleSummary(article: article, revision: generation)
+                }.accessibilityIdentifier("admin.article.\(article.id)")
             }
             ForEach(rows) { row in
                 NavigationLink { destination(row.id) } label: {
@@ -45,11 +79,10 @@ struct AdminListView: View {
             }
             if loading { ProgressView() }
             else if let error { RequestFailureView(message: error) { Task { await load(reset: rows.isEmpty) } } }
-            else if rows.isEmpty { ContentUnavailableView("등록된 항목이 없습니다", systemImage: kind.symbol) }
+            else if rows.isEmpty && articles.isEmpty { ContentUnavailableView("등록된 항목이 없습니다", systemImage: kind.symbol) }
             else if !last { Button("더 보기") { Task { await load() } } }
         }.navigationTitle(kind.title).navigationBarTitleDisplayMode(.inline)
             .task(id: filter) {
-                if kind == .submissions && filter.isEmpty { filter = "PENDING"; return }
                 await load(reset: true)
             }
             .refreshable { await load(reset: true) }
@@ -73,7 +106,7 @@ struct AdminListView: View {
     }
     private func load(reset: Bool = false) async {
         if !reset && (loading || last) { return }
-        if reset { generation += 1; page = 0; rows = []; last = false }
+        if reset { generation += 1; page = 0; rows = []; articles = []; last = false }
         let ticket = generation
         loading = true; error = nil
         defer { if ticket == generation { loading = false } }
@@ -81,13 +114,14 @@ struct AdminListView: View {
         if !filter.isEmpty { query.append(URLQueryItem(name: "status", value: filter)) }
         do {
             var result: [AdminRow]; var isLast: Bool
+            var nextArticles: [AdminArticle] = []
             switch kind {
             case .submissions:
                 let data: AdminPage<Submission> = try await APIClient.shared.decode(kind.path, query: query)
-                result = data.content.map { AdminRow(id: $0.id, title: "검수 요청 #\($0.id)", subtitle: statusLabel($0.status)) }; isLast = data.last
+                result = data.content.map { AdminRow(id: $0.id, title: $0.title ?? "검수 요청 #\($0.id)", subtitle: "\(statusLabel($0.status)) · #\($0.id)\n접수 \(adminDate($0.createdAt))") }; isLast = data.last
             case .articles:
                 let data: AdminPage<AdminArticle> = try await APIClient.shared.decode(kind.path, query: query)
-                result = data.content.map { AdminRow(id: $0.id, title: $0.news.title, subtitle: statusLabel($0.publicationStatus)) }; isLast = data.last
+                result = []; nextArticles = data.content; isLast = data.last
             case .generations:
                 let data: AdminPage<Generation> = try await APIClient.shared.decode(kind.path, query: query)
                 result = data.content.map { AdminRow(id: $0.id, title: "\($0.task) #\($0.id)", subtitle: "\($0.statusText) · \($0.sourceUrl)") }; isLast = data.last
@@ -99,10 +133,40 @@ struct AdminListView: View {
                 result = data.map { AdminRow(id: $0.id, title: $0.name, subtitle: $0.imgUrl) }; isLast = true
             }
             try Task.checkCancellation(); guard ticket == generation else { return }
-            let ids = Set(rows.map(\.id)); rows += result.filter { !ids.contains($0.id) }; page += 1; last = isLast
+            let ids = Set(rows.map(\.id)); rows += result.filter { !ids.contains($0.id) }
+            let articleIDs = Set(articles.map(\.id)); articles += nextArticles.filter { !articleIDs.contains($0.id) }
+            page += 1; last = isLast
         } catch is CancellationError { }
         catch let e as URLError where e.code == .cancelled { }
         catch { if ticket == generation { self.error = error.localizedDescription } }
+    }
+}
+
+private struct AdminArticleSummary: View {
+    let article: AdminArticle
+    let revision: Int
+    @State private var statistics: CardStatistics?
+    @State private var loading = true
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(article.news.title).font(.headline).lineLimit(2)
+            HStack {
+                Text(statusLabel(article.news.contentType ?? "NEWS"))
+                Text(statusLabel(article.publicationStatus))
+                    .foregroundStyle(article.publicationStatus == "READY" ? Color.orange : Color.secondary)
+                Spacer()
+                if let statistics { Label("조회 \(statistics.totalViews)회", systemImage: "eye") }
+                else { Text(loading ? "조회수 불러오는 중" : "조회수 미제공") }
+            }.font(.caption).foregroundStyle(.secondary)
+            if let date = article.news.publicationDate { Text("게시 \(adminDate(date))").font(.caption).foregroundStyle(.secondary) }
+            else if let date = article.approvedAt { Text("승인 \(adminDate(date))").font(.caption).foregroundStyle(.secondary) }
+        }.padding(.vertical, 6)
+            .task(id: "\(article.id):\(revision)") {
+                loading = true
+                let result = await article.statistics()
+                guard !Task.isCancelled else { return }
+                statistics = result; loading = false
+            }
     }
 }
 
@@ -113,14 +177,24 @@ struct EditorialDetailView: View {
     @State private var version: Int64 = 0
     @State private var status = ""
     @State private var reason = ""
-    @State private var contentType = "NEWS"
+    @State private var contentType = ""
     @State private var categories: [NewsCategory] = []
     @State private var selected: Set<Int64> = []
     @State private var busy = false
     @State private var error: String?
     @State private var message: String?
     @State private var action: String?
+    @State private var editing = false
     @State private var review: Submission?
+    @State private var article: AdminArticle?
+    @State private var statistics: CardStatistics?
+    private var approvalGuide: String {
+        switch contentType {
+        case "AI_THEORY": return "승인 즉시 아카이브에 게시됩니다. 뉴스가 없는 날에는 대신 발송될 수 있습니다."
+        case "NEWS": return "승인 후 발송 대기로 이동합니다. 자정 이전 승인된 뉴스 중 하루 한 건을 선정하고, 첫 유효 발송 시작 시 게시합니다. 다음 날 발송이 보장되지는 않습니다."
+        default: return "뉴스 또는 AI 이론을 선택해 승인 후 처리 방식을 확인해 주세요."
+        }
+    }
     private var resource: String { kind == .submissions ? "SUBMISSION" : "ARTICLE" }
     private var canEdit: Bool { kind == .articles || status != "APPROVED" }
     private var hasReason: Bool { !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && reason.count <= 2000 }
@@ -130,12 +204,26 @@ struct EditorialDetailView: View {
                 Section {
                     Text(draft.title).font(.headline)
                     Text(statusLabel(status)).foregroundStyle(.secondary)
+                    if let review {
+                        LabeledContent("접수", value: adminDate(review.createdAt))
+                        LabeledContent("원문 작성", value: adminDate(draft.publishedAt))
+                    }
+                    if let article {
+                        LabeledContent("콘텐츠 유형", value: statusLabel(article.news.contentType ?? "NEWS"))
+                        if let statistics { LabeledContent("조회수", value: "\(statistics.totalViews)회") }
+                        else { LabeledContent("조회수", value: "미제공") }
+                        if let date = article.approvedAt { LabeledContent("승인", value: adminDate(date)) }
+                        if let date = article.news.publicationDate { LabeledContent("게시", value: adminDate(date)) }
+                        if let date = article.firstUsedAt { LabeledContent("첫 발송 시작", value: adminDate(date)) }
+                        else if article.hasStartedDelivery == false { Text("아직 발송을 시작하지 않았습니다.").font(.caption).foregroundStyle(.secondary) }
+                        if let date = article.lastUsedAt { LabeledContent("최근 발송 시작", value: adminDate(date)) }
+                    }
                     if let url = URL(string: draft.sourceUrl) { Link(draft.sourceTitle, destination: url) }
                 }
                 if let review, review.status != "PENDING" {
                     Section("검수 결과") {
                         if let note = review.reviewNote, !note.isEmpty { Text(note) }
-                        if let date = review.reviewedAt { Text("검수 시각: \(date)").font(.caption).foregroundStyle(.secondary) }
+                        if let date = review.reviewedAt { Text("검수 시각: \(adminDate(date))").font(.caption).foregroundStyle(.secondary) }
                         if let reviewer = review.reviewedBy { Text("검수자 #\(reviewer)").font(.caption).foregroundStyle(.secondary) }
                         if let publication = review.publicationStatus { Text("게시 상태: \(statusLabel(publication))") }
                         if let cardID = review.cardNewsId {
@@ -147,35 +235,37 @@ struct EditorialDetailView: View {
                     DisclosureGroup("콘텐츠 미리보기") {
                         Text(draft.title).font(.headline)
                         Text(draft.summary)
-                        if let image = draft.titleImage { RemoteImage(raw: image.url).frame(maxHeight: 220) }
+                        if let image = draft.titleImage { RemoteImage(raw: image.url, showsStatus: true).frame(maxHeight: 220) }
                         ForEach(Array(draft.slides.enumerated()), id: \.offset) { index, slide in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("\(index + 1). \(slide.title)").font(.headline)
-                                if let image = slide.image { RemoteImage(raw: image.url).frame(maxHeight: 220) }
+                                if let image = slide.image { RemoteImage(raw: image.url, showsStatus: true).frame(maxHeight: 220) }
                                 Text(slide.content)
                             }.padding(.vertical, 8)
                         }
                     }
                 }
                 if canEdit {
-                    EditorialDraftFields(draft: Binding(get: { self.draft ?? draft }, set: { self.draft = $0 }))
+                    if editing { EditorialDraftFields(draft: Binding(get: { self.draft ?? draft }, set: { self.draft = $0 })) }
                     Section("변경 사유") { TextField("수정·반려·복원 사유 (필수)", text: $reason, axis: .vertical) }
-                    if let validation = draft.validationMessage { Text(validation).font(.footnote).foregroundStyle(.red) }
-                    Button("수정 저장") { action = "edit" }.disabled(!draft.valid || !hasReason)
+                    if editing {
+                        if let validation = draft.validationMessage { Text(validation).font(.footnote).foregroundStyle(.red) }
+                        Button("수정 저장") { action = "edit" }.disabled(!draft.valid || !hasReason)
+                    }
                 }
                 if kind == .submissions && status == "PENDING" {
                     Section("승인 설정") {
                         Picker("콘텐츠 유형", selection: $contentType) {
-                            Text("뉴스").tag("NEWS"); Text("AI 이론").tag("AI_THEORY")
-                        }
+                            Text("유형 선택").tag(""); Text("뉴스").tag("NEWS"); Text("AI 이론").tag("AI_THEORY")
+                        }.accessibilityIdentifier("admin.approval.type")
                         ForEach(categories) { category in
                             Toggle(category.name, isOn: Binding(get: { selected.contains(category.id) }, set: { value in
                                 if value { selected.insert(category.id) } else { selected.remove(category.id) }
                             }))
                         }
-                        Button("승인") { action = "approve" }.disabled(selected.count > 10)
+                        Button("승인") { action = "approve" }.disabled(selected.count > 10 || contentType.isEmpty)
                         Button("반려", role: .destructive) { action = "reject" }.disabled(!hasReason)
-                        Text("승인된 콘텐츠는 발송 대기 상태가 됩니다.").font(.caption).foregroundStyle(.secondary)
+                        Text(approvalGuide).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if kind == .submissions && status == "DENIED" { Button("재검수로 돌리기") { action = "reopen" }.disabled(!hasReason) }
@@ -186,7 +276,7 @@ struct EditorialDetailView: View {
                 NavigationLink("변경 이력") { EditorialHistoryView(type: resource, id: id) }
             } else if busy { ProgressView() }
             if let error { RequestFailureView(message: error) { Task { await load() } } }
-        }.navigationTitle(kind == .submissions ? "뉴스 검수 #\(id)" : "카드뉴스 수정")
+        }.navigationTitle(kind == .submissions ? "콘텐츠 검수 #\(id)" : "카드뉴스 수정")
             .navigationBarTitleDisplayMode(.inline).disabled(busy).modifier(AdminKeyboardDismissal())
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let message {
@@ -194,11 +284,12 @@ struct EditorialDetailView: View {
                         .background(AppPalette.surface)
                 }
             }
+            .toolbar { if canEdit { Button(editing ? "편집 닫기" : "편집") { editing.toggle() } } }
             .task { await load() }
             .confirmationDialog("변경을 적용할까요?", isPresented: Binding(get: { action != nil }, set: { if !$0 { action = nil } }), titleVisibility: .visible) {
                 if let action { Button("적용", role: action == "hide" || action == "reject" ? .destructive : nil) { Task { await apply(action) } } }
                 Button("취소", role: .cancel) { action = nil }
-            } message: { Text("승인·반려는 서버에 저장된 초안을 기준으로 처리합니다. 내용을 수정했다면 먼저 ‘수정 저장’을 해 주세요.") }
+            } message: { Text((action == "approve" ? approvalGuide + "\n\n" : "") + "승인·반려는 서버에 저장된 초안을 기준으로 처리합니다. 내용을 수정했다면 먼저 ‘수정 저장’을 해 주세요.") }
     }
     private func load() async {
         busy = true; error = nil; defer { busy = false }
@@ -206,10 +297,12 @@ struct EditorialDetailView: View {
             if kind == .submissions {
                 let value: Submission = try await APIClient.shared.decode("\(kind.path)/\(id)")
                 review = value; draft = value.draft; version = value.version ?? 0; status = value.status
+                if let type = value.contentType { contentType = type }
                 categories = try await APIClient.shared.decode("api/v1/cardNews/categories")
             } else {
                 let value: AdminArticle = try await APIClient.shared.decode("\(kind.path)/\(id)")
-                draft = value.draft; version = value.version; status = value.publicationStatus
+                article = value; draft = value.draft; version = value.version; status = value.publicationStatus
+                statistics = await value.statistics()
             }
             if draft == nil { error = "원문 정보가 없는 콘텐츠라 수정 양식을 만들 수 없습니다." }
         } catch { self.error = error.localizedDescription }
@@ -263,7 +356,7 @@ struct EditorialImageFields: View {
     var body: some View {
         Toggle("이미지 사용", isOn: Binding(get: { image != nil }, set: { image = $0 ? EditorialImage(url: "", origin: "GENERATED", sourceUrl: nil, credit: nil) : nil }))
         if image != nil {
-            RemoteImage(raw: image?.url).frame(height: 120)
+            RemoteImage(raw: image?.url, maxPixelSize: 500, showsStatus: true).frame(height: 120)
             TextField("이미지 URL", text: field(\.url)).textInputAutocapitalization(.never).autocorrectionDisabled()
             Picker("이미지 유형", selection: field(\.origin)) { Text("생성 이미지").tag("GENERATED"); Text("출처 이미지").tag("SOURCE") }
             TextField("원문 URL", text: optionalField(\.sourceUrl)).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -327,7 +420,7 @@ struct AdminProfileEditor: View {
     var body: some View {
         Form {
             Section("프로필 이미지") {
-                RemoteImage(raw: url).frame(height: 100)
+                RemoteImage(raw: url, maxPixelSize: 330, showsStatus: true).frame(height: 100)
                 TextField("이름 (20자 이내)", text: $name)
                 TextField("이미지 주소", text: $url).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Text("현재 서버는 이미지 주소도 최대 20자로 제한합니다.").font(.caption).foregroundStyle(.secondary)

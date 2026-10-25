@@ -28,6 +28,7 @@ class EditorialTests {
     @Autowired NewsSubmissionService reviews;
     @Autowired NewsSubmissionRepository submissions;
     @Autowired CardNewsRepository news;
+    @Autowired org.aiknow.server.cardNews.repository.CardViewRepository views;
     @Autowired GenerationCacheService cache;
     @Autowired GenerationRecordRepository records;
     @Autowired GenerationRecoveryService recovery;
@@ -48,9 +49,20 @@ class EditorialTests {
     @Test void editorialChangesKeepOriginalIngestionIdempotentAndApprovalUsesEditedDraft() {
         var original = draft("원래 제목"); long id = reviews.receive(original).id();
         var before = reviews.get(id);
+        assertThat(before.createdAt()).isNotNull();
+        var receipt = reviews.receive(original);
+        assertThat(receipt.title()).isEqualTo("원래 제목");
+        assertThat(receipt.createdAt()).isEqualTo(before.createdAt());
         var edited = editorial.editSubmission(id, new EditorialService.Edit(before.version(), "사실 확인", draft("수정 제목")), actor);
         assertThat(edited.version()).isGreaterThan(before.version());
         assertThat(edited.draft().title()).isEqualTo("수정 제목");
+        assertThat(edited.createdAt()).isEqualTo(before.createdAt());
+        assertThat(reviews.list(InspectionStatus.PENDING, 0, 100).getContent())
+            .anySatisfy(row -> {
+                assertThat(row.id()).isEqualTo(id);
+                assertThat(row.title()).isEqualTo("수정 제목");
+                assertThat(row.createdAt()).isEqualTo(before.createdAt());
+            });
         assertThat(reviews.receive(original).id()).isEqualTo(id);
         assertThatThrownBy(() -> editorial.editSubmission(id, new EditorialService.Edit(before.version(), "이전 화면", original), actor))
             .isInstanceOf(ResponseStatusException.class);
@@ -94,6 +106,51 @@ class EditorialTests {
         mvc.perform(post("/api/v1/admin/card-news/{id}/hide",articleId).with(user(actor).roles("ADMIN"))
             .contentType("application/json").content("{\"version\":0,\"reason\":\"test\"}"))
             .andExpect(status().isForbidden());
+    }
+    @Test void adminCardsSeparatePublicationFromDeliveryAndIncludeViewsWithoutRecordingVisits() throws Exception {
+        long theoryId = reviews.approve(reviews.receive(draft("아카이브 이론")).id(),
+            new NewsSubmissionService.Approve(ContentType.AI_THEORY, List.of()), actor).cardNewsId();
+        url += "/news";
+        long newsId = reviews.approve(reviews.receive(draft("대기 뉴스")).id(),
+            new NewsSubmissionService.Approve(ContentType.NEWS, List.of()), actor).cardNewsId();
+        var theory = editorial.getArticle(theoryId);
+        assertThat(theory.publicationStatus()).isEqualTo(PublicationStatus.PUBLISHED);
+        assertThat(theory.approvedAt()).isNotNull();
+        assertThat(theory.hasStartedDelivery()).isFalse();
+        assertThat(theory.firstUsedAt()).isNull();
+        assertThat(theory.totalViews()).isZero();
+        var visit = new CardView(101L, theoryId, Instant.parse("2026-10-25T00:00:00Z"));
+        visit.record(Instant.parse("2026-10-25T00:01:00Z"));
+        views.save(visit);
+        views.save(new CardView(102L, theoryId, Instant.now()));
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(get("/api/v1/admin/card-news/{id}", theoryId).with(user(actor).roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalViews").value(3))
+                .andExpect(jsonPath("$.uniqueViewers").value(2))
+                .andExpect(jsonPath("$.hasStartedDelivery").value(false));
+        }
+        assertThat(editorial.listArticles(PublicationStatus.READY, 0, 100).getContent())
+            .allSatisfy(row -> assertThat(row.publicationStatus()).isEqualTo(PublicationStatus.READY))
+            .anySatisfy(row -> assertThat(row.news().id()).isEqualTo(newsId));
+        assertThat(editorial.listArticles(PublicationStatus.PUBLISHED, 0, 100).getContent())
+            .allSatisfy(row -> assertThat(row.publicationStatus()).isEqualTo(PublicationStatus.PUBLISHED))
+            .anySatisfy(row -> {
+                assertThat(row.news().id()).isEqualTo(theoryId);
+                assertThat(row.totalViews()).isEqualTo(3);
+                assertThat(row.uniqueViewers()).isEqualTo(2);
+            });
+        var firstUse = Instant.parse("2026-10-26T00:00:00Z");
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> news.findById(newsId).orElseThrow()
+            .publishForDelivery(LocalDate.of(2026, 10, 26), firstUse));
+        var sent = editorial.getArticle(newsId);
+        assertThat(sent.hasStartedDelivery()).isTrue();
+        assertThat(sent.firstUsedAt()).isEqualTo(firstUse);
+        assertThat(sent.lastUsedAt()).isEqualTo(firstUse);
+        editorial.visibility(newsId, false, new EditorialService.Action(sent.version(), "검토"), actor);
+        assertThat(editorial.listArticles(PublicationStatus.HIDDEN, 0, 100).getContent())
+            .anySatisfy(row -> assertThat(row.news().id()).isEqualTo(newsId));
+        assertThat(editorial.listArticles(PublicationStatus.PUBLISHED, 0, 100).getContent())
+            .noneSatisfy(row -> assertThat(row.news().id()).isEqualTo(newsId));
     }
     @Test void responseRecoveryPreservesRawOutputAndNeverReleasesPaidReservation() {
         var claim = cache.claim(url, "draft", "{}"); cache.complete(claim.id(), "{\"bad\":true}");

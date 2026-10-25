@@ -2,18 +2,66 @@
 
 SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세션으로 교환하며, 푸시 수신은 Firebase Messaging SDK로 연결되어 있습니다. 오늘의 카드·아카이브·상세·좋아요·읽음·공지·프로필·알림 설정은 서버 API를 사용합니다. 온보딩 안내 문구는 앱에 포함하며 완료 상태는 서버에 저장합니다.
 
+**현재 Debug/Release 모두 실제 로그인을 사용합니다. 개발 미리보기와 가짜 ADMIN 계정은 제거했으며 서버가 ADMIN으로 응답하는 계정에만 관리자 탭이 표시됩니다.**
+
+## 2026-10-25 관리자 작업 흐름·외부 이미지
+
+관리자 홈을 콘텐츠 운영 / 서비스 관리 / 문제 해결로 묶었습니다. ‘콘텐츠 검수’는 뉴스·AI 이론 공용 접수함이며, 목록에 제목과 최초 접수 시각을 표시합니다. 승인 전에 콘텐츠 유형을 직접 선택해야 합니다. 뉴스는 발송 대기 후 첫 유효 발송 시작 시 게시되고(다음 날 발송 보장 아님), AI 이론은 승인 즉시 아카이브에 게시되며 뉴스가 없는 날 대체 발송하는 기존 정책을 유지합니다.
+
+‘카드뉴스 관리’는 게시 중 / 발송 대기 / 숨김을 나눕니다. 별도 조회수 대시보드를 없애고 카드 목록·상세에 조회수를 표시합니다. 상세에서 승인·게시·첫/최근 발송 시작을 구분하며 긴 수정 양식은 ‘편집’으로 펼칩니다. 실제 권한은 기존 ADMIN 응답을 따릅니다.
+
+검수 `title`/`createdAt`, 카드 `approvedAt`/`firstUsedAt`/`lastUsedAt`/`hasStartedDelivery`/`totalViews`/`uniqueViewers`는 서버 응답 보완이 필요합니다. 이전 배포 서버에서는 접수 시각을 추정하지 않고 ‘미제공’으로 표시하며 조회수는 기존 analytics API에서 ID로 찾아 보완합니다. 서버 변경은 별도 PR이며 이 앱 변경만으로 서버가 배포되지는 않습니다.
+
+외부 Wikimedia Commons PNG/JPEG/WebP 원본은 [표준 썸네일 크기](https://www.mediawiki.org/wiki/Common_thumbnail_sizes)를 사용합니다. 이미 캐시된 원본은 재사용하며 썸네일이 없거나 이미지로 해석되지 않으면 원본으로 돌아갑니다. 다른 도메인·서명 쿼리·SVG URL은 임의로 변환하지 않고 확대는 원본을 유지합니다. 404 같은 실패 응답이나 HTML 응답이 캐시되면 다음 재시도는 캐시를 건너뛰고 재요청합니다. 관리자 이미지 영역은 파일 없음·접근 거부·형식 오류를 구분해 표시하며 URL/출처/저장 데이터는 수정하지 않습니다.
+
+검증 자료는 `.local/admin-workflow/`에만 보관합니다. 서버 검수/발송/계정/편집 관련 테스트 24개, 격리 HTTP 관리자 UI 4개(검수→승인→숨김/복원, 상태별 목록·조회수, READY 공개 제한, ADMIN↔USER 탭 갱신), 이미지 로더 동시 요청·다운샘플링·캐시·오류 재시도·썸네일 원본 대체 테스트를 수행합니다. 배포 서버의 검수 #14에서 외부 이미지 4개가 실제 표시됨을 확인했고, 별도 새 로더 측정은 약 0.15~0.91초였습니다. 이 측정은 특정 이미지·네트워크의 결과이며 모든 링크의 가용성이나 전체 화면 로딩 속도를 보장하지 않습니다. 원본 서버가 삭제/차단한 파일 자체는 앱에서 복구할 수 없습니다.
+Debug 시뮬레이터와 Release iOS 빌드(서명 제외)를 통과했습니다. 두 빌드의 API 주소는 `https://aiknow.kro.kr`이며, 이번 변경의 TestFlight 업로드·실기기 검증은 수행하지 않았습니다. 서버 메타데이터 변경은 [PR #31](https://github.com/Kangila404/ai-know/pull/31) 배포 후 사용할 수 있습니다.
+
+## 2026-10-23 프로필 직접 변경·카드 전체 높이 배치
+
+마이 화면의 프로필 이미지를 누르면 선택 시트가 열리고, 이미지를 선택하면 프로필 API만 호출하여 바로 저장합니다. 닉네임을 누르면 키보드가 열린 입력 시트에서 이름만 수정·저장합니다. 별도 ‘프로필 편집’ 메뉴를 제거했으며, 저장 오류는 해당 시트에서 표시하고 저장 중 중복 입력/닫기를 막습니다.
+
+카드 상세는 고정 4:3 이미지와 내용 높이만큼의 카드 대신, 실제 페이지 높이에서 본문 높이를 제외한 공간을 이미지에 배정합니다. 이미지 좌우의 중복 여백을 없애고 본문 글자를 키웠습니다. 이미지는 비율을 유지해 전체를 표시하며, 긴 본문은 이미지 최소 높이를 유지한 채 세로 스크롤로 끝까지 읽습니다. 페이지 표시·출처 시트·확대는 유지합니다.
+
+검증: 격리 HTTP UI 테스트에서 닉네임 PATCH와 프로필 PATCH가 각각 한 번씩만 호출되고, 프로필 선택이 재진입 후 유지되는 것을 확인했습니다. 짧은 카드의 본문이 페이지 하단까지 배치되고 긴 본문의 끝까지 스크롤되는 검사도 통과했습니다. 운영 로그인 상태에서 라이트·다크 카드 배치, 닉네임 시트 취소, 프로필 선택 시트와 관리자 탭을 확인했습니다. Debug와 Release iOS 빌드(서명 제외)는 통과했으며 API 주소는 `https://aiknow.kro.kr`입니다. 이 변경의 실기기 실행과 TestFlight 업로드는 수행하지 않았습니다. 캡처·로그는 `.local/direct-profile-layout/`에 보관합니다.
+
+## 2026-10-23 읽기·프로필·알림 화면 정리 (TestFlight 미업로드)
+
+- 카드의 다음/완료 버튼을 제거했습니다. 좌우 스와이프 또는 VoiceOver 페이지 조절로 이동하고, 마지막 카드를 2초 동안 보면 읽음 API를 호출합니다. 출처·생성 크레딧·참고 링크는 상단 정보 버튼의 시트에서 확인합니다.
+- 화면 모드 선택을 제거하고 iPhone 시스템 설정을 따릅니다. 프로필 편집은 루미·모리·노바·오르비·피코 5종 선택 그리드이며, 변경된 닉네임/프로필만 저장한 뒤 편집 화면을 닫습니다.
+- 알림 토글과 시간은 250ms 동안 변경을 모아 순서대로 자동 저장합니다. 실패하면 마지막 저장값으로 되돌리고 오류를 표시합니다. 화면을 떠나도 진행 중인 저장을 마칩니다. 저장/등록 재시도/권한 요청 버튼과 개발용 토큰 표시는 제거했습니다. 처음 알림을 켤 때 OS 권한을 요청하고, 이미 차단한 경우에만 iPhone 설정으로 안내합니다.
+- 기본 프로필 5종은 운영 관리자 API로 중복 없이 등록했습니다. 새 앱은 동일 PNG를 번들에서 즉시 표시합니다. 기존 앱/웹에서 새 프로필 URL을 읽으려면 서버의 정적 리소스와 V9 마이그레이션을 배포해야 합니다. V9는 기존 등록 항목을 덮어쓰지 않습니다.
+- 서버 개선안은 원본 PNG를 보존하면서 320/1280px JPEG와 32MiB 메모리 캐시를 제공합니다. API가 `?preview=1280`을 반환한 경우에만 새 앱이 목록용 320px·본문용 1280px·확대용 원본으로 나눠 요청합니다. 아직 해당 API를 배포하지 않은 서버에서는 기존 URL을 그대로 사용합니다.
+- 실제 운영 원본 3,028,143바이트는 첫 바이트 0.93초, 전체 다운로드 3.21초였습니다. 같은 파일의 로컬 서버 변환 결과는 320px 39,223바이트, 1280px 373,748바이트, 최초 변환 약 0.33초였습니다. 운영 서버 배포 후의 전송/화면 표시 시간은 아직 측정하지 않았습니다.
+
+검증: 운영 로그인 상태의 iPhone 16e/iOS 26.3에서 시스템 라이트·다크 전환, 실제 카드 스와이프·출처 시트·프로필 5종·간소화된 알림 화면과 ADMIN 탭을 확인했습니다. iPhone SE 3세대/iOS 18의 격리 HTTP UI 테스트에서 스와이프·출처 열기·읽음·좋아요·프로필/닉네임·알림 자동 저장 등 12개 API 요청 항목을 확인했습니다. 알림 저장 모델과 이미지 로더 회귀 테스트도 통과했습니다. 서버 이미지/모바일 콘텐츠/프로필 권한 테스트 및 실제 로컬 MySQL 8.4 마이그레이션 6개 테스트를 통과했습니다. Debug 시뮬레이터와 Release iOS 빌드(서명 제외)를 통과했으며 두 빌드의 API 주소는 `https://aiknow.kro.kr`입니다. 실기기 푸시 수신과 새 버전 TestFlight 업로드는 이번 변경에서 수행하지 않았습니다.
+
+알림 저장 모델 검증: `xcrun swiftc -parse-as-library ios/AiKnow/AiKnow/Services/APIClient.swift ios/AiKnow/AiKnow/Services/NotificationPreferences.swift ios/tests/NotificationPreferencesProbe.swift -o /tmp/aiknow-notification-probe && /tmp/aiknow-notification-probe`. 빠른 연속 변경, 순차 저장, 실패 복구, 화면 해제 후 저장 완료를 검사합니다. 기본 프로필 PNG는 저장소 루트에서 `xcrun swift ios/scripts/generate_avatars.swift`로 재생성합니다.
+
+## 2026-10-23 운영 이미지·레이아웃 점검 (TestFlight 6 이후 수정)
+
+- 운영 서버 `https://aiknow.kro.kr`에 실제 로그인한 iPhone 16e / iOS 26.3 시뮬레이터에서 아카이브의 `[AI 이론] LLM은 어떻게 문장을 이어갈까?` 게시물과 슬라이드 5장을 확인했습니다. 이미지 로딩 전 영역이 줄어드는 현상, 페이지 표시와 출처의 겹침, 투명 도식의 다크 모드 가독성을 수정했습니다.
+- 이미지 영역은 로딩 전후 같은 크기를 유지하며 전체 이미지를 맞춰 표시합니다. 상세에서는 하단 탭을 숨기고 페이지 표시를 스크롤 영역 밖에 배치합니다. 긴 본문·출처는 스크롤로 끝까지 읽을 수 있고, 긴 도식은 확대 버튼 → 핀치 줌으로 확인할 수 있습니다.
+- `ImageLoader`는 공개 이미지용 HTTP 캐시, 크기별 디코딩 캐시, 동시 요청 공유, 백그라운드 다운샘플링을 사용합니다. 현재 이미지가 준비되면 다음 한 장만 미리 읽습니다. API 세션·권한 조회의 캐시 정책은 변경하지 않았습니다. 프로필/목록은 작은 크기로, 확대 화면은 최대 원본 4096px로 읽습니다.
+- 앱 측정값: 표지 1,186,889바이트의 최초 읽기 약 2.18초, 같은 원본의 캐시 읽기 약 0.0019초. 본문 이미지 중 하나는 3,028,143바이트였습니다. 이 값은 해당 네트워크에서의 이미지 데이터 읽기 시간이며, 전체 화면 표시 시간이나 모든 기기의 성능 보장이 아닙니다. 서버 원본 크기를 줄이는 썸네일 API/CDN 배포는 이번 변경에 포함하지 않았습니다.
+- 검증: 실제 게시물의 5장 이동·스크롤·재진입, 관리자 탭 복귀, 라이트/다크 확대 화면과 3배 핀치 줌. 격리 이미지 테스트에서 20개 동시 요청 공유, 크기별 다운샘플링, 원본 보존, HTTP/디코딩 캐시, 실패 후 재시도, 잘못된 이미지 처리를 확인했습니다. 운영 좋아요·읽음·편집 요청은 보내지 않았지만 상세 열기에 따른 서버 조회수 집계는 발생합니다.
+- 빌드: Debug 시뮬레이터 테스트와 Release iOS 빌드(`CODE_SIGNING_ALLOWED=NO`)를 통과했습니다. 이번 수정본의 배포 서명·아카이브 검증은 수행하지 않았습니다.
+- 실기기·다른 화면 크기의 시각 검증과 이 수정본의 TestFlight 업로드는 아직 진행하지 않았습니다. TestFlight 최신 업로드는 아래 기록의 `1.0 (6)`입니다.
+
+이미지 테스트는 `python3 ios/tests/test_image_loader.py --device <booted-simulator-UDID>`로 실행합니다. 운영 화면 자동 점검은 실제 로그인된 시뮬레이터에서만 사용합니다. 빈 임시 디렉터리를 `python3 -m http.server 18089 --bind 127.0.0.1 --directory <empty-directory>`로 열어 명시적으로 활성화한 뒤 `AiKnowUITests/ProductionLayoutInspectionTests`를 선택합니다. 기본 API 주소를 변경하지 않으며, 상세 열기는 운영 조회수에 반영됩니다. 점검 후 이 로컬 서버를 종료합니다. 스크린샷·측정 로그는 `.local/production-media-inspection/`에만 보관하고 커밋하지 않습니다.
+
 ## 실행
 
 1. 로컬 Firebase 설정 파일을 `AiKnow/AiKnow.xcodeproj/GoogleService-Info.plist`에 둡니다. Firebase의 iOS 앱 Bundle ID는 `org.aiknow.AiKnow`여야 합니다. 이 파일은 Git에서 제외됩니다.
 2. Xcode에서 `AiKnow/AiKnow.xcodeproj`를 엽니다. Swift Package Manager가 FirebaseMessaging, GoogleSignIn 9.2.0, KakaoSDKUser 2.29.0과 관련 의존성을 내려받습니다. Package.resolved는 저장소에 포함해 SDK 버전을 고정합니다.
 3. Signing & Capabilities의 Team은 `SS32PHC392`, Bundle ID는 `org.aiknow.AiKnow`로 설정되어 있습니다. Sign in with Apple, Push Notifications, Background Modes / Remote notifications가 프로젝트에 설정되어 있습니다. Xcode에 해당 Team 계정이 로그인되어 있어야 하며, 두 capability가 포함된 앱 전용 provisioning profile을 사용해야 합니다.
-4. iPhone을 실행 대상으로 선택하고 실행합니다. 앱 진입 시 또는 마이 → 알림 설정에서 알림 권한을 허용합니다.
+4. iPhone을 실행 대상으로 선택하고 실행합니다. 마이 → 알림 설정에서 매일 카드 알림을 켜고 OS 알림 권한을 허용합니다.
 
 ## 푸시 테스트
 
 - Firebase Console → 프로젝트 설정 → Cloud Messaging → iOS 앱에 APNs 인증 키(.p8), Key ID, Team ID를 등록합니다. Apple Developer App ID에서도 Push Notifications가 활성화되어 있어야 합니다.
-- Debug 앱의 마이 → 알림 설정 → FCM 테스트 토큰 복사를 누릅니다.
-- Firebase Console의 Messaging 테스트 메시지 수신자에 토큰을 붙여 넣어 전송합니다. 전경에서는 배너·소리로 표시되고, 배경에서는 iOS가 알림을 표시합니다. 알림을 누르면 앱이 열리며 최근 연 알림 제목을 알림 설정에서 확인할 수 있습니다.
+- 실제 로그인한 기기에서 매일 카드 알림을 켭니다. FCM 토큰은 인증된 세션으로 `/api/v1/device-tokens`에 자동 등록됩니다.
+- 서버의 승인된 발송 경로 또는 Firebase Console에서 테스트 메시지를 보냅니다. 토큰은 사용자 설정 화면에 노출하지 않습니다. 전경에서는 배너·소리로 표시되고, 배경에서는 iOS가 알림을 표시합니다. `cardNewsId`가 있으면 알림을 눌러 해당 카드를 엽니다.
 - 실제 기기의 수신 여부로 최종 검증합니다. 서명 없이 수행한 Simulator 빌드는 APNs 전달 검증을 대신하지 않습니다.
 
 ## 서버 토큰 등록
@@ -204,9 +252,9 @@ Production 재시험에서는 연결된 실제 iPhone의 새 IOS 기기 등록�
 로그인 화면은 `GET /api/v1/auth/social/providers`가 반환한 제공자만 표시합니다. 서버가 연결되지 않으면 연결 안내와 재시도를 표시하고, 활성화된 제공자가 없으면 로그인 준비 상태를 표시합니다. 서버의 `status/code/message` 오류 응답을 처리하며 입력 검증 메시지는 화면에 전달합니다. 401 세션 만료, 오늘의 카드 404 빈 상태, Security의 403 CSRF 갱신은 기존 동작을 유지하고 업무 규칙의 403은 자동 재시도하지 않습니다. 네트워크/TLS 실패도 별도로 안내합니다.
 
 
-### 개발 미리보기와 관리자 화면 (2026-10-08)
+### 개발 미리보기 도입 기록 (2026-10-08, 2026-10-23 제거)
 
-Debug 로그인 화면의 ‘화면 미리보기’ / ‘관리자 미리보기’로 인증 없이 UI를 확인할 수 있습니다. 상단 배너의 ‘종료’로 로그인 화면으로 돌아갑니다. 변경은 메모리에만 저장되며 앱을 재시작하면 초기화됩니다. 이 경로는 서버 인증 우회가 아니며 미리보기 API는 외부 서버에 요청하지 않습니다. 푸시 등록과 회원탈퇴도 실행하지 않습니다. `DevelopmentPreview.swift`, 진입 버튼 및 전송 분기는 모두 `#if DEBUG` 안에 있고 Release에는 포함되지 않습니다. 마지막 배포 전 임시 코드 삭제 시 이 파일과 `beginPreview`/`endPreview`/`previewRequest` 호출부, 미리보기 UI 테스트를 함께 제거합니다.
+2026-10-08에 UI 확인용 임시 미리보기를 도입했으나, 2026-10-23에 사용자 요청으로 진입 버튼·실행 인자·가짜 데이터·API 대체 코드·해당 UI 테스트를 삭제했습니다. 아래 검증 기록은 당시 상태이며 현재는 Xcode에서도 실제 로그인과 서버 계정 권한을 사용합니다.
 
 실제 로그인은 `/api/v1/users`의 `userRole == ADMIN`일 때 네 번째 관리자 탭을 표시합니다. 모든 관리자 요청은 기존 세션/CSRF를 사용하며 서버의 ADMIN 권한 검사를 거칩니다.
 
@@ -221,9 +269,9 @@ Debug 로그인 화면의 ‘화면 미리보기’ / ‘관리자 미리보기�
 
 편집/복구는 서버 버전과 사유를 전달합니다. 충돌 응답이 오면 다시 조회해야 합니다. 승인/반려는 서버에 저장된 초안에 적용하므로 먼저 수정 저장을 완료합니다. READY 카드의 숨김/복원은 서버 규칙대로 막습니다.
 
-사용자 관리 API(전체 사용자 조회, 권한 변경, 정지)는 현재 서버에 없어서 준비 중으로 표시합니다. 프로필 이미지 URL은 현재 서버가 20자로 제한하므로 해당 제한을 안내하고 준수합니다. `/internal/v1/...` 수집·생성 예약·이미지 업로드는 n8n/서버 전용 인증을 사용하는 내부 API이며 앱에 내부 키를 넣거나 직접 노출하지 않습니다. 앱의 이미지 복구는 ADMIN 인증이 적용된 `/api/v1/admin/generations/{id}/recover-image`를 사용합니다.
+당시 사용자 관리 API는 없어 준비 중으로 표시했으며, 2026-10-23 최신 main의 계정 관리 API와 화면을 반영했습니다. 프로필 이미지 URL은 현재 서버가 20자로 제한하므로 해당 제한을 안내하고 준수합니다. `/internal/v1/...` 수집·생성 예약·이미지 업로드는 n8n/서버 전용 인증을 사용하는 내부 API이며 앱에 내부 키를 넣거나 직접 노출하지 않습니다. 앱의 이미지 복구는 ADMIN 인증이 적용된 `/api/v1/admin/generations/{id}/recover-image`를 사용합니다.
 
-마이 → 프로필 편집에서 닉네임과 서버에 등록된 프로필 이미지를 변경할 수 있습니다. 마이 → 화면 모드에서 시스템/라이트/다크를 선택합니다. 카드·입력창·본문·관리자 Form은 시스템 배경/텍스트 색상으로 전환됩니다.
+마이 → 프로필 편집에서 닉네임과 서버에 등록된 프로필 이미지를 변경할 수 있습니다. 밝은/어두운 화면은 iPhone 시스템 설정을 따릅니다. 카드·입력창·본문·관리자 Form은 시스템 배경/텍스트 색상으로 전환됩니다.
 
 이번 변경의 검증 범위:
 - Debug Simulator 빌드 성공. `PreviewAdminTests`의 일반 사용자(관리자 탭 미노출·프로필/닉네임 저장·미리보기 종료), 관리자 검수(수정·승인·이력), 공지 생성/목록 반영·생성 응답 복구 시나리오 통과. 공지/복구 테스트에서 발견한 상단 버튼 터치 영역 겹침과 키보드 접근 문제를 수정 후 재검증했습니다.
@@ -248,16 +296,16 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 - 뉴스 검수의 반려 사유·검수 시각·검수자·게시 상태를 표시하고 승인된 카드 관리로 이동할 수 있습니다. 콘텐츠 미리보기와 서버 제한에 맞춘 입력 오류 안내를 제공합니다.
 - 생성 기록에는 응답 대기/저장/복구 상태와 원본 응답·복구 응답·이미지 선택 참고 자료를 표시합니다. 내부 유료 생성 실행은 제공하지 않습니다.
 - 편집 화면의 ‘입력 완료’로 키보드를 닫고 저장·검수 작업을 계속할 수 있습니다.
-- 사용자 전체 목록/정지/권한 변경은 현재 서버에 API가 없어 준비 중입니다. 프로필 이미지는 서버에서 등록한 항목을 선택하는 방식이며 관리자 이미지 주소의 20자 제한을 유지합니다.
+- 사용자 전체 목록/정지/권한 변경은 최신 main의 `/api/v1/admin/users` API와 연결합니다. 프로필 이미지는 서버에서 등록한 항목을 선택하는 방식이며 관리자 이미지 주소의 20자 제한을 유지합니다.
 
 관리자 API UI 검증은 `python3 ios/tests/test_admin_ui.py --device <UDID>`로 실행합니다. 별도 HTTP 서버에서 세션 쿠키·CSRF·ADMIN 역할·버전·변경 사유·요청 본문을 검사하며 검수, 카드 공개 상태, 공지/프로필 CRUD, 생성 복구와 탭 권한 갱신을 조작합니다. 실제 운영 계정·콘텐츠는 변경하지 않습니다. `--only <test method>`로 특정 시나리오만 재실행할 수 있습니다. 기존 일반 사용자 흐름은 `test_content_ui.py`로 검증합니다. 테스트 후 일반 Xcode 빌드로 테스트용 API 주소를 복원해야 합니다.
 
 
-소셜 로그인 버튼은 SF Symbols 대체 아이콘을 제거하고 공식 리소스를 사용합니다. 이미지는 원본의 색상·비율을 유지하며 Google은 라이트/다크 리소스를 전환합니다. Google·카카오의 접근성 레이블은 한국어이며 Apple 버튼은 시스템의 현지화 레이블을 사용합니다.
+소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Google/카카오는 ‘Google 로그인 / 카카오 로그인’ 문구, 54pt 높이, 16pt Medium 글꼴, 20pt 심볼, 12pt 간격을 공유합니다. Google은 라이트/다크 색상을 전환합니다.
 
-- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 ZIP](https://developers.google.com/static/identity/images/signin-assets.zip)에서 iOS/PNG @4x/{Light,Dark}/`Theme=…, Show text=Yes, Shape=Square, Platform=iOS@4x.png`를 그대로 사용합니다. 버튼에 포함된 영문 문구와 서체도 원본입니다. 공식 SVG의 마스크/필터가 iOS 에셋 렌더러에서 깨지는 것을 확인해 제공된 최고 해상도 PNG를 사용합니다.
-- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)를 그대로 사용합니다.
-- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)을 사용합니다. 버튼 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
+- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 두 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
+- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)에서 말풍선 심볼 path를 분리했습니다. 심볼의 형태·비율·색상은 유지합니다.
+- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)의 로그인 타입을 사용합니다. 버튼 높이는 54pt이며 문구/서체는 Apple이 제공합니다. 한국어 지원 언어를 선언해 한국어 기기에서 시스템 로그인 문구도 현지화됩니다. 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
 
 `python3 ios/tests/test_login_ui.py --device <UDID>`는 세 제공자를 반환하는 별도 HTTP fixture에서 밝은/어두운 로그인 화면을 캡처하고 각 버튼이 해당 제공자의 challenge API와 CSRF 처리로 연결되는지 검사합니다. 실제 Google·카카오·Apple 계정 로그인 성공을 대신하는 검증은 아닙니다. 운영 로그인 버튼 노출은 서버의 `/api/v1/auth/social/providers` 응답을 따릅니다.
 
@@ -272,3 +320,57 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 14:58 KST에 Xcode가 `Upload succeeded`, `Uploaded package is processing`, `EXPORT SUCCEEDED`를 반환했고 전송 메타데이터의 버전 3을 확인했습니다. 배포 코드 커밋은 `94bfdcc`이며 [PR #25](https://github.com/Kangila404/ai-know/pull/25)에서 검토할 수 있습니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
 
 App Store 배포용 IPA의 코드 서명과 provisioning profile에서 Bundle ID `org.aiknow.AiKnow`, Team `SS32PHC392`, Production APNs, Sign in with Apple, 디버깅 비활성화를 확인했습니다. 최종 실행 파일에 개발 미리보기 진입 인자·타입·표시 문자열이 없고 API 주소가 `https://aiknow.kro.kr`인 것도 확인했습니다. 아카이브·검증 IPA·업로드 로그는 `.local/testflight/2026-10-23-build-3/`에 보관합니다.
+
+
+### Xcode에서도 실제 로그인과 서버 관리자 권한 사용
+
+Xcode Debug와 TestFlight 모두 실제 소셜 로그인/서버 세션을 사용합니다. 개발 미리보기 버튼, 실행 인자, 가짜 사용자/콘텐츠 데이터 및 API 응답 대체 코드를 제거했습니다. 기존 `--preview-admin`/`--preview-user` 인자를 넣어도 로그인 화면을 우회하지 않습니다.
+
+- `/api/v1/users`의 `userRole == ADMIN`일 때만 관리자 탭이 맨 오른쪽에 표시됩니다. Xcode로 실행했다는 이유로 관리자 권한을 부여하지 않습니다.
+- 로그인 후 계정 권한을 바꿨다면 앱을 다시 활성화하거나 마이 화면을 당겨 새로고침합니다. 최신 서버는 기존 세션도 매 요청마다 계정 권한과 정지 여부를 확인하며, 정지된 계정은 세션을 종료합니다.
+- 현재 최신 iOS 코드는 `develop` 기준입니다. 다른 Mac에서는 실행 브랜치/커밋과 API 주소를 확인합니다.
+- `test_login_ui.py`는 라이트/다크 버튼과 인증 challenge 연결, 이전 미리보기 인자로도 로그인 우회가 되지 않는지 검사합니다. `test_admin_ui.py`는 별도 HTTP fixture의 ADMIN↔USER 응답에 따라 탭이 갱신되는지 검사합니다. 테스트용 HTTP 서버는 앱 배포물에 포함되지 않습니다.
+
+미리보기 삭제 후 검증: 인증/세션/CSRF/multipart APIClient 회귀 테스트, 라이트/다크 로그인 화면과 기존 인자를 통한 우회 차단 3개 UI 테스트, HTTP ADMIN→USER→ADMIN 응답에 따른 탭 갱신 테스트를 통과했습니다. 실제 다른 사용자의 운영 계정 권한은 조회하거나 변경하지 않았습니다.
+
+
+### 2026-10-23 TestFlight 업로드 — 1.0 (4)
+
+개발 미리보기 제거와 소셜 로그인 버튼 통일을 포함한 버전 1.0 빌드 4를 업로드했습니다. 15:27 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했으며 업로드 메타데이터의 빌드 번호도 4로 확인했습니다. Apple의 업로드 수락까지 확인했으며 처리 완료·테스트 그룹 배정·테스터 설치는 아직 확인하지 않았습니다.
+
+Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니다. 최종 일반 Debug 빌드와 Release 아카이브의 API 주소는 `https://aiknow.kro.kr`입니다. App Store 배포 IPA의 코드 서명, Bundle ID/Team, Production APNs, Sign in with Apple 및 디버깅 비활성화를 검증했습니다. 최종 실행 파일에 개발 미리보기 코드/진입 인자가 없는 것도 확인했습니다. 실제 다른 사용자의 계정 권한과 이번 빌드의 실기기 로그인·푸시는 아직 검증하지 않았습니다.
+
+아카이브와 업로드 로그는 로컬 `.local/testflight/2026-10-23-build-4/`에, 최종 로그인 라이트/다크 화면은 `.local/login-no-preview-evidence/final-{light,dark}.png`에 보관합니다.
+
+
+### 2026-10-23 최신 main API 반영 — 1.0 (5)
+
+`main`의 사용자 관리·조회수 집계 API와 iOS 화면을 기존 로그인/실제 ADMIN 권한 흐름에 통합했습니다. 관리자 탭의 ‘계정 목록·권한 관리’에서 검색, 권한/정지 필터, 페이지 조회, 계정 상세, 권한·정지 변경 및 USER 변경 이력을 제공합니다. 변경 시 조회한 version과 사유를 전송하며 409 충돌 후에는 ‘계정 다시 조회’로 최신 상태를 받은 뒤 다시 검토합니다. 본인의 권한 해제와 정지를 막고 키보드를 닫는 버튼을 제공합니다.
+
+‘조회수·운영 현황’은 전체 계정/정지 계정/발송 대기·게시 카드 수와 전체 조회수·고유 조회자를 표시합니다. 카드 제목 검색과 페이지 조회, 관리자 카드 상세 이동을 지원합니다. 일반 카드 상세의 GET 요청으로 서버가 조회수를 집계하므로 별도 중복 집계 요청은 보내지 않습니다. API 요청은 로컬 응답 캐시를 우회해 서버에서 권한과 카드 열람을 확인합니다.
+
+서버 배포에 V6/V7 DB 마이그레이션이 포함되어야 새 기능이 동작합니다. TestFlight 업로드만으로 운영 서버를 배포하지는 않습니다. API 계약은 `server/docs/admin-operations.md`를 참조합니다.
+
+검증 결과:
+- 서버 `AdminOperationsTests` 5개 통과: 관리자 접근 제어, 권한/정지 변경·기존 세션 반영, 변경 이력, 조회수 집계. 최신 main `d8ec119`의 Server CI 및 EC2 publish/deploy 작업도 성공한 것을 확인했습니다.
+- 신규 사용자 관리·조회수 HTTP UI 시나리오 2개 통과: 검색/필터/페이지, 자기 계정 보호, 409 충돌 후 재조회와 최신 version 저장, 권한·정지 변경·USER 이력, 운영 통계와 카드 상세 이동. 요청의 세션 쿠키·CSRF·본문도 검사했습니다.
+- 검수/게시 변경, ADMIN↔USER 탭 갱신, publicationDate가 null인 READY 카드 편집·공개 상태 변경 차단의 UI 시나리오 3개 통과.
+- 일반 사용자 HTTP UI의 12개 요청 항목(카드 상세 열람, 검색/필터, 좋아요/읽음, 공지, 닉네임/프로필, 알림/온보딩) 통과.
+- 라이트/다크 로그인과 미리보기 인자 우회 차단 3개 UI 테스트, 세 제공자 challenge 경로와 APIClient 인증/세션/CSRF/multipart 회귀 테스트 통과.
+- 운영 HTTPS health-check와 로그인 제공자 응답은 정상입니다. 인증된 운영 관리자 API의 실제 데이터 변경, 이번 빌드의 실기기 소셜 로그인·푸시 수신은 재검증하지 않았습니다.
+
+새 관리자 화면 캡처는 로컬 `.local/build5-admin-evidence/`에 보관합니다. UI 검증 데이터는 별도 HTTP fixture이며 앱에는 포함되지 않습니다.
+
+
+### 2026-10-23 AI 이론 승인 정책 반영 — 1.0 (6)
+
+빌드 5 업로드 직후 추가된 최신 main `de1868b`(PR #29)를 통합했습니다. AI 이론은 승인 즉시 아카이브에 공개되고, 뉴스는 최초 발송 전까지 READY 상태로 유지됩니다. 앱 검수 화면의 승인 안내를 선택한 콘텐츠 유형에 따라 표시합니다. 요청/응답 경로와 형식은 동일하며 서버가 반환한 게시 상태를 따릅니다. 기존 발송 대기 AI 이론은 V8 마이그레이션이 처리합니다.
+
+빌드 5는 16:05 KST 업로드 수락/처리 시작을 확인했으며, 이 정책 안내까지 반영한 빌드 6을 후속 배포합니다.
+
+추가 검증: `NewsIngestionTests` 9개와 AI 이론 선택→승인→게시 카드 관리, READY 뉴스 공개 변경 차단 UI 시나리오 2개를 통과했습니다. 최신 main `de1868b`의 Server CI와 EC2 배포 성공도 확인했습니다. 빌드 5에서 검증한 사용자 관리·조회수·로그인·일반 사용자 흐름의 구현은 유지합니다.
+
+
+빌드 6 배포 결과: 2026-10-23 16:14 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했고 전송 메타데이터의 빌드 번호 6을 확인했습니다. 앱 코드 기준은 `efbc734`이며 최신 main `de1868b`(PR #29)를 포함합니다. Debug/Release 빌드, App Store IPA 서명과 Production APNs/Sign in with Apple, 운영 HTTPS 주소 검증을 통과했습니다. 시뮬레이터도 운영 API를 사용하는 빌드 6으로 복원했습니다.
+
+아카이브·서명 검증·업로드 로그는 로컬 `.local/testflight/2026-10-23-build-6/`에 보관합니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치와 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 확인하지 않았습니다. 빌드 5 구현 커밋 `32cda6d`의 GitHub Server CI/iOS build도 통과했으며, 후속 커밋의 자동 검사는 별도로 실행됩니다.

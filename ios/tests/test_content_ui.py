@@ -16,9 +16,10 @@ state = {"nickname": "연결 테스트", "onboardingCompleted": False, "userId":
 card = {"id": 9001, "title": "API 연결 검증 카드", "keyPoints": ["서버에서 받은 핵심 내용"],
         "publicationDate": "2026-10-07", "categories": [{"id": 1, "name": "기술"}], "liked": False, "read": False}
 notice = {"id": 1, "title": "API 공지", "content": "서버에서 받은 공지 본문", "publishedAt": "2026-10-07T00:00:00Z"}
-profiles = [{"id": 1, "name": "테스트 프로필", "imgUrl": ""}]
+profiles = [{"id": i + 1, "name": n, "imgUrl": f"/avatars/{k}-v1.png"} for i, (k,n) in enumerate([("lumi","루미"),("mori","모리"),("nova","노바"),("orbi","오르비"),("pico","피코")])]
 settings = {"settingTime": "09:00:00", "isAllowed": False}
 checks = set()
+writes = {"nickname": 0, "profile": 0}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -38,11 +39,17 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/users/onboarding" and method == "PATCH":
             state["onboardingCompleted"] = True; value = state; checks.add("onboarding")
         elif path == "/api/v1/users/nickname" and method == "PATCH":
+            assert state["profile"] is None, "Nickname edit must not change the avatar"
+            writes["nickname"] += 1
             state["nickname"] = body["nickname"]; checks.add("nickname")
         elif path == "/api/v1/users/profile/1" and method == "PATCH":
+            assert state["nickname"] == "연결 테스트 수정"
+            writes["profile"] += 1
             state["profile"] = profiles[0]; checks.add("profile")
         elif path == "/api/v1/profile": value = profiles
-        elif path in ("/api/v1/cardNews/today", "/api/v1/cardNews/9001"): value = card
+        elif path in ("/api/v1/cardNews/today", "/api/v1/cardNews/9001"):
+            value = card
+            if path.endswith("/9001"): checks.add("card-open")
         elif path == "/api/v1/cardNews/categories": value = card["categories"]
         elif path == "/api/v1/cardNews":
             value = [card]
@@ -54,7 +61,7 @@ class Handler(BaseHTTPRequestHandler):
                 value = [card] if card["liked"] else []; checks.add("liked-filter")
         elif path == "/api/v1/cardNews/cardSlides":
             assert query.get("cardNewsId") == ["9001"]
-            value = [{"id": 1, "title": "서버 슬라이드", "content": "API에서 받은 카드 본문", "sequence": 1}]
+            value = [{"id": i + 1, "title": title, "content": "API에서 받은 카드 본문" if i < 2 else ("긴 본문도 잘리지 않고 스크롤로 읽을 수 있어야 합니다.\n" * 12 + "본문 마지막 문장"), "sequence": i + 1, "imgUrl": "/avatars/lumi-v1.png", "imageCredit": "AI 생성 검증 이미지" if i == 0 else None} for i, title in enumerate(["서버 슬라이드", "두 번째 슬라이드", "마지막 슬라이드"])]
             checks.add("slides")
         elif path == "/api/v1/cardNews/9001/like" and method == "PATCH":
             card["liked"] = body["liked"]; value = {"liked": card["liked"]}; checks.add("like")
@@ -89,8 +96,9 @@ if __name__ == "__main__":
                 "-configuration", "Debug", "-destination", f"platform=iOS Simulator,id={args.device}", "-jobs", "2",
                 "-only-testing:AiKnowUITests/ContentConnectionTests", "AIKNOW_API_BASE_URL=http://localhost:18081",
                 "ONLY_ACTIVE_ARCH=YES", "test"], cwd=root, stdout=log, stderr=subprocess.STDOUT)
-        expected = {"onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings"}
+        expected = {"card-open", "onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings"}
         print("UI test exit:", result.returncode, "Verified:", ", ".join(sorted(checks)), "Missing:", ", ".join(sorted(expected - checks)))
         assert result.returncode == 0 and checks >= expected
+        assert writes == {"nickname": 1, "profile": 1}, writes
     finally:
         server.shutdown()

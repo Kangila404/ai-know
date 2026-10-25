@@ -47,15 +47,20 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", 18083), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        with open("/tmp/aiknow-login-ui.log", "w") as log:
-            result = subprocess.run([
-                "xcodebuild", "-project", "ios/AiKnow/AiKnow.xcodeproj", "-scheme", "AiKnowUITests",
-                "-configuration", "Debug", "-destination", f"platform=iOS Simulator,id={args.device}", "-jobs", "2",
-                "-only-testing:AiKnowUITests/LoginBrandingTests", "AIKNOW_API_BASE_URL=http://localhost:18083",
-                "ONLY_ACTIVE_ARCH=YES", "test"
-            ], cwd=Path(__file__).resolve().parents[2], stdout=log, stderr=subprocess.STDOUT)
+        results = []
+        for mode in ("light", "dark"):
+            subprocess.run(["xcrun", "simctl", "ui", args.device, "appearance", mode], check=True)
+            with open(f"/tmp/aiknow-login-ui-{mode}.log", "w") as log:
+                tests = [f"-only-testing:AiKnowUITests/LoginBrandingTests/test{mode.title()}"]
+                if mode == "dark": tests.append("-only-testing:AiKnowUITests/LoginBrandingTests/testLegacyPreviewArgumentsCannotBypassLogin")
+                result = subprocess.run([
+                    "xcodebuild", "-project", "ios/AiKnow/AiKnow.xcodeproj", "-scheme", "AiKnowUITests",
+                    "-configuration", "Debug", "-destination", f"platform=iOS Simulator,id={args.device}", "-jobs", "2",
+                    *tests, "AIKNOW_API_BASE_URL=http://localhost:18083", "ONLY_ACTIVE_ARCH=YES", "test"
+                ], cwd=Path(__file__).resolve().parents[2], stdout=log, stderr=subprocess.STDOUT)
+                results.append(result.returncode)
         expected = {f"/api/v1/auth/social/{provider}/challenge" for provider in ["GOOGLE", "KAKAO", "APPLE"]}
-        print("UI exit:", result.returncode, "Button routes:", sorted(challenges), "Missing:", sorted(expected - challenges))
-        assert result.returncode == 0 and challenges == expected
+        print("UI exits:", results, "Button routes:", sorted(challenges), "Missing:", sorted(expected - challenges))
+        assert all(code == 0 for code in results) and challenges == expected
     finally:
         server.shutdown()

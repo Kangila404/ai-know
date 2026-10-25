@@ -45,11 +45,6 @@ struct Notice: Decodable, Identifiable {
     let publishedAt: String?
 }
 struct NoticePage: Decodable { let content: [Notice]; let last: Bool }
-struct NotificationSetting: Codable {
-    var settingTime: String
-    var isAllowed: Bool
-}
-
 enum AppTab: Hashable { case today, archive, profile, admin }
 
 @MainActor @Observable
@@ -156,13 +151,58 @@ struct RequestFailureView: View {
 
 struct RemoteImage: View {
     let raw: String?
+    var aspectRatio: CGFloat = 4 / 3
+    var maxPixelSize = 1_280
+    // Editorial PNGs can contain transparency with black diagram labels/lines.
+    var imageBackground = Color.white
+    @State private var image: UIImage?
+    var showsStatus = false
+    @State private var failure: String?
+    @State private var retry = 0
+
     var body: some View {
-        AsyncImage(url: AuthSession.shared.isPreview ? nil : APIClient.shared.mediaURL(raw)) { phase in
-            if let image = phase.image { image.resizable().scaledToFit() }
-            else {
-                RoundedRectangle(cornerRadius: 16).fill(Color.indigo.opacity(0.1))
-                    .overlay { Image(systemName: "photo").foregroundStyle(.indigo) }
+        let url = APIClient.shared.mediaURL(raw)
+        let bundled = BuiltInAvatar.image(for: raw)
+        // The placeholder and loaded image have the same bounds. An image's intrinsic
+        // size must never determine a ScrollView's width or move the text below it.
+        Color.indigo.opacity(0.06)
+            .aspectRatio(aspectRatio, contentMode: .fit)
+            .overlay {
+                if let image = bundled ?? image {
+                    Image(uiImage: image).resizable().scaledToFit()
+                        .background(imageBackground).accessibilityHidden(true)
+                }
+                else if url == nil { Image(systemName: "photo").foregroundStyle(.secondary).accessibilityLabel("이미지 없음") }
+                else if let failure {
+                    VStack(spacing: 8) {
+                        if showsStatus { Text(failure).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center) }
+                        Button { retry += 1 } label: {
+                            Image(systemName: "arrow.clockwise").frame(minWidth: 44, minHeight: 44)
+                        }.buttonStyle(.plain).accessibilityLabel("이미지 다시 불러오기")
+                    }.padding(8)
+                } else { ProgressView().accessibilityLabel("이미지 불러오는 중") }
             }
-        }
+            .clipped()
+            .task(id: "\(url?.absoluteString ?? "")|\(maxPixelSize)|\(retry)") {
+                image = nil; failure = nil
+                guard bundled == nil, let url else { return }
+                do {
+                    let loaded = try await ImageLoader.shared.image(at: url, maxPixelSize: maxPixelSize)
+                    try Task.checkCancellation()
+                    image = loaded
+                } catch {
+                    if !Task.isCancelled { failure = error.localizedDescription }
+                }
+            }
+    }
+}
+
+/// Versioned paths also work on the web once the static server assets are deployed.
+/// Native clients draw the identical bundled PNG without waiting for the network.
+enum BuiltInAvatar {
+    static let choices = [("lumi", "루미"), ("mori", "모리"), ("nova", "노바"), ("orbi", "오르비"), ("pico", "피코")]
+    static func image(for raw: String?) -> UIImage? {
+        guard let raw, let choice = choices.first(where: { raw == "/avatars/\($0.0)-v1.png" }) else { return nil }
+        return UIImage(named: "Avatar-\(choice.0)")
     }
 }
