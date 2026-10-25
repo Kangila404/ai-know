@@ -32,11 +32,12 @@ public class NewsSubmissionService {
     private final org.aiknow.server.storage.ImageStorage imageStorage;
     private final org.aiknow.server.editorial.EditorialAuditService editorialAudit;
 
-    public record Receipt(Long id, InspectionStatus status, Long cardNewsId) {
-        static Receipt from(NewsSubmission s) { return new Receipt(s.getId(), s.getStatus(), s.getCardNewsId()); }
+    public record Receipt(Long id, InspectionStatus status, Long cardNewsId, String title, java.time.LocalDateTime createdAt) {}
+    private Receipt receipt(NewsSubmission s) {
+        return new Receipt(s.getId(), s.getStatus(), s.getCardNewsId(), read(s).title(), s.getCreatedAt());
     }
     public record Review(Long id, long version, InspectionStatus status, NewsImportRequest draft, Long cardNewsId,
-        Long reviewedBy, java.time.Instant reviewedAt, String reviewNote, PublicationStatus publicationStatus, ContentType contentType) {}
+        Long reviewedBy, java.time.Instant reviewedAt, String reviewNote, PublicationStatus publicationStatus, ContentType contentType, java.time.LocalDateTime createdAt) {}
     public record Approve(@NotNull ContentType contentType, @Size(max = 10) List<@NotNull @Positive Long> categoryIds) {}
     public record Reject(@NotBlank @Size(max = 2000) String reason) {}
 
@@ -49,7 +50,7 @@ public class NewsSubmissionService {
         String payloadHash = hash(payload);
         var existing = submissions.findBySourceHash(sourceHash);
         if (existing.isPresent()) return duplicate(existing.get(), payloadHash);
-        try { return Receipt.from(writer.insert(sourceHash, payloadHash, request.sourceUrl(), payload)); }
+        try { return receipt(writer.insert(sourceHash, payloadHash, request.sourceUrl(), payload)); }
         catch (DataIntegrityViolationException e) {
             return submissions.findBySourceHash(sourceHash).map(s -> duplicate(s, payloadHash)).orElseThrow(() -> e);
         }
@@ -72,12 +73,12 @@ public class NewsSubmissionService {
     private Receipt duplicate(NewsSubmission existing, String hash) {
         if (!existing.getPayloadHash().equals(hash))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "같은 원문 URL의 다른 초안이 이미 존재합니다. submissionId=" + existing.getId());
-        return Receipt.from(existing);
+        return receipt(existing);
     }
 
     @Transactional(readOnly = true)
     public Page<Receipt> list(InspectionStatus status, int page, int size) {
-        return submissions.findByStatusOrderByIdDesc(status, PageRequest.of(page, size)).map(Receipt::from);
+        return submissions.findByStatusOrderByIdDesc(status, PageRequest.of(page, size)).map(this::receipt);
     }
 
     @Transactional(readOnly = true)
@@ -85,13 +86,13 @@ public class NewsSubmissionService {
         var s = submissions.findById(id).orElseThrow(this::notFound);
         var article = s.getCardNewsId() == null ? null : news.findById(s.getCardNewsId()).orElse(null);
         return new Review(s.getId(), s.getVersion(), s.getStatus(), read(s), s.getCardNewsId(), s.getReviewedBy(), s.getReviewedAt(), s.getReviewNote(),
-            article == null ? null : article.getPublicationStatus(), article == null ? null : article.getContentType());
+            article == null ? null : article.getPublicationStatus(), article == null ? null : article.getContentType(), s.getCreatedAt());
     }
 
     @Transactional
     public Receipt approve(Long id, Approve request, String reviewer) {
         var submission = submissions.findForUpdate(id).orElseThrow(this::notFound);
-        if (submission.getStatus() == InspectionStatus.APPROVED) return Receipt.from(submission);
+        if (submission.getStatus() == InspectionStatus.APPROVED) return receipt(submission);
         requirePending(submission);
         var categoryIds = request.categoryIds() == null ? Set.<Long>of() : new LinkedHashSet<>(request.categoryIds());
         var selected = categories.findAllById(categoryIds);
@@ -101,8 +102,8 @@ public class NewsSubmissionService {
             article.publishTheoryForArchive(clock.instant().atZone(deliveryProperties.zone()).toLocalDate());
         news.saveAndFlush(article);
         submission.approve(article.getId(), reviewerId(reviewer), clock.instant());
-        editorialAudit.record("SUBMISSION", id, "APPROVE", reviewer, "관리자 승인", null, Receipt.from(submission));
-        return Receipt.from(submission);
+        editorialAudit.record("SUBMISSION", id, "APPROVE", reviewer, "관리자 승인", null, receipt(submission));
+        return receipt(submission);
     }
 
     @Transactional
@@ -110,8 +111,8 @@ public class NewsSubmissionService {
         var submission = submissions.findForUpdate(id).orElseThrow(this::notFound);
         requirePending(submission);
         submission.reject(request.reason().strip(), reviewerId(reviewer), clock.instant());
-        editorialAudit.record("SUBMISSION", id, "REJECT", reviewer, request.reason(), null, Receipt.from(submission));
-        return Receipt.from(submission);
+        editorialAudit.record("SUBMISSION", id, "REJECT", reviewer, request.reason(), null, receipt(submission));
+        return receipt(submission);
     }
 
     private Long reviewerId(String userId) {
