@@ -20,10 +20,13 @@ public class EditorialService {
     private final NewsSubmissionService reviews;
     private final CardNewsRepository news;
     private final EditorialAuditService audit;
+    private final org.aiknow.server.cardNews.repository.CardViewRepository views;
     public record Edit(@NotNull @PositiveOrZero Long version, @NotBlank @Size(max = 2000) String reason,
         @NotNull @Valid NewsImportRequest draft) {}
     public record Action(@NotNull @PositiveOrZero Long version, @NotBlank @Size(max = 2000) String reason) {}
-    public record Article(long version, PublicationStatus publicationStatus, CardNewsResponse news, List<CardSlideResponse> slides) {}
+    public record Article(long version, PublicationStatus publicationStatus, CardNewsResponse news, List<CardSlideResponse> slides,
+        java.time.Instant approvedAt, java.time.Instant firstUsedAt, java.time.Instant lastUsedAt,
+        boolean hasStartedDelivery, long totalViews, long uniqueViewers) {}
 
     @Transactional
     public NewsSubmissionService.Review editSubmission(Long id, Edit request, String actor) {
@@ -53,7 +56,11 @@ public class EditorialService {
     @Transactional(readOnly = true)
     public Page<Article> listArticles(PublicationStatus status, int page, int size) {
         var pageable = PageRequest.of(page, size, Sort.by("id").descending());
-        return (status == null ? news.findAll(pageable) : news.findByPublicationStatus(status, pageable)).map(this::snapshot);
+        var results = status == null ? news.findAll(pageable) : news.findByPublicationStatus(status, pageable);
+        var counts = results.isEmpty() ? Map.<Long, org.aiknow.server.cardNews.repository.CardViewRepository.Counts>of()
+            : views.counts(results.getContent().stream().map(CardNews::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(org.aiknow.server.cardNews.repository.CardViewRepository.Counts::getCardId, c -> c));
+        return results.map(article -> snapshot(article, counts.get(article.getId())));
     }
 
     @Transactional
@@ -80,8 +87,13 @@ public class EditorialService {
     }
 
     private Article snapshot(CardNews article) {
+        return snapshot(article, views.counts(List.of(article.getId())).stream().findFirst().orElse(null));
+    }
+    private Article snapshot(CardNews article, org.aiknow.server.cardNews.repository.CardViewRepository.Counts count) {
         return new Article(article.getVersion(), article.getPublicationStatus(), CardNewsResponse.from(article),
-            article.getCardSlides().stream().sorted(Comparator.comparing(CardSlide::getSequence)).map(CardSlideResponse::from).toList());
+            article.getCardSlides().stream().sorted(Comparator.comparing(CardSlide::getSequence)).map(CardSlideResponse::from).toList(),
+            article.getApprovedAt(), article.getFirstUsedAt(), article.getLastUsedAt(), article.getFirstUsedAt() != null,
+            count == null ? 0 : count.getTotalViews(), count == null ? 0 : count.getUniqueViewers());
     }
     private void requireVersion(long actual, Long expected) { if (expected == null || actual != expected) throw conflict("다른 변경이 반영되었습니다. 다시 조회하세요."); }
     private void requireSameSource(NewsImportRequest before, NewsImportRequest after) {
