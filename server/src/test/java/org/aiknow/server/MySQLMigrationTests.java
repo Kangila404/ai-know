@@ -37,7 +37,7 @@ class MySQLMigrationTests {
             .baselineOnMigrate(false).cleanDisabled(true);
     }
     @Test void newDatabaseMigratesOnceAndHibernateValidatesAllEntities() {
-        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(8);
+        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(9);
         assertThat(flyway.migrate().migrationsExecuted).isZero(); flyway.validate();
         try (var context = new SpringApplicationBuilder(ServerApplication.class).profiles("test").run(
             "--server.port=0", "--spring.datasource.url=" + url, "--spring.datasource.username=" + user,
@@ -55,7 +55,7 @@ class MySQLMigrationTests {
         }
         assertThatThrownBy(() -> config().load().migrate()).isInstanceOf(FlywayException.class);
         var adopted = config().baselineVersion("1").load(); adopted.baseline();
-        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(7);
+        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(8);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement();
              var rs = s.executeQuery("SELECT nickname FROM users WHERE user_id='migration-fixture'")) {
             assertThat(rs.next()).isTrue(); assertThat(rs.getString(1)).isEqualTo("preserved");
@@ -66,7 +66,7 @@ class MySQLMigrationTests {
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement()) {
             s.execute("INSERT INTO news_generation_record(attempt_key,source_url,task,request_hash,request_json,response_json,created_at,version) VALUES(REPEAT('a',64),'https://example.test/legacy','image_selection',REPEAT('b',64),'{}','{\"original\":true}',NOW(),0)");
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(5);
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
              var r=s.executeQuery("SELECT request_json,response_json,context_json FROM news_generation_record")) {
             assertThat(r.next()).isTrue(); assertThat(r.getString(1)).isEqualTo("{}");
@@ -108,7 +108,7 @@ class MySQLMigrationTests {
             s.execute(insert.formatted("'2026-10-22'"));
             assertThatThrownBy(() -> s.execute(insert.formatted("NULL"))).isInstanceOf(SQLException.class);
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(4);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement()) {
             s.execute(insert.formatted("NULL"));
             try (var rs = s.executeQuery("SELECT publication_date FROM card_news ORDER BY id")) {
@@ -129,7 +129,7 @@ class MySQLMigrationTests {
                 s.executeUpdate();
             }
         }
-        assertThat(config().load().migrate().migrationsExecuted).isOne();
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(2);
         assertThat(config().load().migrate().migrationsExecuted).isZero();
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
              var r=s.executeQuery("SELECT title,publication_status,publication_date,version,first_used_at,last_used_at FROM card_news ORDER BY id")) {
@@ -140,6 +140,22 @@ class MySQLMigrationTests {
                 assertThat(r.next()).isTrue(); assertThat(r.getString(2)).isEqualTo(state);
                 assertThat(r.getDate(3)).isNull(); assertThat(r.getLong(4)).isZero();
             }
+        }
+    }
+    @Test void defaultAvatarsPreserveExistingRegistrations() throws Exception {
+        config().target("8").load().migrate();
+        try (var c = DriverManager.getConnection(url, user, password); var stmt = c.createStatement()) {
+            stmt.execute("INSERT INTO profile_img(name,img_url,created_at,updated_at) VALUES('existing','/avatars/lumi-v1.png',NOW(),NOW())");
+        }
+        assertThat(config().load().migrate().migrationsExecuted).isOne();
+        try (var c = DriverManager.getConnection(url, user, password); var stmt = c.createStatement();
+             var rows = stmt.executeQuery("SELECT name,img_url FROM profile_img ORDER BY id")) {
+            int count = 0;
+            while (rows.next()) {
+                if (count == 0) assertThat(rows.getString(1)).isEqualTo("existing");
+                count++;
+            }
+            assertThat(count).isEqualTo(5);
         }
     }
 }
