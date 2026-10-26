@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -21,19 +22,23 @@ import org.aiknow.android.R
 import org.aiknow.android.data.*
 
 @Composable fun AiKnowApp(model: AppModel) {
-    AiKnowTheme(model.appearance) {
+    val context=LocalContext.current
+    val introPrefs=remember{context.getSharedPreferences("intro",0)}
+    var intro by rememberSaveable { mutableStateOf(!introPrefs.getBoolean("seen",false)) }
+    AiKnowTheme {
         Surface(Modifier.fillMaxSize()) {
             when {
                 model.starting -> Loading()
-                model.user == null -> LoginScreen(model)
-                !model.user!!.flag("onboardingCompleted") -> Onboarding(model)
+                model.user == null && intro -> ConversationIntro { introPrefs.edit().putBoolean("seen",true).apply();intro=false }
+                model.user == null -> LoginScreen(model){introPrefs.edit().putInt("step",0).apply();intro=true}
+                !model.user!!.flag("onboardingCompleted") -> AccountOnboarding(model)
                 else -> SignedInApp(model)
             }
             model.error?.let { message -> AlertDialog(onDismissRequest={model.error=null},title={Text("안내")},text={Text(message)},confirmButton={TextButton(onClick={model.error=null}){Text("확인")}}) }
         }
     }
 }
-@Composable private fun LoginScreen(model: AppModel) {
+@Composable private fun LoginScreen(model: AppModel, replayIntro:()->Unit) {
     val activity=requireNotNull(LocalActivity.current)
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.Center) {
         Image(painterResource(R.drawable.brand_logo),"AI Know",Modifier.size(82.dp))
@@ -58,17 +63,8 @@ import org.aiknow.android.data.*
             TextButton(onClick={model.restore()}) { Text("연결 다시 확인") }
         }
         if(model.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        TextButton(onClick=replayIntro,enabled=!model.busy){Text("소개 다시 보기")}
         Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=18.dp))
-    }
-}
-@Composable private fun Onboarding(model: AppModel) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
-        TextButton(onClick={model.onboarding()},enabled=!model.busy,modifier=Modifier.align(Alignment.End)){Text("건너뛰기")}
-        Text("하루 한 장의\nAI 인사이트",style=MaterialTheme.typography.displaySmall)
-        listOf("오늘" to "복잡한 AI 소식을 카드 한 장으로 쉽고 빠르게 만나보세요.","마음에 드는 이야기는 좋아요로" to "좋아요한 카드와 관심 있는 카테고리를 아카이브에서 다시 볼 수 있어요.","매일 새로운 AI 이야기" to "알림 설정으로 오늘의 카드가 도착했을 때 놓치지 않고 확인해 보세요.").forEach { (title,body) ->
-            ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(24.dp)) { SectionTitle(title); Text(body,Modifier.padding(top=12.dp)) } }
-        }
-        Button(onClick={model.onboarding()},enabled=!model.busy,modifier=Modifier.fillMaxWidth()) { Text("시작하기") }
     }
 }
 @Composable private fun SignedInApp(model: AppModel) {

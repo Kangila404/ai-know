@@ -40,7 +40,6 @@ import org.aiknow.android.data.*
             } }
             item { ListItem(headlineContent={Text("알림 설정")},supportingContent={Text("받고 싶은 시간에 AI 소식 받기")},leadingContent={Icon(Icons.Default.NotificationsNone,null)},modifier=Modifier.clickable{navigate("notifications")}) }
             item { ListItem(headlineContent={Text("공지사항")},leadingContent={Icon(Icons.Default.Campaign,null)},modifier=Modifier.clickable{navigate("notices")}) }
-            item { ListItem(headlineContent={Text("화면 모드")},supportingContent={Text(when(model.appearance){"dark"->"다크";"light"->"라이트";else->"시스템 설정"})},leadingContent={Icon(Icons.Default.DarkMode,null)},modifier=Modifier.clickable{sheet="theme"}) }
             item { HorizontalDivider(Modifier.padding(vertical=12.dp)) }
             item { TextButton(onClick={confirmation="logout"},enabled=!model.busy){Text("로그아웃")} }
             item { TextButton(onClick={confirmation="withdraw"},enabled=!model.busy){Text("회원탈퇴",color=MaterialTheme.colorScheme.error)} }
@@ -63,7 +62,6 @@ import org.aiknow.android.data.*
                         RemoteImage(p.text("imgUrl"),null,Modifier.size(56.dp),true);Text(p.text("name"),Modifier.padding(16.dp))
                     } }
                 } }
-                "theme" -> { SectionTitle("화면 모드"); listOf("system" to "시스템 설정","light" to "라이트","dark" to "다크").forEach{(v,t)->Row(Modifier.fillMaxWidth().clickable{model.theme(v);sheet=null},verticalAlignment=Alignment.CenterVertically){RadioButton(model.appearance==v,{model.theme(v);sheet=null});Text(t)}} }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -76,20 +74,14 @@ import org.aiknow.android.data.*
         LoadPane("notifications",{model.api.request("api/v1/notification-setting")}) { saved,reload ->
             var allowed by remember(saved){mutableStateOf(saved.flag("isAllowed"))}
             var time by remember(saved){mutableStateOf(saved.text("settingTime","09:00:00"))}
-            var choosing by remember{mutableStateOf(false)}
             Column(Modifier.verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
                 Text("매일 한 번, AI를 만나는 시간",style=MaterialTheme.typography.headlineSmall)
                 ListItem(headlineContent={Text("카드뉴스 알림")},trailingContent={Switch(allowed,{allowed=it},enabled=!model.busy)})
-                OutlinedButton(onClick={choosing=true},enabled=!model.busy,modifier=Modifier.fillMaxWidth()){Icon(Icons.Default.Schedule,null);Spacer(Modifier.width(8.dp));Text("알림 시간 ${time.take(5)} · 한국 시간")}
+                ReminderSchedule(time,{time=it},enabled=!model.busy)
                 Button(onClick={model.action{model.api.request("api/v1/notification-setting","PUT",payload("settingTime" to time,"isAllowed" to allowed));reload();if(allowed){if(Build.VERSION.SDK_INT>=33&&!model.app.push.permitted())permission.launch(Manifest.permission.POST_NOTIFICATIONS) else model.syncPush()}}},enabled=!model.busy,modifier=Modifier.fillMaxWidth()){Text("설정 저장")}
                 if(!model.app.push.configured) Text(if(Platform.demo) "데모에서는 알림을 전송하지 않습니다." else "이 빌드는 푸시 연결을 준비 중입니다. 설정은 계정에 저장됩니다.",style=MaterialTheme.typography.bodySmall)
                 if(!model.app.push.permitted()) TextButton(onClick={context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName))}){Text("기기 알림 권한 설정")}
                 model.pushError?.let{Text(it,color=MaterialTheme.colorScheme.error);TextButton(onClick={model.syncPush()}){Text("기기 등록 다시 시도")}}
-            }
-            if(choosing) {
-                val parts=time.split(":")
-                val clock=rememberTimePickerState(parts.getOrNull(0)?.toIntOrNull()?:9,parts.getOrNull(1)?.toIntOrNull()?:0,true)
-                AlertDialog(onDismissRequest={choosing=false},title={Text("알림 시간")},text={TimeInput(clock)},confirmButton={TextButton(onClick={time="%02d:%02d:00".format(clock.hour,clock.minute);choosing=false}){Text("선택")}},dismissButton={TextButton(onClick={choosing=false}){Text("취소")}})
             }
         }
     } }

@@ -20,6 +20,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.font.FontWeight
@@ -38,10 +42,10 @@ import org.aiknow.android.data.*
             }) { data,_ ->
                 if(data==JsonNull) EmptyState("오늘의 소식을 준비 중이에요","먼저 아카이브에서 AI 이론을 만나보세요.","아카이브 보기",archive)
                 else LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-                    item { Text("AI를 알아가는 작은 습관",color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelLarge) }
-                    item { NewsTile(data,false){open(data.number("id"))} }
-                    item { SectionTitle("오늘의 핵심 포인트") }
-                    items(data.array("keyPoints")) { point -> Card(Modifier.fillMaxWidth()) { Text((point as JsonPrimitive).content,Modifier.padding(20.dp),style=MaterialTheme.typography.bodyLarge) } }
+                    item { TodayGreeting(model.user?.text("nickname").orEmpty()) }
+                    item { TodayFeature(data){open(data.number("id"))} }
+                    if(data.array("keyPoints").isNotEmpty()) item { KeyPointPanel(data.array("keyPoints").map{(it as JsonPrimitive).content}) }
+                    item { ArchiveInvitation(archive) }
                 }
             }
         }
@@ -52,7 +56,7 @@ import org.aiknow.android.data.*
         if(compact) Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.spacedBy(16.dp),verticalAlignment=Alignment.CenterVertically) {
             RemoteImage(card.text("titleImgUrl"),null,Modifier.size(88.dp),true)
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                Text(card.text("title"),style=MaterialTheme.typography.titleMedium)
+            Text(card.text("title"),style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=TextOverflow.Ellipsis)
                 Text("${statusLabel(card.text("contentType"))} · ${card.text("publicationDate")}",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
                 if(card.flag("read")) Text("읽음",style=MaterialTheme.typography.labelSmall)
             }
@@ -91,7 +95,7 @@ import org.aiknow.android.data.*
     }
     Page("아카이브",actions={Refresh{reload++}}) { padding ->
         Column(Modifier.padding(padding)) {
-            OutlinedTextField(query,{query=it.take(200)},Modifier.fillMaxWidth().padding(horizontal=20.dp),placeholder={Text("궁금한 AI 이야기를 검색하세요")},leadingIcon={Icon(Icons.Default.Search,null)},singleLine=true,shape=MaterialTheme.shapes.extraLarge)
+            OutlinedTextField(query,{query=it.take(200)},Modifier.fillMaxWidth().padding(horizontal=20.dp),placeholder={Text("궁금한 AI 이야기를 검색하세요")},leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(Icons.Default.Close,"검색어 지우기")}},singleLine=true,shape=MaterialTheme.shapes.extraLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FilterChip(likes,{likes=!likes},label={Text("좋아요")},leadingIcon={Icon(Icons.Default.FavoriteBorder,null,Modifier.size(18.dp))})
                 FilterChip(category==null,{category=null},label={Text("전체")})
@@ -125,12 +129,13 @@ import org.aiknow.android.data.*
             var liked by remember(id){mutableStateOf(card.flag("liked"))}
             var read by remember(id){mutableStateOf(card.flag("read"))}
             var readError by remember(id){mutableStateOf<String?>(null)}
-            LaunchedEffect(pager.settledPage,slides.size,read) {
+            var readRetry by remember(id){mutableIntStateOf(0)}
+            LaunchedEffect(pager.settledPage,slides.size,read,readRetry) {
                 if(slides.isNotEmpty() && pager.settledPage==slides.lastIndex && !read) {
                     delay(2000)
-                    try { model.api.request("api/v1/cardNews/$id/read","PUT");read=true;model.contentChanged() }
+                    try { readError=null;model.api.request("api/v1/cardNews/$id/read","PUT");read=true;model.contentChanged() }
                     catch(e:CancellationException){throw e}
-                    catch(_:Exception){readError="읽음 기록을 저장하지 못했습니다. 아래 버튼으로 다시 시도해 주세요."}
+                    catch(_:Exception){readError="읽음 기록을 저장하지 못했어요."}
                 }
             }
             if(showSources) ModalBottomSheet(onDismissRequest={showSources=false}) {
@@ -154,12 +159,21 @@ import org.aiknow.android.data.*
                     Text("${pager.currentPage+1} / ${slides.size}",style=MaterialTheme.typography.labelLarge,modifier=Modifier.weight(1f))
                     IconButton(onClick={model.action{val r=model.api.request("api/v1/cardNews/$id/like","PATCH",payload("liked" to !liked));liked=r.flag("liked");model.contentChanged()}},enabled=!model.busy){Icon(if(liked)Icons.Default.Favorite else Icons.Default.FavoriteBorder,if(liked)"좋아요 취소" else "좋아요",tint=MaterialTheme.colorScheme.primary)}
                 }
-                HorizontalPager(pager,Modifier.weight(1f),beyondViewportPageCount=1) { index ->
+                HorizontalPager(pager,Modifier.weight(1f).testTag("card-pager").semantics {
+                    contentDescription="카드뉴스 슬라이드"
+                    // TalkBack can change pages without locating or pressing a visual next button.
+                    customActions=listOf(CustomAccessibilityAction("다음 슬라이드"){if(pager.currentPage<slides.lastIndex){scope.launch{pager.animateScrollToPage(pager.currentPage+1)};true}else false},CustomAccessibilityAction("이전 슬라이드"){if(pager.currentPage>0){scope.launch{pager.animateScrollToPage(pager.currentPage-1)};true}else false})
+                },beyondViewportPageCount=1) { index ->
                     ReadingPage(slides[index]){expandedImage=slides[index].text("imgUrl")}
                 }
-                readError?.let{Text(it,Modifier.padding(horizontal=24.dp),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
-                LinearProgressIndicator(progress={(pager.currentPage+1).toFloat()/slides.size},modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp))
-                Button(onClick={if(pager.currentPage==slides.lastIndex) model.action{if(!read){model.api.request("api/v1/cardNews/$id/read","PUT");read=true;model.contentChanged()};back()} else scope.launch{pager.animateScrollToPage(pager.currentPage+1)}},enabled=!model.busy,modifier=Modifier.fillMaxWidth().padding(20.dp)){Text(if(pager.currentPage==slides.lastIndex) "다 읽었어요" else "다음 카드")}
+                readError?.let{Row(Modifier.padding(horizontal=20.dp),verticalAlignment=Alignment.CenterVertically){Text(it,Modifier.weight(1f),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall);TextButton(onClick={readRetry++}){Text("다시 저장")}}}
+                Column(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.clearAndSetSemantics{}){repeat(slides.size){i->Box(Modifier.width(if(i==pager.currentPage)24.dp else 6.dp).height(6.dp).background(if(i==pager.currentPage)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,CircleShape))}}
+                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Icon(if(pager.currentPage==slides.lastIndex)Icons.Default.CheckCircleOutline else Icons.Default.SwipeLeft,null,Modifier.size(16.dp),tint=MaterialTheme.colorScheme.primary)
+                        Text(if(pager.currentPage==slides.lastIndex){if(read)"읽음으로 저장했어요"else"마지막 카드예요"}else"왼쪽으로 밀어 다음 이야기",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     } }

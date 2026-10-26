@@ -9,7 +9,7 @@
 | 기능 | 대조한 iOS 소스 | Android 반영 |
 |---|---|---|
 | 오늘/아카이브/마이/관리자 | `App/RootTabView.swift` | Material 3 NavigationBar, 실제 ADMIN 응답과 복귀 시 권한 재조회 |
-| 로고·로그인 안내·온보딩 | `Components/BrandLogo.swift`, `Features/Auth`, `Features/Onboarding` | 같은 K 로고, 안내 문구, 온보딩 완료/건너뛰기 API |
+| 로고·로그인 안내·온보딩 | `Components/BrandLogo.swift`, `Features/Auth`, `Features/Onboarding` | 같은 K 로고와 완료 API. 10월 26일 요청에 따라 Android는 대화형 소개 → 닉네임 → 알림·시간 설정으로 확장 |
 | 오늘의 카드·미게시·핵심 포인트 | `Features/Home/HomeView.swift` | 동일 API, 404 미게시 안내와 아카이브 이동 |
 | 검색·카테고리·좋아요·읽음 | `Features/Library/LibraryView.swift` | 필터/페이지, 변경 후 목록 재조회 |
 | 카드 높이·긴 본문 | `Features/Home/CardNewsDetailView.swift` | 본문 측정 후 남은 높이에 이미지 배치, 비율 유지, 긴 내용 세로 스크롤 |
@@ -29,10 +29,16 @@
 
 ## 플랫폼 차이와 미검증 경계
 
-- iOS SwiftUI 배치를 픽셀 단위 복제하지 않습니다. Android의 Material 3, Compose Pager/BottomSheet, Credential Manager, 시스템 사진 선택기를 사용합니다. Android에는 명시적 ‘다음 카드/다 읽었어요’ 버튼과 앱별 다크 모드 선택도 있습니다.
+- iOS SwiftUI 배치를 픽셀 단위 복제하지 않습니다. Android의 Material 3, Compose Pager/BottomSheet, Credential Manager, 시스템 사진 선택기를 사용합니다. 2026-10-26 사용자 요청에 따라 다음 카드/완료 버튼을 제거하고 스와이프와 TalkBack 페이지 동작을 사용하며, 테마는 휴대폰 설정만 따릅니다.
 - Apple iOS 네이티브 로그인은 Android에 그대로 이식할 수 없습니다. Android Apple 로그인용 Services ID·웹 리다이렉트와 서버 연결은 미구현입니다. Google/Kakao/FCM도 발급 설정이 없어 실계정 인증·실기기 수신은 미검증입니다.
 - Android 운영 API와 외부 이미지는 HTTPS를 사용합니다. 데모는 별도 flavor의 로컬 데이터만 사용하며 실계정·관리자 권한을 우회하지 않습니다.
 - 날짜/승인/공개 정책은 서버가 결정합니다. Android에서 PENDING을 자동 승인하거나 READY를 임의로 공개하지 않습니다.
 - 사진 선택 UI와 운영 복구 성공은 실제 관리자 연결 후 최종 확인이 필요합니다. 자동 검증은 격리된 multipart 요청 계약, 데모 읽기·검수 흐름, 이미지 URL 및 데이터 검증을 대상으로 합니다.
 
 검증 결과와 실행 명령은 [README.md](README.md)의 검증 기록 및 테스트 소스를 참조하세요.
+
+## 2026-10-26 사용성 개선
+
+- 인트로는 사용자의 `D:/projects/ethica/android` 내 `JourneyExperience.kt`와 `ConversationMotion.kt`를 참고했습니다. 응답을 누르면 이전 문장이 축소·흐림 처리되며 위로 이동하고, 작은 화면/큰 글씨에서는 현재 문장을 우선합니다. 건너뛰기, 이전, 이어보기, 로그인에서 소개 다시 보기를 지원합니다.
+- 신규 계정은 닉네임 PATCH 이후 알림 시간/동의를 PUT하고 마지막에 온보딩 완료 PATCH를 실행합니다. 설정 실패 시 완료로 건너뛰지 않습니다. 권한 거절 또는 알림 없이 시작을 선택하면 수신을 끄고 가입을 완료합니다. 기존 완료 계정에는 온보딩을 다시 강제하지 않습니다.
+- 오늘 화면은 대표 이미지 카드, 번호와 펼침 동작이 있는 핵심 포인트, 아카이브 바로가기를 사용합니다. 서버 콘텐츠와 출처는 변경하지 않습니다.

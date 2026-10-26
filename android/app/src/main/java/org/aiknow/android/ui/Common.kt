@@ -27,8 +27,8 @@ import kotlinx.serialization.json.*
 import org.aiknow.android.BuildConfig
 import org.aiknow.android.data.*
 
-@Composable fun AiKnowTheme(appearance: String, content: @Composable () -> Unit) {
-    val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
+@Composable fun AiKnowTheme(content: @Composable () -> Unit) {
+    val dark = isSystemInDarkTheme()
     MaterialTheme(colorScheme = if(dark) darkColorScheme(primary=Color(0xFFC7BEFF),secondary=Color(0xFFBBC9E8))
         else lightColorScheme(primary=Color(0xFF5145C6),secondary=Color(0xFF51617C),surface=Color(0xFFFCF9FF)), content=content)
 }
@@ -45,7 +45,7 @@ import org.aiknow.android.data.*
     }
 }
 @Composable fun ErrorState(message: String, retry: () -> Unit) = EmptyState("불러오지 못했어요",message,"다시 시도",retry)
-@Composable fun RemoteImage(raw: String?, description: String?, modifier: Modifier = Modifier, thumbnail: Boolean = false, fullResolution: Boolean = false) {
+@Composable fun RemoteImage(raw: String?, description: String?, modifier: Modifier = Modifier, thumbnail: Boolean = false, fullResolution: Boolean = false, contentScale: ContentScale = ContentScale.Fit) {
     val context=LocalContext.current
     val preview=remember(raw,thumbnail,fullResolution) { mediaUrl(raw,BuildConfig.API_BASE_URL,thumbnail,fullResolution) }
     val source=remember(raw) { mediaUrl(raw,BuildConfig.API_BASE_URL,original=true) }
@@ -57,7 +57,7 @@ import org.aiknow.android.data.*
         if(retry>0) { diskCachePolicy(CachePolicy.WRITE_ONLY); memoryCachePolicy(CachePolicy.WRITE_ONLY); networkCachePolicy(CachePolicy.WRITE_ONLY) }
         if(fullResolution) size(4096)
     }.build(),contentDescription=description,
-        modifier=modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer),contentScale=ContentScale.Fit,
+        modifier=modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainer),contentScale=contentScale,
         loading={ Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator(Modifier.size(24.dp),strokeWidth=2.dp) } },
         onError={ state ->
             failure=state.result.throwable

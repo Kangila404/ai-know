@@ -17,7 +17,7 @@ Kotlin + Jetpack Compose로 만든 별도 Android 네이티브 클라이언트�
 
 ## 바로 화면 확인
 
-Build Variants에서 **demoDebug** 선택 후 Run합니다. 앱 이름은 AI KNOW, 패키지는 `org.aiknow.android.demo`입니다. `데모 둘러보기` → 온보딩 → 오늘/아카이브/마이/관리자를 확인합니다. 데모는 별도 `src/demo` 소스와 로컬 이미지·JSON만 사용하며 운영 서버, 실제 로그인, 유료 생성, 푸시 발송을 호출하지 않습니다. 지원하지 않는 데모 쓰기는 성공처럼 표시하지 않습니다.
+Build Variants에서 **demoDebug** 선택 후 Run합니다. 앱 이름은 AI KNOW, 패키지는 `org.aiknow.android.demo`입니다. 첫 실행의 대화형 소개 → `데모 둘러보기` → 닉네임 → 알림·시간 설정 → 오늘/아카이브/마이/관리자를 확인합니다. 소개는 로그인 화면에서 다시 볼 수 있습니다. 데모는 별도 `src/demo` 소스와 로컬 이미지·JSON만 사용하며 운영 서버, 실제 로그인, 유료 생성, 푸시 발송을 호출하지 않습니다. 지원하지 않는 데모 쓰기는 성공처럼 표시하지 않습니다.
 
 `demoRelease`는 비활성화돼 배포용 AAB에 데모 인증 코드가 포함되지 않습니다. 본 서비스는 **liveDebug/liveRelease**, 패키지는 **`org.aiknow.android`** 입니다. 설정이 없는 live 빌드에서는 로그인 제공자 버튼이 비활성화되고 준비 중임을 안내합니다. 인증 우회는 없습니다.
 
@@ -30,7 +30,7 @@ Build Variants에서 **demoDebug** 선택 후 Run합니다. 앱 이름은 AI KNO
 - `notifications/`: FCM 등록/해제, ANDROID 설치 UUID, Android 13+ 알림 권한, 알림의 cardNewsId로 상세 이동. 설정 전에는 Firebase를 강제로 초기화하지 않습니다.
 - 이미지: 별도 Coil 3 메모리/디스크 캐시, 서버가 제공한 320/1280 preview, Commons 래스터 썸네일, 화면 크기에 맞는 디코딩, 다음 카드 한 장 미리 구성. 확대 화면은 원본을 사용하며 외부 이미지 호스트로 인증 쿠키를 보내지 않습니다.
 
-사용자: 오늘 카드, 아카이브 검색/카테고리/좋아요/페이지, 카드 넘김·출처·좋아요·읽음, 닉네임/아바타, 알림 시간, 공지, 화면 모드, 로그아웃/탈퇴.
+사용자: 이미지 중심 오늘 카드와 펼쳐보는 핵심 포인트, 아카이브 검색/카테고리/좋아요/페이지, 스와이프 카드 넘김·출처·좋아요·자동 읽음, 닉네임/아바타, 알림 시간과 시간대별 프리셋, 공지, 로그아웃/탈퇴. 화면 테마는 휴대폰 설정을 따르며 앱 자체 테마 선택은 없습니다.
 
 관리자: 콘텐츠 운영 / 서비스 관리 / 문제 해결 구성, 콘텐츠 유형 직접 선택 후 승인, 슬라이드 추가·삭제·출처 편집, 상태별 카드 관리와 카드별 조회수, 사용자 검색·권한/정지 필터, 공지/프로필 CRUD, 변경 전·후 이력. 생성 복구는 JSON 응답 또는 시스템 사진 선택기를 통한 PNG 업로드를 지원합니다(4096×4096, 변환 후 10MB 이하).
 
@@ -57,12 +57,13 @@ Apple 로그인은 iOS 네이티브 인증 전용입니다. Android에서 Apple 
 
 참고: [Compose](https://developer.android.com/develop/ui/compose), [Google Credential Manager](https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation), [Kakao Android](https://developers.kakao.com/docs/en/kakaologin/android).
 
-## 검증 기록 (2026-10-25)
+## 검증 기록 (2026-10-26)
 
-- `assembleDemoDebug`, `assembleLiveDebug`, `testLiveDebugUnitTest`, `lintLiveDebug` 통과. 단위 테스트 11개, lint 오류 0개. 세션/CSRF, 이미지 URL 정책, 편집 검증, 조회수 연결, PNG multipart 계약을 검사합니다. 일부 의존성 업데이트와 코드 스타일 권고 경고는 남아 있습니다.
+- `assembleDemoDebug`, `assembleLiveDebug`, `testLiveDebugUnitTest`, `lintLiveDebug` 통과. 단위 테스트 14개, lint 오류 0개. 세션/CSRF, 이미지 URL 정책, 편집 검증, 조회수 연결, PNG multipart, 온보딩 저장 순서·실패·재시도를 검사합니다. 일부 의존성 업데이트와 코드 스타일 권고 경고는 남아 있습니다.
 - D드라이브의 Android Studio에서 프로젝트와 Compose 라이트/다크/큰 글씨 Preview를 열었습니다. D드라이브 SDK의 API 36 Pixel 7 에뮬레이터에서 데모 APK를 실행했습니다.
-- `NavigationTest.readerAndEditorialJourneys` 통과: 온보딩, 아카이브, 이미지 확대·출처 시트, 카드 넘김, 좋아요, 마지막 장 자동 읽음과 목록 갱신, 다크 모드, 슬라이드 추가·삭제, 유형 선택 전 승인 차단, 승인 후 카드 관리 이동·조회수. 이미지 로딩 완료와 오류 자리표시자가 없음을 함께 검사합니다. 운영 데이터에는 접근하지 않습니다.
-- 테스트가 앱 외부 파일 디렉터리에 `01-today.png`부터 `07-article-metadata.png`까지 화면 증거를 저장합니다. 이 PC의 복사본은 저장소 루트 `.local/android-ui-evidence/files/`에 있습니다(Git 제외).
+- `NavigationTest.readerAndEditorialJourneys`: 소개·재생/건너뛰기, 닉네임/시간 저장과 알림 미동의, 아카이브, 이미지 확대·출처 시트, 실제 터치 스와이프, 좋아요, 마지막 장 자동 읽음과 목록 갱신, 슬라이드 추가·삭제, 유형 선택 전 승인 차단, 승인 후 카드 관리 이동·조회수. 이미지 로딩 완료와 오류 자리표시자가 없음을 함께 검사합니다. 운영 데이터에는 접근하지 않습니다.
+- `SystemThemeTest`: 예전 앱 테마 선호가 남아 있어도 시스템 Configuration의 라이트/다크 전환을 따르는지 검증합니다. 1.3배 글자 크기에서 핵심 포인트를 캡처하고 펼침 동작을 검사합니다. 두 UI 테스트는 API 36 에뮬레이터에서 실행합니다.
+- 테스트가 앱 외부 파일 디렉터리에 `00-intro-first.png`, `00-onboarding-notifications.png`, `01-today.png`, `03-reader.png`, `08-system-dark-points.png` 등의 화면 증거를 저장합니다. 이 PC의 복사본은 저장소 루트 `.local/android-ui-evidence/files/`에 있습니다(Git 제외).
 - Google/Kakao 실계정 인증, 실제 FCM 수신, 운영 관리자 변경, 서명한 Play 배포는 아직 검증하지 않았습니다. 위 설정을 준비한 뒤 실제 기기에서 확인해야 합니다.
 
 데모 이미지 리소스는 숫자 ID 주소로 변환합니다. Coil 3에서 이름 기반 리소스 URI 지원이 제거된 내용은 [공식 변경 기록](https://github.com/coil-kt/coil/blob/main/CHANGELOG.md)에 설명되어 있습니다.

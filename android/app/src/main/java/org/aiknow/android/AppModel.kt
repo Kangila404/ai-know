@@ -23,14 +23,11 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var pendingCard by mutableStateOf<Long?>(null)
     var contentRevision by mutableIntStateOf(0); private set
     fun contentChanged() { contentRevision++ }
-    private val prefs = application.getSharedPreferences("appearance",0)
-    var appearance by mutableStateOf(prefs.getString("theme","system") ?: "system"); private set
     val admin get() = user?.text("userRole") == "ADMIN"
     init {
         api.onUnauthorized = { viewModelScope.launch { user = null } }
         restore()
     }
-    fun theme(value: String) { appearance=value; prefs.edit().putString("theme",value).apply() }
     fun restore() = viewModelScope.launch {
         starting = true; error = null
         try { user = api.request("api/v1/users") }
@@ -59,7 +56,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             if(user != null) try { refreshUser() } catch(_: Exception) { }
         } }
     }
-    fun onboarding() = action { user=api.request("api/v1/users/onboarding","PATCH") }
+    fun onboarding(time:String, notifications:Boolean) = action {
+        user=completeOnboarding(api,time,notifications)
+        if(notifications) syncPush()
+    }
     fun syncPush() = viewModelScope.launch {
         app.accountLock.withLock {
             if(user != null) try { app.push.sync(); pushError=null } catch(_: Exception) { pushError="기기 알림 등록에 실패했습니다. 다시 시도해 주세요." }
