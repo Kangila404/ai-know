@@ -97,7 +97,7 @@ import org.aiknow.android.data.*
         Column(Modifier.padding(padding)) {
             OutlinedTextField(query,{query=it.take(200)},Modifier.fillMaxWidth().padding(horizontal=20.dp),placeholder={Text("궁금한 AI 이야기를 검색하세요")},leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(query.isNotEmpty())IconButton(onClick={query=""}){Icon(Icons.Default.Close,"검색어 지우기")}},singleLine=true,shape=MaterialTheme.shapes.extraLarge)
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                FilterChip(likes,{likes=!likes},label={Text("좋아요")},leadingIcon={Icon(Icons.Default.FavoriteBorder,null,Modifier.size(18.dp))})
+                FilterChip(likes,{if(model.requireLogin("좋아요한 카드 모아보기는 로그인 후 이용할 수 있어요."))likes=!likes},label={Text("좋아요")},leadingIcon={Icon(Icons.Default.FavoriteBorder,null,Modifier.size(18.dp))})
                 FilterChip(category==null,{category=null},label={Text("전체")})
                 categories.forEach{ c-> FilterChip(category==c.text("id"),{category=c.text("id")},label={Text(c.text("name"))}) }
             }
@@ -131,7 +131,7 @@ import org.aiknow.android.data.*
             var readError by remember(id){mutableStateOf<String?>(null)}
             var readRetry by remember(id){mutableIntStateOf(0)}
             LaunchedEffect(pager.settledPage,slides.size,read,readRetry) {
-                if(slides.isNotEmpty() && pager.settledPage==slides.lastIndex && !read) {
+                if(model.user!=null && slides.isNotEmpty() && pager.settledPage==slides.lastIndex && !read) {
                     delay(2000)
                     try { readError=null;model.api.request("api/v1/cardNews/$id/read","PUT");read=true;model.contentChanged() }
                     catch(e:CancellationException){throw e}
@@ -157,7 +157,7 @@ import org.aiknow.android.data.*
             else Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),verticalAlignment=Alignment.CenterVertically) {
                     Text("${pager.currentPage+1} / ${slides.size}",style=MaterialTheme.typography.labelLarge,modifier=Modifier.weight(1f))
-                    IconButton(onClick={model.action{val r=model.api.request("api/v1/cardNews/$id/like","PATCH",payload("liked" to !liked));liked=r.flag("liked");model.contentChanged()}},enabled=!model.busy){Icon(if(liked)Icons.Default.Favorite else Icons.Default.FavoriteBorder,if(liked)"좋아요 취소" else "좋아요",tint=MaterialTheme.colorScheme.primary)}
+                    IconButton(onClick={if(model.requireLogin("좋아요를 저장하려면 로그인해 주세요."))model.action{val r=model.api.request("api/v1/cardNews/$id/like","PATCH",payload("liked" to !liked));liked=r.flag("liked");model.contentChanged()}},enabled=!model.busy){Icon(if(liked)Icons.Default.Favorite else Icons.Default.FavoriteBorder,if(liked)"좋아요 취소" else "좋아요",tint=MaterialTheme.colorScheme.primary)}
                 }
                 HorizontalPager(pager,Modifier.weight(1f).testTag("card-pager").semantics {
                     contentDescription="카드뉴스 슬라이드"

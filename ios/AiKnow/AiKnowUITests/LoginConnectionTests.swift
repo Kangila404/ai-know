@@ -1,5 +1,47 @@
 import XCTest
 
+// Execute separately with ios/tests/test_guest_ui.py (anonymous fixture, no real OAuth).
+final class GuestConnectionTests: XCTestCase {
+    @MainActor
+    func testGuestBrowsingAndLoginGates() throws {
+        let data = try? Data(contentsOf: URL(string: "http://localhost:18081/__fixture")!)
+        let fixture = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Bool] }
+        try XCTSkipIf(fixture?["guest"] != true, "Run with ios/tests/test_guest_ui.py")
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["login.guest"].waitForExistence(timeout: 30))
+        app.buttons["login.guest"].tap()
+        XCTAssertTrue(app.staticTexts["둘러보는 중"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.tabBars.buttons["관리자"].exists)
+        app.tabBars.buttons["마이"].tap()
+        XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
+        app.alerts.buttons["계속 둘러보기"].tap()
+        app.buttons["공지사항"].tap()
+        let notice = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "API 공지")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 10)); notice.tap()
+        XCTAssertTrue(app.staticTexts["서버에서 받은 공지 본문"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.tabBars.buttons["아카이브"].tap()
+        XCTAssertTrue(app.buttons["archive.card.9001"].waitForExistence(timeout: 15))
+        app.buttons["좋아요"].firstMatch.tap()
+        XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
+        app.alerts.buttons["계속 둘러보기"].tap()
+        app.buttons["archive.card.9001"].tap()
+        XCTAssertTrue(app.staticTexts["서버 슬라이드"].waitForExistence(timeout: 10))
+        app.buttons["좋아요"].tap()
+        XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
+        app.alerts.buttons["로그인"].tap()
+        XCTAssertTrue(app.staticTexts["현재 이용 가능한 로그인 방법이 없습니다."].waitForExistence(timeout: 10))
+        app.buttons["닫기"].tap()
+        XCTAssertTrue(app.staticTexts["서버 슬라이드"].waitForExistence(timeout: 10))
+        app.swipeLeft(); app.swipeLeft()
+        XCTAssertTrue(app.staticTexts["마지막 슬라이드"].waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 3)
+        XCTAssertFalse(app.alerts.firstMatch.exists, "Reading must not trigger automatic login prompts")
+    }
+}
+
 // Execute with ios/tests/test_content_ui.py, which supplies an isolated API fixture.
 final class ContentConnectionTests: XCTestCase {
     @MainActor

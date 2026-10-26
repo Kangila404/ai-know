@@ -8,7 +8,17 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    AppHeader(title: "오늘의 AI 카드뉴스", trailingIcon: "bell", trailingAction: { showNotifications = true })
+                    AppHeader(title: "오늘의 AI 카드뉴스", trailingIcon: "bell", trailingAction: {
+                        if AuthSession.shared.requireLogin("알림 시간과 수신 설정은 로그인 후 이용할 수 있어요.") { showNotifications = true }
+                    })
+                    if AuthSession.shared.user == nil {
+                        HStack {
+                            Label("둘러보는 중", systemImage: "eye").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            NavigationLink("공지사항") { NoticeListView() }
+                            Button("로그인") { AuthSession.shared.showLogin = true }
+                        }.font(.subheadline)
+                    }
                     if store.todayLoading && store.today == nil {
                         ProgressView("오늘의 소식을 불러오는 중…").frame(maxWidth: .infinity).padding(40)
                     } else if let error = store.todayError {
@@ -43,7 +53,7 @@ struct HomeView: View {
             }.background(AppPalette.background)
                 .refreshable { await store.loadToday() }
                 .task { await store.loadToday() }
-                .sheet(isPresented: $showNotifications) { NavigationStack { PushSettingsView() } }
+                .sheet(isPresented: $showNotifications) { if AuthSession.shared.user != nil { NavigationStack { PushSettingsView() } } }
         }
     }
 }

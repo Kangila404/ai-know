@@ -21,6 +21,7 @@ class NavigationTest {
         override fun before() {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             check(context.packageName == "org.aiknow.android.demo")
+            (context.applicationContext as AiKnowApplication).api=DemoGateway(context)
             context.getSharedPreferences("intro",0).edit().clear().commit()
         }
     }
@@ -42,6 +43,7 @@ class NavigationTest {
         screenshot("00-intro-first")
         compose.onNodeWithText("맞아요, 너무 많아요").performClick()
         compose.waitUntil(5_000){compose.onAllNodes(hasText("어떻게 읽나요?") and isEnabled()).fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithText("이전").assertDoesNotExist()
         screenshot("00-intro-conversation")
         listOf("어떻게 읽나요?","좋아요, 그다음은요?","함께 시작해 볼게요","AI KNOW 시작하기").forEach { response ->
             compose.waitUntil(5_000){compose.onAllNodes(hasText(response) and isEnabled()).fetchSemanticsNodes().isNotEmpty()}

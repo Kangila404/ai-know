@@ -42,6 +42,8 @@ public class CardNewsService {
 
     @Transactional
     public CardNewsResponse openCard(Long id, String userId) {
+        // Anonymous reads do not create fake accounts or identifiable viewing history.
+        if (isGuest(userId)) return CardNewsResponse.from(approvedNews(id));
         var user = userRepository.findByUserIdForUpdate(userId)
             .filter(u -> !u.isSuspended()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         var card = approvedNews(id);
@@ -58,12 +60,14 @@ public class CardNewsService {
     }
     @Transactional(readOnly = true)
     public List<CardNewsResponse> getCardNews(Pageable pageable, Long categoryId, String userId, boolean likedOnly, String query) {
-        User user = findUserByUserIdOrThrow(userId);
-        return responses(cardNewsRepository.searchPublished(user.getId(), categoryId, likedOnly,
+        User user = isGuest(userId) ? null : findUserByUserIdOrThrow(userId);
+        if (user == null && likedOnly) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "좋아요 목록은 로그인이 필요합니다.");
+        return responses(cardNewsRepository.searchPublished(user == null ? null : user.getId(), categoryId, likedOnly,
             query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT), pageable), user);
     }
     private List<CardNewsResponse> responses(List<CardNews> news, User user) {
         if (news.isEmpty()) return List.of();
+        if (user == null) return news.stream().map(CardNewsResponse::from).toList();
         var ids = news.stream().map(CardNews::getId).toList();
         var liked = likeRepository.likedIds(user.getId(), ids);
         var read = reads.readIds(user.getId(), ids);
@@ -71,7 +75,7 @@ public class CardNewsService {
     }
     @Transactional(readOnly = true)
     public CardNewsResponse getCard(Long id, String userId) {
-        return responses(List.of(approvedNews(id)), findUserByUserIdOrThrow(userId)).getFirst();
+        return responses(List.of(approvedNews(id)), isGuest(userId) ? null : findUserByUserIdOrThrow(userId)).getFirst();
     }
     @Transactional(readOnly = true)
     public CardNewsResponse getTodayCardNews(String userId) {
@@ -135,6 +139,10 @@ public class CardNewsService {
 
 
     // ===== 메서드 ===== //
+    private boolean isGuest(String userId) {
+        // @AuthenticationPrincipal String also receives Spring's anonymous principal.
+        return userId == null || "anonymousUser".equals(userId);
+    }
     private CardNews approvedNews(Long id) {
         return cardNewsRepository.findByIdAndInspectionStatusAndPublicationStatus(id, InspectionStatus.APPROVED, PublicationStatus.PUBLISHED)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "카드 뉴스를 찾을 수 없습니다."));

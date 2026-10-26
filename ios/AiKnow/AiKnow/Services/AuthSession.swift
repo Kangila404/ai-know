@@ -14,6 +14,25 @@ final class AuthSession {
     private(set) var busy = false
     var errorMessage: String?
     var isAdmin: Bool { user?.userRole == "ADMIN" }
+    private(set) var browsingAsGuest = false
+    private(set) var sessionGeneration = UUID()
+    var showLogin = false
+    var loginReason: String?
+
+    func browseWithoutLogin() {
+        guard user == nil, !busy else { return }
+        APIClient.shared.clearSession()
+        PushNotifications.shared.pendingCardID = nil
+        browsingAsGuest = true; showLogin = false; loginReason = nil; errorMessage = nil
+        sessionGeneration = UUID()
+    }
+
+    @discardableResult
+    func requireLogin(_ reason: String) -> Bool {
+        guard user == nil else { return true }
+        if !showLogin && loginReason == nil { loginReason = reason }
+        return false
+    }
     private let logger = Logger(subsystem: "org.aiknow.AiKnow", category: "Authentication")
     private let appleAuthorization = AppleAuthorization()
 
@@ -121,13 +140,16 @@ final class AuthSession {
 
     private func finishLogin() async throws {
         user = try await APIClient.shared.currentUser()
+        browsingAsGuest = false; showLogin = false; loginReason = nil
+        sessionGeneration = UUID()
         Task { await PushNotifications.shared.syncToken() }
     }
 
     func restoreSession() async -> Bool {
         do {
-            user = try await APIClient.shared.currentUser()
+            let restored = try await APIClient.shared.currentUser()
             try await APIClient.shared.refreshCSRF()
+            user = restored
             return true
         } catch APIError.http(401) {
             user = nil
@@ -163,6 +185,9 @@ final class AuthSession {
 
     func expireSession() {
         user = nil
+        browsingAsGuest = false; showLogin = false; loginReason = nil
+        PushNotifications.shared.pendingCardID = nil
+        sessionGeneration = UUID()
         APIClient.shared.clearSession()
     }
 
@@ -195,13 +220,13 @@ final class AuthSession {
             PushNotifications.shared.pendingCardID = nil
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
-            user = nil
+            expireSession()
             errorMessage = nil
         } catch APIError.http(401) {
             APIClient.shared.clearSession()
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
-            user = nil
+            expireSession()
         } catch { errorMessage = "로그아웃에 실패했습니다. 서버 연결을 확인하고 다시 시도해 주세요." }
     }
 

@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.compose.*
 import org.aiknow.android.*
 import org.aiknow.android.R
@@ -29,16 +31,25 @@ import org.aiknow.android.data.*
         Surface(Modifier.fillMaxSize()) {
             when {
                 model.starting -> Loading()
-                model.user == null && intro -> ConversationIntro { introPrefs.edit().putBoolean("seen",true).apply();intro=false }
-                model.user == null -> LoginScreen(model){introPrefs.edit().putInt("step",0).apply();intro=true}
-                !model.user!!.flag("onboardingCompleted") -> AccountOnboarding(model)
-                else -> SignedInApp(model)
+                model.user == null && intro && !model.browsingAsGuest -> ConversationIntro { introPrefs.edit().putBoolean("seen",true).apply();intro=false }
+                model.user == null && !model.browsingAsGuest -> LoginScreen(model){introPrefs.edit().putInt("step",0).apply();intro=true}
+                model.user != null && !model.user!!.flag("onboardingCompleted") -> AccountOnboarding(model)
+                else -> key(model.sessionGeneration,model.user?.text("userId") ?: "guest") { SignedInApp(model) }
+            }
+            model.loginReason?.let { reason ->
+                AlertDialog(onDismissRequest={model.loginReason=null},title={Text("로그인이 필요한 기능이에요")},text={Text(reason)},confirmButton={TextButton(onClick={model.loginReason=null;model.showLogin=true}){Text("로그인")}},dismissButton={TextButton(onClick={model.loginReason=null}){Text("계속 둘러보기")}})
+            }
+            if(model.showLogin && model.user==null) Dialog(onDismissRequest={if(!model.busy)model.showLogin=false},properties=DialogProperties(usePlatformDefaultWidth=false)) {
+                Surface(Modifier.fillMaxSize()) { Column {
+                    TextButton(onClick={model.showLogin=false;model.error=null},enabled=!model.busy,modifier=Modifier.statusBarsPadding()){Text("닫기")}
+                    Box(Modifier.weight(1f)) { LoginScreen(model,allowGuest=false){} }
+                } }
             }
             model.error?.let { message -> AlertDialog(onDismissRequest={model.error=null},title={Text("안내")},text={Text(message)},confirmButton={TextButton(onClick={model.error=null}){Text("확인")}}) }
         }
     }
 }
-@Composable private fun LoginScreen(model: AppModel, replayIntro:()->Unit) {
+@Composable private fun LoginScreen(model: AppModel, allowGuest:Boolean=true, replayIntro:()->Unit) {
     val activity=requireNotNull(LocalActivity.current)
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.Center) {
         Image(painterResource(R.drawable.brand_logo),"AI Know",Modifier.size(82.dp))
@@ -63,7 +74,10 @@ import org.aiknow.android.data.*
             TextButton(onClick={model.restore()}) { Text("연결 다시 확인") }
         }
         if(model.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        TextButton(onClick=replayIntro,enabled=!model.busy){Text("소개 다시 보기")}
+        if(allowGuest) {
+            OutlinedButton(onClick={model.browseAsGuest()},enabled=!model.busy,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){Text("로그인 없이 둘러보기")}
+            TextButton(onClick=replayIntro,enabled=!model.busy){Text("소개 다시 보기")}
+        }
         Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=18.dp))
     }
 }
@@ -74,18 +88,22 @@ import org.aiknow.android.data.*
     val roots=listOf("today","archive","me","admin")
     LaunchedEffect(model.admin) { if(!model.admin && route.startsWith("admin")) nav.navigate("me") { popUpTo("today");launchSingleTop=true } }
     LaunchedEffect(model.pendingCard) { model.pendingCard?.let { nav.navigate("card/$it"); model.pendingCard=null } }
-    Scaffold(bottomBar={
+    Scaffold(topBar={if(model.user==null && route in roots) Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
+        Text("둘러보는 중",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
+        TextButton(onClick={nav.navigate("notices")}){Text("공지사항")}
+        TextButton(onClick={model.showLogin=true}){Text("로그인")}
+    }},bottomBar={
         if(route in roots) NavigationBar {
             val tabs=listOf(Triple("today","오늘",Icons.Default.AutoAwesome),Triple("archive","아카이브",Icons.Default.CollectionsBookmark),Triple("me","마이",Icons.Default.Person)) + if(model.admin) listOf(Triple("admin","관리자",Icons.Default.AdminPanelSettings)) else emptyList()
-            tabs.forEach { (path,label,icon) -> NavigationBarItem(selected=route==path,onClick={nav.navigate(path){popUpTo("today"){saveState=true};launchSingleTop=true;restoreState=true}},icon={Icon(icon,null)},label={Text(label)}) }
+            tabs.forEach { (path,label,icon) -> NavigationBarItem(selected=route==path,onClick={if(path!="me" || model.requireLogin("내 프로필과 알림 설정은 로그인 후 이용할 수 있어요."))nav.navigate(path){popUpTo("today"){saveState=true};launchSingleTop=true;restoreState=true}},icon={Icon(icon,null)},label={Text(label)}) }
         }
     }) { padding ->
-        NavHost(nav,"today",Modifier.padding(bottom=padding.calculateBottomPadding())) {
-            composable("today") { TodayScreen(model,{nav.navigate("card/$it")},{nav.navigate("archive")},{nav.navigate("notifications")}) }
+        NavHost(nav,"today",Modifier.padding(padding).consumeWindowInsets(padding)) {
+            composable("today") { TodayScreen(model,{nav.navigate("card/$it")},{nav.navigate("archive")},{if(model.requireLogin("알림 시간과 수신 설정은 로그인 후 이용할 수 있어요."))nav.navigate("notifications")}) }
             composable("archive") { ArchiveScreen(model){nav.navigate("card/$it")} }
             composable("card/{id}") { e -> CardScreen(model,e.arguments!!.getString("id")!!.toLong()){nav.popBackStack()} }
-            composable("me") { ProfileScreen(model){nav.navigate(it)} }
-            composable("notifications") { NotificationScreen(model){nav.popBackStack()} }
+            composable("me") { if(model.user!=null)ProfileScreen(model){nav.navigate(it)} }
+            composable("notifications") { if(model.user!=null)NotificationScreen(model){nav.popBackStack()} }
             composable("notices") { NoticeScreen(model){nav.popBackStack()} }
             composable("admin") { if(model.admin) AdminHome {nav.navigate(it)} }
             composable("admin/{kind}") { e -> if(model.admin) AdminList(model,e.arguments!!.getString("kind")!!,{nav.popBackStack()}) {kind,id->nav.navigate("admin/$kind/$id")} }

@@ -24,8 +24,26 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var contentRevision by mutableIntStateOf(0); private set
     fun contentChanged() { contentRevision++ }
     val admin get() = user?.text("userRole") == "ADMIN"
+    var browsingAsGuest by mutableStateOf(false); private set
+    var showLogin by mutableStateOf(false)
+    var loginReason by mutableStateOf<String?>(null)
+    var sessionGeneration by mutableIntStateOf(0); private set
+    fun browseAsGuest() {
+        if(user != null || busy) return
+        api.clearSession(); pendingCard=null; error=null
+        browsingAsGuest=true; showLogin=false; loginReason=null; sessionGeneration++
+    }
+    fun requireLogin(reason:String):Boolean {
+        if(user != null) return true
+        if(!showLogin && loginReason==null) loginReason=reason
+        return false
+    }
+    private fun clearAccount() {
+        api.clearSession(); user=null; pendingCard=null
+        browsingAsGuest=false; showLogin=false; loginReason=null; sessionGeneration++
+    }
     init {
-        api.onUnauthorized = { viewModelScope.launch { user = null } }
+        api.onUnauthorized = { viewModelScope.launch { if(user != null) clearAccount() } }
         restore()
     }
     fun restore() = viewModelScope.launch {
@@ -46,6 +64,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
             if(!Platform.demo) SocialLogin(api).login(activity,provider)
             else api.request("api/v1/auth/demo","POST")
             user=api.request("api/v1/users")
+            browsingAsGuest=false; showLogin=false; loginReason=null; sessionGeneration++
         }
         syncPush()
     }
@@ -69,7 +88,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         app.accountLock.withLock {
             app.push.unregister()
             if(withdraw) api.request("api/v1/users/me","DELETE") else api.request("api/v1/auth/logout","POST")
-            api.clearSession(); user=null; pendingCard=null
+            clearAccount()
             if(!Platform.demo) SocialLogin(api).clear(activity)
         }
     }

@@ -115,6 +115,7 @@ final class StoryStore {
     }
 
     func toggleLike(_ original: NewsCard) async {
+        guard AuthSession.shared.requireLogin("좋아요를 저장하려면 로그인해 주세요.") else { return }
         let card = current(original)
         guard !busyIDs.contains(card.id) else { return }
         busyIDs.insert(card.id); defer { busyIDs.remove(card.id) }
@@ -128,6 +129,7 @@ final class StoryStore {
     }
 
     func markRead(_ original: NewsCard) async -> Bool {
+        guard AuthSession.shared.user != nil else { return false }
         let card = current(original)
         if card.read { return true }
         do {

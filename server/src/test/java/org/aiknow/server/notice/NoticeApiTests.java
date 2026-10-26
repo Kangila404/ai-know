@@ -45,6 +45,8 @@ class NoticeApiTests {
         var result = mvc.perform(post("/api/v1/admin/notices").session(admin).header("X-CSRF-TOKEN", token)
             .contentType(MediaType.APPLICATION_JSON).content(draft)).andExpect(status().isCreated()).andReturn();
         long id = mapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(get("/api/v1/notices/{id}", id)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/notices")).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(get("/api/v1/notices/{id}", id).session(reader)).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/notices").session(reader)).andExpect(jsonPath("$.totalElements").value(0));
         mvc.perform(get("/api/v1/admin/notices/{id}", id).session(admin)).andExpect(status().isOk());
@@ -52,6 +54,7 @@ class NoticeApiTests {
             .contentType(MediaType.APPLICATION_JSON).content(draft.replace("false", "true")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.publishedAt").isNotEmpty());
         mvc.perform(get("/api/v1/notices").session(reader)).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get("/api/v1/notices/{id}", id)).andExpect(status().isOk()).andExpect(jsonPath("$.content").value("본문"));
         mvc.perform(put("/api/v1/admin/notices/{id}", id).session(admin).header("X-CSRF-TOKEN", token)
             .contentType(MediaType.APPLICATION_JSON).content(draft)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/notices/{id}", id).session(reader)).andExpect(status().isNotFound());
@@ -64,7 +67,7 @@ class NoticeApiTests {
     void enforcesRolesCsrfAndInputLimits() throws Exception {
         var admin = login(UserRole.ADMIN); var reader = login(UserRole.USER);
         var body = "{\"title\":\"공지\",\"content\":\"본문\",\"published\":true}";
-        mvc.perform(get("/api/v1/notices")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/notices")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/admin/notices").session(reader)).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/admin/notices").session(admin).contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isForbidden());

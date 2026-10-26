@@ -15,7 +15,7 @@ struct AppFlowView: View {
                     }
                 }
             case .login:
-                LoginView {
+                LoginView(onGuest: { login.browseWithoutLogin(); move(to: .app) }) {
                     move(to: authenticatedScreen)
                 }
             case .onboarding:
@@ -24,15 +24,18 @@ struct AppFlowView: View {
                 }
             case .app:
                 RootTabView()
-                    .task { await PushNotifications.shared.refresh() }
+                    .id(login.sessionGeneration)
+                    .task { if login.user != nil { await PushNotifications.shared.refresh() } }
             }
         }
         .animation(.snappy, value: screen)
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("AIKnowSessionExpired"))) { _ in
-            login.expireSession()
+            if login.user != nil { login.expireSession() }
         }
-        .onChange(of: login.user == nil) { _, signedOut in
-            if signedOut { move(to: .login) }
+        .onChange(of: login.user?.userId) { _, userID in
+            guard screen != .splash else { return }
+            if userID != nil { move(to: authenticatedScreen) }
+            else if !login.browsingAsGuest { move(to: .login) }
         }
     }
 

@@ -51,6 +51,11 @@ public class SecurityConfig {
             .requestCache(AbstractHttpConfigurer::disable)
 
             .authorizeHttpRequests(auth -> auth
+                // Only published-content reads are public. Never expose an API subtree or a write method.
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                    "/api/v1/cardNews", "/api/v1/cardNews/today", "/api/v1/cardNews/categories",
+                    "/api/v1/cardNews/cardSlides", "/api/v1/cardNews/{id:[0-9]+}",
+                    "/api/v1/notices", "/api/v1/notices/{id:[0-9]+}").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/social/providers").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/social/*/challenge", "/api/v1/auth/social/*").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/media/generated/*", "/avatars/*.png").permitAll()

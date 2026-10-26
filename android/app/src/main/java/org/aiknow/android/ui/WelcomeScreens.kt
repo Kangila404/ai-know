@@ -8,6 +8,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.animation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -56,7 +59,7 @@ private val introLines=listOf(
     var step by rememberSaveable{mutableIntStateOf(prefs.getInt("step",0).coerceIn(introLines.indices))}
     var moving by remember{mutableStateOf(false)}
     val motion=ValueAnimator.areAnimatorsEnabled()
-    LaunchedEffect(step){if(moving&&motion)delay(700);moving=false}
+    LaunchedEffect(step){if(moving&&motion)delay(400);moving=false}
     fun goBack(){if(!moving&&step>0){moving=true;step--;prefs.edit().putInt("step",step).apply()}}
     BackHandler(step>0){goBack()}
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal=28.dp,vertical=16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -87,11 +90,16 @@ private val introLines=listOf(
                 }
             }
         }
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            if(step>0)TextButton(onClick={goBack()},enabled=!moving){Text("이전")}
-            Button(onClick={if(step==introLines.lastIndex)onFinish()else{moving=true;step++;prefs.edit().putInt("step",step).apply()}},enabled=!moving,modifier=Modifier.weight(1f).heightIn(min=56.dp)) {
-                Text(introLines[step].response);Spacer(Modifier.width(12.dp));Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(18.dp))
-            }
+        val interaction=remember{MutableInteractionSource()}
+        val pressed by interaction.collectIsPressedAsState()
+        val buttonScale by animateFloatAsState(if(pressed&&motion).97f else 1f,if(motion)spring(dampingRatio=.8f,stiffness=500f)else snap(),label="응답 버튼")
+        Button(onClick={if(step==introLines.lastIndex)onFinish()else{moving=true;step++;prefs.edit().putInt("step",step).apply()}},enabled=!moving,interactionSource=interaction,
+            colors=ButtonDefaults.buttonColors(disabledContainerColor=MaterialTheme.colorScheme.primary,disabledContentColor=MaterialTheme.colorScheme.onPrimary),
+            modifier=Modifier.fillMaxWidth().heightIn(min=56.dp).graphicsLayer{scaleX=buttonScale;scaleY=buttonScale}) {
+            AnimatedContent(introLines[step].response,transitionSpec={
+                (fadeIn(tween(if(motion)240 else 0))+slideInVertically(tween(if(motion)240 else 0)){it/3}) togetherWith fadeOut(tween(if(motion)120 else 0))
+            },label="응답 문구"){response->Text(response)}
+            Spacer(Modifier.width(12.dp));Icon(Icons.AutoMirrored.Filled.ArrowForward,null,Modifier.size(18.dp))
         }
     }
 }
