@@ -1,3 +1,7 @@
+# Immutable public media only. Never cache authenticated application/API responses.
+proxy_cache_path /var/cache/nginx/aiknow-media levels=1:2 keys_zone=aiknow_media:8m
+    max_size=256m inactive=30d use_temp_path=off;
+
 server {
     listen 80;
     server_name ${API_DOMAIN};
@@ -21,6 +25,29 @@ server {
 
     location ~ ^/(internal/|actuator/|swagger-ui|v3/api-docs) {
         return 404;
+    }
+    location ~ "^/media/generated/[a-f0-9]{64}[.]png$" {
+        set $backend http://server:8080;
+        proxy_pass $backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Authorization "";
+        proxy_set_header Cookie "";
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Prefix "";
+        proxy_set_header Forwarded "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+        proxy_cache aiknow_media;
+        proxy_cache_key "$uri$is_args$args";
+        proxy_cache_lock on;
+        proxy_cache_valid 200 30d;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 60s;
+        add_header X-Media-Cache $upstream_cache_status always;
     }
     location / {
         set $backend http://server:8080;

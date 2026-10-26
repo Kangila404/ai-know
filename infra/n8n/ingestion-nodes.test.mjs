@@ -18,6 +18,16 @@ test('maps n8n draft into the server contract and preserves attribution', () => 
   assert.equal(converted.slides[0].image.sourceUrl, 'https://example.com/image');
 });
 
+test('Commons tracking-only URLs allow client thumbnails while signed URLs and credits stay intact', () => {
+  const input=draft(),im=input.slides[0].visual.image;
+  const original='https://upload.wikimedia.org/wikipedia/commons/a/ab/Example%20Image.jpg';
+  im.url=original+'?utm_source=commons&utm_campaign=imageinfo';
+  const result=toImportRequest(input).slides[0].image;
+  assert.equal(result.url,original);assert.match(result.credit,/Author.*CC BY 4.0/);
+  im.url=original+'?signature=keep&utm_source=commons';
+  assert.equal(toImportRequest(input).slides[0].image.url,im.url);
+});
+
 test('does not silently lose generated images without permanent storage', () => {
   const input = draft();
   input.slides[0].visual.image = { origin: 'generated', url: null, binaryProperty: 'image_1' };

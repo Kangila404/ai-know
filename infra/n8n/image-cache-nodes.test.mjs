@@ -4,6 +4,20 @@ import { imageCacheNodes, imageCacheConnections } from './image-cache-nodes.mjs'
 
 const media={mode:'local',publicBaseUrl:'http://localhost:8080/media/generated'};
 const nodes=imageCacheNodes('http://server:8080',{},media);
+
+test('confirmed upload releases only its binary while failed receipts preserve recovery data', () => {
+  const key='b'.repeat(64)+'.png';
+  const receipt={key,url:media.publicBaseUrl+'/'+key,contentType:'image/png',size:300};
+  const before={json:{assets:[{key:'concept',generationPrompt:'Concept',image:{binaryProperty:'image_concept'}}],assetIndex:1},
+    binary:{image_concept:{data:'large-original'},pending:{data:'pending'}}};
+  const run=new Function('$','$input',nodes.find(n=>n.id==='aiknow-image-persisted').parameters.jsCode);
+  const result=run(()=>({itemMatching:()=>before}),{first:()=>({json:{statusCode:201,body:receipt}})})[0];
+  assert.deepEqual(Object.keys(result.binary),['pending']);
+  assert.equal(result.json.assets[0].image.url,receipt.url);
+  assert.equal(before.binary.image_concept.data,'large-original');
+  assert.throws(()=>run(()=>({itemMatching:()=>before}),{first:()=>({json:{statusCode:500}})}),/저장 실패/);
+  assert.equal(before.binary.image_concept.data,'large-original');
+});
 test('stored image receipt restores an asset without OpenAI or binary data', () => {
   const key='a'.repeat(64)+'.png',receipt={key,url:media.publicBaseUrl+'/'+key,contentType:'image/png',size:300};
   const state={assets:[{key:'concept',generationPrompt:'Concept'}],assetIndex:0,counters:{},imageClaim:{decision:'REPLAY',responseJson:JSON.stringify(receipt)}};

@@ -1,5 +1,16 @@
 # Public image previews and profile avatars
 
+Production proxy update (2026-10-26): immutable `/media/generated/{sha256}.png` responses now use a bounded
+256 MiB Nginx disk cache, with the query string included in its key so originals and previews remain distinct.
+Concurrent cold requests are coalesced. Only public hash-addressed image paths enter this cache; application/API
+responses do not. Upstream cache-control rules remain in effect. The cache can be rebuilt after container replacement.
+Confirmed uploads also stop carrying their Binary through subsequent n8n loop iterations.
+
+Observed production sample: PNG original 1,244,744 bytes; 320px JPEG 27,604 bytes; reading JPEG 141,599 bytes
+(about 98% and 89% smaller). First requests returned `X-Media-Cache: MISS`; repeated preview requests returned `HIT`.
+Download times from the developer connection were 1.93s original, 0.86s cached thumbnail and 1.24s cached reading image.
+These are single-request observations, not a mobile performance benchmark. Original files and image credits remain intact.
+
 Generated image originals remain available at `/media/generated/{sha256}.png` without query parameters. `GET`/`HEAD` with `?preview=320` or `?preview=1280` returns a JPEG with that maximum side length, preserved aspect ratio, and a white transparency background. Other nonzero sizes return 400. Originals are not rewritten. Preview responses are immutable and cacheable for one year; the process retains at most 32 MiB of encoded previews in LRU order. Cold transforms are serialized to bound decoding memory. Restarting the process clears this memory cache.
 
 Card cover and slide response DTOs advertise `?preview=1280` for generated-image paths without existing query parameters/fragments. External image URLs remain unchanged. Existing clients can display this image normally. Updated iOS clients request 320px for list thumbnails, 1280px for reading, and remove the preview parameter when opening the original zoom image. The updated client does not request previews until the server advertises support, so either deployment order works.

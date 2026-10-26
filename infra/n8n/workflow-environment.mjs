@@ -19,8 +19,8 @@ export function readWorkflowEnvironment(env) {
     if (!['true', 'false'].includes(env[key])) throw new Error(`${key} must be true or false`);
     return env[key] === 'true';
   };
-  if (!/^[0-3]$/.test(env.AIKNOW_MAX_IMAGE_GENERATIONS ?? ''))
-    throw new Error('AIKNOW_MAX_IMAGE_GENERATIONS must be 0-3');
+  if (!/^[0-5]$/.test(env.AIKNOW_MAX_IMAGE_GENERATIONS ?? ''))
+    throw new Error('AIKNOW_MAX_IMAGE_GENERATIONS must be 0-5');
   const automation = env.AIKNOW_AUTOMATION_ENABLED ?? 'false';
   if (!['true', 'false'].includes(automation)) throw new Error('AIKNOW_AUTOMATION_ENABLED must be true or false');
   if (automation === 'true' && env.AIKNOW_DRY_RUN !== 'false') throw new Error('Automation requires AIKNOW_DRY_RUN=false');

@@ -1,4 +1,5 @@
-// This pure function is also embedded in the n8n Code node.
+import { formatCardText } from './card-text.mjs';
+// These pure functions are also embedded in the n8n Code node.
 export function toImportRequest(draft, media = {}) {
   const requiredText = (value, max, field) => {
     if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`Invalid ${field}`);
@@ -25,7 +26,16 @@ export function toImportRequest(draft, media = {}) {
       ? media.publicBaseUrl.replace(/\/+$/, '') + '/' : null;
     const localUrl = origin === 'GENERATED' && localPrefix && value.url.startsWith(localPrefix)
       && /^[a-f0-9]{64}\.png$/.test(value.url.slice(localPrefix.length));
-    return { url: localUrl ? value.url : https(value.url, 'image'), origin, sourceUrl, credit };
+    let url = localUrl ? value.url : https(value.url, 'image');
+    const parsed = new URL(url);
+    // Openverse adds tracking parameters to Commons originals. Those parameters
+    // prevent mobile clients from selecting the smaller Commons thumbnail URL.
+    if (parsed.hostname === 'upload.wikimedia.org' && !parsed.hash
+        && /^\/wikipedia\/commons\/[a-f0-9]\/[a-f0-9]{2}\/[^/]+\.(png|jpe?g|webp)$/i.test(parsed.pathname)
+        && [...parsed.searchParams.keys()].every(key => /^utm_(source|medium|campaign|term|content)$/.test(key))) {
+      parsed.search = ''; url = parsed.href;
+    }
+    return { url, origin, sourceUrl, credit };
   };
   const date = Date.parse(draft.publishedAt);
   if (!Number.isFinite(date)) throw new Error('Invalid publishedAt');
@@ -33,13 +43,13 @@ export function toImportRequest(draft, media = {}) {
   return {
     sourceTitle: requiredText(draft.sourceTitle, 500, 'sourceTitle'),
     sourceUrl: https(draft.sourceUrl, 'sourceUrl'), publishedAt: new Date(date).toISOString(),
-    title: requiredText(draft.title, 200, 'title'), summary: requiredText(draft.summary, 5000, 'summary'),
+    title: requiredText(draft.title, 200, 'title'), summary: formatCardText(requiredText(draft.summary, 5000, 'summary')),
     keyPoints: draft.keyPoints ?? [], titleImage: image(draft.titleImage),
     slides: draft.slides.map((slide, index) => {
       if (slide.sequence !== index + 1) throw new Error('Slides must be sequential');
       return {
         sequence: slide.sequence, title: requiredText(slide.title, 200, 'slide title'),
-        content: requiredText(slide.content, 5000, 'slide content'),
+        content: formatCardText(requiredText(slide.content, 5000, 'slide content')),
         layout: slide.layout ?? slide.visual?.type ?? null,
         image: image(slide.image ?? slide.visual?.image),
       };
@@ -52,7 +62,7 @@ export function ingestionNodes(url = 'http://host.docker.internal:8080/internal/
     {
       id: 'aiknow-import-transform', name: '서버 요청 변환', type: 'n8n-nodes-base.code', typeVersion: 2,
       position: [2496, 464],
-      parameters: { jsCode: `${toImportRequest.toString()}\nreturn $input.all().map((item, index) => ({ json: { request: toImportRequest(item.json, ${JSON.stringify(media)}), reviewWarnings: item.json.validation?.warnings ?? [] }, pairedItem: { item: index } }));` },
+      parameters: { jsCode: `${formatCardText.toString()}\n${toImportRequest.toString()}\nreturn $input.all().map((item, index) => ({ json: { request: toImportRequest(item.json, ${JSON.stringify(media)}), reviewWarnings: item.json.validation?.warnings ?? [] }, pairedItem: { item: index } }));` },
     },
     {
       id: 'aiknow-server-import', name: '서버 검수 대기 저장', type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2,

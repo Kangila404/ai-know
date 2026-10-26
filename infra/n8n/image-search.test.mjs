@@ -86,14 +86,14 @@ test('controller exhausts search before selecting; suitable existing images bypa
   next=runController(next);assert.equal(next.route,4);assert.equal(next.counters.imageCalls,0);
 });
 
-test('generation is last resort; disabled generation and exhausted generation budget preserve draft',()=>{
+test('search errors generate images; disabled or exhausted generation fails without storing incomplete cards',()=>{
   const state={phase:'assets',config:{allowImageGeneration:true,maxImageGenerations:3,dryRun:false,visualStyle:{illustration:'style'},imageModel:'fixture'},
     counters:{transitions:0,commonsCalls:0,imageCalls:0},assets:[{key:'topic',description:'topic',generationPrompt:'concept',candidates:[]}],assetIndex:0,audit:[],
     draft:{slides:[{sequence:1,visual:{type:'photo',assetKey:'topic'}}]}};
   let next=runController(state);assert.equal(next.route,3);assert.equal(next.counters.imageCalls,1);
-  state.config.allowImageGeneration=false;next=runController(state);assert.equal(next.route,4);assert.equal(next.counters.imageCalls,0);
-  state.config.allowImageGeneration=true;state.counters.imageCalls=3;next=runController(state);assert.equal(next.route,4);assert.equal(next.draft.slides[0].visual.type,'text');
-  state.counters.imageCalls=0;state.assets[0].searchFailures=1;next=runController(state);assert.equal(next.route,4);assert.equal(next.counters.imageCalls,0);
+  state.config.allowImageGeneration=false;next=runController(state);assert.equal(next.route,5);assert.equal(next.counters.imageCalls,0);
+  state.config.allowImageGeneration=true;state.counters.imageCalls=3;next=runController(state);assert.equal(next.route,5);assert.equal(next.draft.slides[0].visual.type,'photo');
+  state.counters.imageCalls=0;state.assets[0].searchFailures=1;next=runController(state);assert.equal(next.route,3);assert.equal(next.counters.imageCalls,1);
 });
 
 test('every embedded Code node compiles and graph references existing nodes',()=>{

@@ -46,8 +46,12 @@ return [{json:s,...(item.binary?{binary:item.binary}:{}),pairedItem:{item:0}}];`
 const r=$input.first().json;
 if(r.statusCode!==201)throw new Error('이미지 저장 실패. 원래 실행의 Binary로 복구하고 이미지를 재생성하지 마세요.');
 const before=$('생성 이미지 확보').itemMatching(0),s=JSON.parse(JSON.stringify(before.json));
+const uploadedProperty=s.assets[s.assetIndex-1].image.binaryProperty;
 attach(s,r.body,s.assetIndex-1);
-return [{json:s,...(before.binary?{binary:before.binary}:{}),pairedItem:{item:0}}];`),
+// Confirmed permanent storage replaces this binary in subsequent loop iterations.
+const binary={...before.binary};
+delete binary[uploadedProperty];
+return [{json:s,...(Object.keys(binary).length?{binary}:{}),pairedItem:{item:0}}];`),
   ];
 }
 
