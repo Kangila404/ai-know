@@ -12,8 +12,8 @@ final class GuestConnectionTests: XCTestCase {
         XCTAssertTrue(app.buttons["login.guest"].waitForExistence(timeout: 30))
         app.buttons["login.guest"].tap()
         XCTAssertTrue(app.staticTexts["둘러보는 중"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.tabBars.buttons["관리자"].exists)
-        app.tabBars.buttons["마이"].tap()
+        XCTAssertFalse(app.tabBars.buttons["관리자"].firstMatch.exists)
+        app.tabBars.buttons["마이"].firstMatch.tap()
         XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
         app.alerts.buttons["계속 둘러보기"].tap()
         app.buttons["공지사항"].tap()
@@ -22,7 +22,7 @@ final class GuestConnectionTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["서버에서 받은 공지 본문"].waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        app.tabBars.buttons["아카이브"].tap()
+        app.tabBars.buttons["아카이브"].firstMatch.tap()
         XCTAssertTrue(app.buttons["archive.card.9001"].waitForExistence(timeout: 15))
         app.buttons["좋아요"].firstMatch.tap()
         XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
@@ -42,6 +42,38 @@ final class GuestConnectionTests: XCTestCase {
     }
 }
 
+final class OnboardingSetupTests: XCTestCase {
+    @MainActor func testFirstMemberSetupAndReturningMember() throws {
+        let data = try? Data(contentsOf: URL(string: "http://localhost:18081/__fixture")!)
+        let fixture = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Bool] }
+        try XCTSkipIf(fixture?["onboardingSetup"] != true, "Run with ios/tests/test_onboarding_ui.py")
+        continueAfterFailure = false
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.buttons["건너뛰기"].waitForExistence(timeout: 30)); app.buttons["건너뛰기"].tap()
+        let name = app.textFields["onboarding.nickname"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10)); name.tap()
+        let previous = name.value as? String ?? ""
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: previous.count) + "새 회원")
+        app.buttons["입력 완료"].tap()
+        let toggle = app.switches["onboarding.daily"]
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        XCTAssertTrue(app.datePickers["onboarding.time"].waitForExistence(timeout: 5))
+        app.buttons["저장하고 시작하기"].tap()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.firstMatch.waitForExistence(timeout: 5) {
+            for label in ["Allow", "허용"] where springboard.alerts.buttons[label].exists { springboard.alerts.buttons[label].tap() }
+        }
+        XCTAssertTrue(app.tabBars.buttons["아카이브"].firstMatch.waitForExistence(timeout: 20))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.tabBars.buttons["마이"].firstMatch.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["건너뛰기"].exists)
+        app.tabBars.buttons["마이"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["profile.nickname"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.buttons["profile.nickname"].value as? String, "새 회원")
+        app.terminate()
+    }
+}
+
 // Execute with ios/tests/test_content_ui.py, which supplies an isolated API fixture.
 final class ContentConnectionTests: XCTestCase {
     @MainActor
@@ -53,6 +85,7 @@ final class ContentConnectionTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["건너뛰기"].waitForExistence(timeout: 30))
         app.buttons["건너뛰기"].tap()
+        XCTAssertTrue(app.buttons["나중에 설정"].waitForExistence(timeout: 15)); app.buttons["나중에 설정"].tap()
         XCTAssertTrue(app.tabBars.buttons["아카이브"].firstMatch.waitForExistence(timeout: 20))
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         if springboard.alerts.firstMatch.waitForExistence(timeout: 3) {
@@ -76,6 +109,11 @@ final class ContentConnectionTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         XCTAssertLessThan(pagination.frame.minY - body.frame.maxY, 90, "Short cards should use the available height")
         let layout = XCTAttachment(screenshot: app.screenshot()); layout.name = "full-height-fixture"; layout.lifetime = .keepAlways; add(layout)
+        app.buttons["이미지 확대"].firstMatch.tap()
+        let zoom = app.descendants(matching: .any)["image.zoom"].firstMatch
+        XCTAssertTrue(zoom.waitForExistence(timeout: 15))
+        zoom.pinch(withScale: 2, velocity: 1)
+        app.buttons["닫기"].tap()
         app.buttons["좋아요"].tap()
         XCTAssertTrue(app.buttons["좋아요 취소"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["다음 카드"].exists)
@@ -401,6 +439,82 @@ final class AdminAPIConnectionTests: XCTestCase {
         reveal(notice, app)
         XCTAssertFalse(app.buttons["숨김"].exists)
         XCTAssertFalse(app.buttons["복원"].exists)
+        app.terminate()
+    }
+    @MainActor func testHOperationalAlerts() throws {
+        let app = try launch()
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__alerts?mode=error-once")!)
+        app.buttons["자동화·발송 알림"].tap()
+        XCTAssertTrue(app.buttons["다시 시도"].waitForExistence(timeout: 10)); app.buttons["다시 시도"].tap()
+        XCTAssertTrue(app.staticTexts["새 초안 도착"].waitForExistence(timeout: 10))
+        app.buttons["콘텐츠 검수 열기"].tap()
+        XCTAssertTrue(app.navigationBars["콘텐츠 검수 #1"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let more = app.buttons["더 보기"]; reveal(more, app); more.tap()
+        let candidate = app.staticTexts["승인된 뉴스는 후보이며 발송이 확정되지 않았습니다."]
+        reveal(candidate, app); XCTAssertTrue(candidate.exists)
+        let date = app.staticTexts["대상 날짜 2026-11-04"]; reveal(date, app)
+        let card = app.buttons["카드뉴스 관리 열기"].firstMatch; reveal(card, app); card.tap()
+        XCTAssertTrue(app.navigationBars["카드뉴스 수정"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        for title in ["오늘의 카드 선정", "AI 이론 게시", "새 콘텐츠 없음"] { reveal(app.staticTexts[title], app) }
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "admin-operational-alerts"; shot.lifetime = .keepAlways; add(shot)
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__alerts?mode=empty")!)
+        app.navigationBars.buttons.element(boundBy: 0).tap(); app.buttons["자동화·발송 알림"].tap()
+        XCTAssertTrue(app.staticTexts["아직 운영 알림이 없습니다"].waitForExistence(timeout: 10))
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__alerts?mode=normal")!)
+        let list = app.collectionViews.firstMatch
+        list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+            .press(forDuration: 0.1, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)))
+        XCTAssertTrue(app.staticTexts["새 초안 도착"].waitForExistence(timeout: 10))
+        app.terminate()
+    }
+    @MainActor private func openTestNotification(_ query: String) throws {
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__push?" + query)!)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        if springboard.alerts.firstMatch.waitForExistence(timeout: 3) {
+            for label in ["열기", "Open"] where springboard.alerts.buttons[label].exists {
+                springboard.alerts.buttons[label].tap()
+            }
+        }
+    }
+    @MainActor func testINotificationRouting() throws {
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=ADMIN")!)
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__alerts?mode=normal")!)
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-test-notifications"]
+        app.launchEnvironment["AIKNOW_UI_TEST_NOTIFICATION"] = "com.googleusercontent.apps.911270764810-7fv7p889f1ir36ilnfg18qqldvqga0ng://aiknow-ui-test?adminAlertId=101&cardNewsId=9001"
+        app.launch()
+        XCTAssertTrue(app.navigationBars["자동화·발송 알림"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["새 초안 도착"].waitForExistence(timeout: 10))
+        // A second tap replaces the open sheet instead of presenting competing sheets.
+        try openTestNotification("cardNewsId=9001")
+        XCTAssertTrue(app.staticTexts["서버 슬라이드"].waitForExistence(timeout: 15))
+        app.buttons["닫기"].tap()
+        // The app is still foregrounded with the old role. Routing must recheck it.
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=USER")!)
+        try openTestNotification("adminAlertId=102")
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.tabBars.buttons["관리자"].firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 15), .completed)
+        XCTAssertFalse(app.navigationBars["자동화·발송 알림"].exists)
+        app.terminate()
+    }
+    @MainActor func testJGuestNotificationGuard() throws {
+        _ = try Data(contentsOf: URL(string: "http://localhost:18082/__role?role=GUEST")!)
+        let app = XCUIApplication(); app.launchArguments = ["--ui-test-notifications"]
+        app.launchEnvironment["AIKNOW_UI_TEST_NOTIFICATION"] = "com.googleusercontent.apps.911270764810-7fv7p889f1ir36ilnfg18qqldvqga0ng://aiknow-ui-test?adminAlertId=101"
+        app.launch()
+        XCTAssertTrue(app.buttons["login.guest"].waitForExistence(timeout: 30)); app.buttons["login.guest"].tap()
+        XCTAssertTrue(app.tabBars.buttons["아카이브"].firstMatch.waitForExistence(timeout: 15))
+        try openTestNotification("adminAlertId=102")
+        try openTestNotification("cardNewsId=9001")
+        XCTAssertTrue(app.staticTexts["서버 슬라이드"].waitForExistence(timeout: 15))
+        app.buttons["좋아요"].tap()
+        XCTAssertTrue(app.alerts["로그인이 필요한 기능이에요"].waitForExistence(timeout: 5))
+        app.alerts.buttons["계속 둘러보기"].tap()
+        XCTAssertTrue(app.staticTexts["서버 슬라이드"].exists)
+        XCTAssertFalse(app.tabBars.buttons["관리자"].firstMatch.exists)
+        XCTAssertFalse(app.navigationBars["자동화·발송 알림"].exists)
         app.terminate()
     }
     @MainActor func testDRoleChangesUpdateRightmostTab() throws {

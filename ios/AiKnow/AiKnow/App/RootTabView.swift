@@ -3,9 +3,7 @@ import SwiftUI
 struct RootTabView: View {
     @State private var store = StoryStore()
     @State private var login = AuthSession.shared
-    @State private var pushed: PushDestination?
-    @State private var showAdminAlerts = false
-    private struct PushDestination: Identifiable { let id: Int64 }
+    @State private var pushed: PushNotifications.Destination?
 
     var body: some View {
         @Bindable var store = store
@@ -41,35 +39,40 @@ struct RootTabView: View {
         .tint(AppPalette.accent)
         .environment(store)
         .modifier(GuestAccessPresentation(enabled: pushed == nil))
-        .onChange(of: AuthSession.shared.isAdmin) { _, isAdmin in
-            if !isAdmin { showAdminAlerts = false }
-            if !isAdmin && store.selectedTab == .admin { store.selectedTab = .profile }
+        .onChange(of: login.isAdmin) { _, isAdmin in
+            if !isAdmin, case .adminAlert = pushed { pushed = nil }
+            if !isAdmin && store.selectedTab == .admin { store.selectedTab = login.user == nil ? .today : .profile }
         }
-        .task(id: PushNotifications.shared.pendingAdminAlertID) {
-            guard PushNotifications.shared.pendingAdminAlertID != nil else { return }
-            defer { PushNotifications.shared.pendingAdminAlertID = nil }
-            guard login.isAdmin else { return }
-            store.selectedTab = .admin
-            pushed = nil
-            showAdminAlerts = true
-        }
-        .sheet(isPresented: $showAdminAlerts) {
-            NavigationStack {
-                AdminAlertsView()
-                    .toolbar { ToolbarItem(placement: .topBarLeading) { Button("닫기") { showAdminAlerts = false } } }
+        .task(id: PushNotifications.shared.pendingDestination) {
+            guard let destination = PushNotifications.shared.pendingDestination else { return }
+            let generation = login.sessionGeneration
+            defer {
+                if PushNotifications.shared.pendingDestination == destination { PushNotifications.shared.pendingDestination = nil }
             }
-        }
-        .task(id: PushNotifications.shared.pendingCardID) {
-            if let id = PushNotifications.shared.pendingCardID {
-                pushed = PushDestination(id: id)
-                PushNotifications.shared.pendingCardID = nil
+            if case .adminAlert = destination {
+                guard login.user != nil else { return }
+                do { try await login.refreshUser() }
+                catch {
+                    if !Task.isCancelled, login.user != nil { store.actionError = "관리자 권한을 확인하지 못했습니다. 관리자 탭에서 알림을 다시 열어 주세요." }
+                    return
+                }
+                guard login.isAdmin else { return }
             }
+            guard !Task.isCancelled, login.sessionGeneration == generation else { return }
+            if case .adminAlert = destination { store.selectedTab = .admin }
+            pushed = destination
         }
         .sheet(item: $pushed) { destination in
             NavigationStack {
-                CardNewsDetailView(cardID: destination.id)
-                    .toolbar { ToolbarItem(placement: .topBarLeading) { Button("닫기") { pushed = nil } } }
-            }.environment(store).modifier(GuestAccessPresentation(enabled: true))
+                Group {
+                    switch destination {
+                    case .card(let id): CardNewsDetailView(cardID: id)
+                    case .adminAlert:
+                        if login.isAdmin { AdminAlertsView() }
+                    }
+                }
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("닫기") { pushed = nil } } }
+            }.id(destination).environment(store).modifier(GuestAccessPresentation(enabled: true))
         }
         .alert("요청을 완료하지 못했습니다", isPresented: Binding(get: { store.actionError != nil }, set: { if !$0 { store.actionError = nil } })) {
             Button("확인") { store.actionError = nil }

@@ -28,6 +28,11 @@ class Handler(BaseHTTPRequestHandler):
     def handle_request(self):
         url = urlsplit(self.path)
         path, query = url.path, parse_qs(url.query)
+        if self.command == "GET" and path == "/avatars/lumi-v1.png":
+            image = (Path(__file__).resolve().parents[2] / "server/src/main/resources/static/avatars/lumi-v1.png").read_bytes()
+            self.send_response(200); self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(image))); self.end_headers(); self.wfile.write(image)
+            checks.add("image"); return
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
         method = self.command
         code, value = 200, None
@@ -96,7 +101,7 @@ if __name__ == "__main__":
                 "-configuration", "Debug", "-destination", f"platform=iOS Simulator,id={args.device}", "-jobs", "2",
                 "-only-testing:AiKnowUITests/ContentConnectionTests", "AIKNOW_API_BASE_URL=http://localhost:18081",
                 "ONLY_ACTIVE_ARCH=YES", "test"], cwd=root, stdout=log, stderr=subprocess.STDOUT)
-        expected = {"card-open", "onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings"}
+        expected = {"card-open", "onboarding", "search", "category", "liked-filter", "slides", "like", "read", "notice", "nickname", "profile", "settings", "image"}
         print("UI test exit:", result.returncode, "Verified:", ", ".join(sorted(checks)), "Missing:", ", ".join(sorted(expected - checks)))
         assert result.returncode == 0 and checks >= expected
         assert writes == {"nickname": 1, "profile": 1}, writes

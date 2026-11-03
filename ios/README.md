@@ -389,3 +389,39 @@ Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니�
 Apple 네이티브 로그인은 기존 ASAuthorizationAppleIDProvider와 서버의 일회성 nonce·Apple JWKS 검증을 사용합니다. Apple Developer에서 `org.aiknow.AiKnow` App ID의 Sign in with Apple capability 및 최신 계약을 확인한 뒤 Mac에서 새로 서명/빌드해야 합니다. 서버는 `APPLE_LOGIN_ENABLED=true`, `APPLE_CLIENT_IDS=org.aiknow.AiKnow`를 사용합니다.
 
 이번 Windows 작업에서는 iOS Xcode 빌드·TestFlight 업로드·실기기 Apple 로그인/푸시 수신을 검증하지 못했습니다. Mac에서 신규 관리자 목록, 로그인 후 푸시 이동, 권한 강등 후 접근 차단, 일반 카드 푸시 회귀를 확인해야 합니다. Firebase 서버 서비스 계정 및 iOS APNs 인증이 준비되어야 실제 푸시가 발송됩니다.
+
+
+### 2026-11-03 Mac iOS 보완 — PR #33
+
+`feat/android-native`의 API 계약을 기준으로 기존 SwiftUI 앱을 보완했습니다. Apple/Google/Kakao 네이티브 로그인과 서버 세션·CSRF 흐름을 유지합니다.
+
+- 비회원은 공개 콘텐츠를 읽으며, 좋아요·프로필은 로그인 안내를 취소하면 읽던 화면으로 돌아갑니다.
+- 첫 가입 시 소개 화면 다음에 닉네임·알림 권한·한국 시간 기준 수신 시각을 설정합니다. 저장을 마친 뒤 온보딩 완료를 기록하며, 나중에 설정하거나 기존 회원이면 반복하지 않습니다.
+- 관리자 운영 알림은 서버 제목/본문·생성 시각·대상 날짜를 표시합니다. 발송 후보와 선정 결과를 구분하며 검수/카드 관리로 이동합니다. 상세에서 돌아오면 읽던 목록과 페이지를 유지합니다.
+- 알림 탭은 하나의 목적지로 처리합니다. `adminAlertId`가 있으면 관리자 권한을 다시 확인한 뒤 운영 알림을 열며, `cardNewsId`는 공개 카드 상세를 엽니다. 권한 강등/로그아웃 이후 관리자 화면과 오래된 요청 응답을 차단합니다.
+
+재현 명령 (켜진 시뮬레이터의 UDID 사용):
+
+```sh
+python3 ios/tests/test_guest_ui.py --device <UDID>
+python3 ios/tests/test_onboarding_ui.py --device <UDID>
+python3 ios/tests/test_content_ui.py --device <UDID>
+python3 ios/tests/test_admin_ui.py --device <UDID>
+python3 ios/tests/test_login_ui.py --device <UDID>
+```
+
+테스트는 격리된 HTTP fixture를 사용합니다. 운영 콘텐츠나 사용자 계정을 수정하지 않습니다. 관리자 알림 이동 입력은 Debug + 명시적 UI 테스트 실행 인자 + localhost:18082에서만 작동하며 로그인/역할을 우회하지 않습니다. Release에는 이 입력 경로가 포함되지 않습니다. 실제 FCM 수신 테스트와 구분합니다.
+
+테스트 후 일반 Debug 앱을 `AIKNOW_API_BASE_URL=https://aiknow.kro.kr`로 다시 빌드/설치해야 합니다. 서버 `FCM_ENABLED`와 `NEWS_BATCH_ENABLED`, Android 설정 및 n8n은 이번 Mac 작업에서 변경하지 않았습니다.
+
+
+Mac 검증 기록 (2026-11-03):
+
+- 비회원 UI: 공개 콘텐츠·공지 열람, 좋아요/마이 로그인 안내와 취소, 개인 API 요청 0건 확인.
+- 관리자 UI: 검수/게시, 공지/프로필 CRUD, 생성 복구, 역할 변경, 사용자 관리, 조회 통계, 발송 대기 카드, 운영 알림의 오류/재시도·페이지·빈 상태·새로고침·관련 상세 이동 확인. 운영 알림의 상세 복귀 시 페이지 초기화 문제를 수정했습니다.
+- 알림 이동: cold start 관리자 입력, 실행 중 일반 카드로 화면 교체, 서버 역할 강등 시 관리자 탭 제거, 비회원 관리자 접근 차단과 공개 카드 로그인 안내 취소 확인. FCM 실제 수신 검증은 아닙니다.
+- 첫 가입 UI: 닉네임 변경, 알림 활성화, 서버 한국 시각 유지, 설정 저장 후 완료 처리, 재실행 시 온보딩 생략 확인.
+- 콘텐츠 UI: 이미지 다운로드/확대, 좌우 스와이프, 긴 본문 끝까지 스크롤, 출처 펼침, 검색/카테고리/좋아요/읽음, 공지, 닉네임과 아바타 개별 변경, 알림 자동 저장 확인.
+- 운영 서버 읽기 확인: health/public cards/providers 200, GOOGLE/KAKAO/APPLE 노출, 비로그인 관리자 알림 401.
+
+로컬 증거: `.local/ios-pr33/`와 Xcode DerivedData의 `Logs/Test/*.xcresult`. UI 테스트는 실제 OAuth 자격 증명/실서버 사용자 데이터로 수행한 검증과 구분합니다.

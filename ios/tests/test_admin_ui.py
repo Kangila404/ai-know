@@ -10,9 +10,21 @@ from pathlib import Path
 import subprocess
 import threading
 from urllib.parse import urlsplit, parse_qs
+import urllib.parse
 import test_content_ui as content
 
 checks, failures = set(), []
+alert_mode = "normal"
+device = None
+alerts = [
+ {"id": 101, "type": "DRAFT_READY", "title": "새 초안 도착", "body": "검수 후 승인해 주세요.", "submissionId": 1},
+ {"id": 102, "type": "AUTOMATION_FAILED", "title": "자동화 실패", "body": "저장 단계에서 실패했습니다."},
+ {"id": 103, "type": "DELIVERY_CANDIDATE", "title": "뉴스 발송 후보", "body": "승인된 뉴스는 후보이며 발송이 확정되지 않았습니다.", "cardNewsId": 9002, "deliveryDate": "2026-11-04"},
+ {"id": 104, "type": "DELIVERY_SELECTED", "title": "오늘의 카드 선정", "body": "오늘 사용할 카드가 선정되었습니다.", "cardNewsId": 9002},
+ {"id": 105, "type": "THEORY_PUBLISHED", "title": "AI 이론 게시", "body": "아카이브에 게시되었습니다.", "cardNewsId": 9002},
+ {"id": 106, "type": "AUTOMATION_NO_CONTENT", "title": "새 콘텐츠 없음", "body": "검토할 새 초안이 없습니다."}
+]
+for alert in alerts: alert["createdAt"] = "2026-11-03T11:00:00Z"
 draft = {"sourceTitle": "검증 원문", "sourceUrl": "https://example.com/admin-fixture", "publishedAt": "2026-10-23T00:00:00Z",
          "title": "운영 카드", "summary": "관리자 HTTP 연결 검증", "keyPoints": ["API 계약 검증"],
          "slides": [{"sequence": 1, "title": "검증 슬라이드", "content": "운영 카드 본문", "layout": "text"}]}
@@ -50,8 +62,22 @@ class Handler(content.Handler):
             super().send_header("Set-Cookie", "JSESSIONID=fixture-session; Path=/; HttpOnly")
 
     def handle_request(self):
+        global alert_mode
         path = urlsplit(self.path).path
         query = parse_qs(urlsplit(self.path).query)
+        if path in ["/__alerts", "/__push"]:
+            if path == "/__alerts": alert_mode = query["mode"][0]
+            else:
+                scheme = "com.googleusercontent.apps.911270764810-7fv7p889f1ir36ilnfg18qqldvqga0ng"
+                url = scheme + "://aiknow-ui-test?" + urllib.parse.urlencode({k:v[0] for k,v in query.items()})
+                subprocess.run(["xcrun", "simctl", "openurl", device, url], check=True, capture_output=True)
+                checks.add("notification-payload")
+            self.send_response(200); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if path == "/api/v1/admin/alerts" and alert_mode == "error-once":
+            alert_mode = "normal"; checks.add("alerts-error")
+            self.send_response(503); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if path == "/api/v1/users" and content.state.get("userRole") == "GUEST":
+            self.send_response(401); self.send_header("Content-Length", "0"); self.end_headers(); return
         if not path.startswith(("/api/v1/admin/", "/__role")):
             return super().handle_request()
         method = self.command
@@ -87,6 +113,11 @@ class Handler(content.Handler):
             target["version"] += 1
             audits.append({"id": len(audits)+1, "action": action, "actorId": 1, "occurredAt": "2026-10-23T00:00:00Z", "reason": body.get("reason", "관리자 승인")})
         checks.add(f"{method} {path}")
+        if resource == "alerts":
+            index = int(query.get("page", ["0"])[0])
+            checks.add("alerts-page-" + str(index))
+            if alert_mode == "empty": checks.add("alerts-empty"); return page([])
+            return {"content": alerts[:2] if index == 0 else alerts[2:], "last": index > 0}
         if resource == "users":
             if ident is None:
                 values = list(accounts.values())
@@ -199,8 +230,9 @@ class Handler(content.Handler):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--device", required=True)
-    parser.add_argument("--only", action="append", choices=["testAReviewAndPublication", "testBNoticeAndProfileCRUD", "testCGenerationRecovery", "testDRoleChangesUpdateRightmostTab", "testEUserAdministration", "testFAnalytics", "testGReadyArticle"])
+    parser.add_argument("--only", action="append", choices=["testAReviewAndPublication", "testBNoticeAndProfileCRUD", "testCGenerationRecovery", "testDRoleChangesUpdateRightmostTab", "testEUserAdministration", "testFAnalytics", "testGReadyArticle", "testHOperationalAlerts", "testINotificationRouting", "testJGuestNotificationGuard"])
     args = parser.parse_args()
+    device = args.device
     content.state.update(onboardingCompleted=True, userRole="ADMIN")
     root = Path(__file__).resolve().parents[2]
     server = ThreadingHTTPServer(("127.0.0.1", 18082), Handler)
@@ -227,6 +259,11 @@ if __name__ == "__main__":
         if not args.only or 'testFAnalytics' in args.only:
             expected |= {'cards-PUBLISHED', 'cards-READY', 'cards-HIDDEN', 'legacy-card-counts', 'GET /api/v1/admin/card-news/9002'}
         if not args.only or 'testGReadyArticle' in args.only: expected.add('GET /api/v1/admin/card-news/9004')
-        print('UI exit:'  ,result.returncode,'Verified:',len(checks),'Missing:',sorted(expected-checks),'Contract failures:',failures)
+        if not args.only or 'testHOperationalAlerts' in args.only:
+            expected |= {'alerts-error', 'alerts-page-0', 'alerts-page-1', 'alerts-empty'}
+        if not args.only or 'testINotificationRouting' in args.only: expected |= {'notification-payload', 'role-USER'}
+        if not args.only or 'testJGuestNotificationGuard' in args.only: expected |= {'notification-payload', 'role-GUEST'}
+        if args.only == ['testJGuestNotificationGuard']: expected.discard('role-ADMIN')
+        print('UI exit:',result.returncode,'Verified:',len(checks),'Missing:',sorted(expected-checks),'Contract failures:',failures)
         assert result.returncode == 0 and expected <= checks and not failures
     finally: server.shutdown()

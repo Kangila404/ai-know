@@ -9,6 +9,7 @@ private struct AdminOperationalAlert: Decodable, Identifiable {
     let createdAt: String
     let submissionId: Int64?
     let cardNewsId: Int64?
+    let deliveryDate: String?
 }
 
 struct AdminAlertsView: View {
@@ -17,8 +18,11 @@ struct AdminAlertsView: View {
     @State private var last = false
     @State private var loading = false
     @State private var error: String?
+    @State private var generation = 0
 
     var body: some View {
+        Group {
+        if AuthSession.shared.isAdmin {
         List {
             Section {
                 ForEach(rows) { row in
@@ -27,12 +31,13 @@ struct AdminAlertsView: View {
                             .font(.headline)
                         Text(row.body).font(.subheadline)
                         Text(adminDate(row.createdAt)).font(.caption).foregroundStyle(.secondary)
+                        if let date = row.deliveryDate { Text("대상 날짜 \(date)").font(.caption).foregroundStyle(.secondary) }
                         if let id = row.submissionId {
                             NavigationLink("콘텐츠 검수 열기") { EditorialDetailView(id: id, kind: .submissions) }
                         } else if let id = row.cardNewsId {
                             NavigationLink("카드뉴스 관리 열기") { EditorialDetailView(id: id, kind: .articles) }
                         }
-                    }.padding(.vertical, 5)
+                    }.padding(.vertical, 5).accessibilityIdentifier("admin.alert.\(row.id)")
                 }
             } footer: {
                 Text("발송 후보와 실제 선정 결과는 다를 수 있습니다. 검수 승인은 직접 진행해 주세요.")
@@ -43,27 +48,40 @@ struct AdminAlertsView: View {
             else if !last { Button("더 보기") { Task { await load() } } }
         }
         .navigationTitle("자동화·발송 알림").navigationBarTitleDisplayMode(.inline)
-        .task { await load(reset: true) }
+        .task { if page == 0 { await load(reset: true) } }
         .refreshable { await load(reset: true) }
+        } else { ContentUnavailableView("관리자 권한이 필요합니다", systemImage: "lock") }
+        }
+        .onChange(of: AuthSession.shared.isAdmin) { _, allowed in
+            if !allowed { generation += 1; rows = []; error = nil; loading = false }
+        }
     }
 
     private func load(reset: Bool = false) async {
-        guard !loading, AuthSession.shared.isAdmin else { return }
+        guard AuthSession.shared.isAdmin, reset || (!loading && !last) else { return }
+        if reset { generation += 1 }
+        let ticket = generation
+        let account = AuthSession.shared.sessionGeneration
         loading = true; error = nil
-        defer { loading = false }
+        defer { if ticket == generation { loading = false } }
         let requestedPage = reset ? 0 : page
         do {
             let result: AdminPage<AdminOperationalAlert> = try await APIClient.shared.decode("api/v1/admin/alerts", query: [
                 URLQueryItem(name: "page", value: String(requestedPage)), URLQueryItem(name: "size", value: "20")
             ])
             try Task.checkCancellation()
-            guard AuthSession.shared.isAdmin else { rows = []; return }
+            guard ticket == generation, AuthSession.shared.sessionGeneration == account, AuthSession.shared.isAdmin else { return }
             if reset { rows = [] }
             let ids = Set(rows.map(\.id))
             rows += result.content.filter { !ids.contains($0.id) }
             page = requestedPage + 1; last = result.last
         } catch is CancellationError { }
-        catch { self.error = error.localizedDescription }
+        catch let failure as URLError where failure.code == .cancelled { }
+        catch {
+            guard ticket == generation, AuthSession.shared.sessionGeneration == account else { return }
+            self.error = error.localizedDescription
+            if case APIError.http(403) = error { rows = []; await AuthSession.shared.refreshAccountIfSignedIn() }
+        }
     }
 }
 

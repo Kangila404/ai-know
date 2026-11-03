@@ -22,8 +22,7 @@ final class AuthSession {
     func browseWithoutLogin() {
         guard user == nil, !busy else { return }
         APIClient.shared.clearSession()
-        PushNotifications.shared.pendingCardID = nil
-        PushNotifications.shared.pendingAdminAlertID = nil
+        PushNotifications.shared.pendingDestination = nil
         browsingAsGuest = true; showLogin = false; loginReason = nil; errorMessage = nil
         sessionGeneration = UUID()
     }
@@ -159,17 +158,24 @@ final class AuthSession {
         } catch { return false }
     }
 
-    func refreshUser() async throws { user = try await APIClient.shared.currentUser() }
+    func refreshUser() async throws {
+        let generation = sessionGeneration
+        let refreshed = try await APIClient.shared.currentUser()
+        try Task.checkCancellation()
+        guard sessionGeneration == generation, user != nil else { throw CancellationError() }
+        user = refreshed
+    }
 
     private var refreshingUser = false
     func refreshAccountIfSignedIn() async {
         guard let current = user, !busy, !refreshingUser else { return }
         refreshingUser = true
+        let generation = sessionGeneration
         defer { refreshingUser = false }
         do {
             let updated = try await APIClient.shared.currentUser()
             // Do not restore a stale account if logout or another sign-in completed meanwhile.
-            guard !busy, user != nil, user?.userId == current.userId else { return }
+            guard !busy, sessionGeneration == generation, user != nil, user?.userId == current.userId else { return }
             user = updated
         } catch { /* APIClient handles 401; keep the current screen on transient network failures. */ }
     }
@@ -187,8 +193,7 @@ final class AuthSession {
     func expireSession() {
         user = nil
         browsingAsGuest = false; showLogin = false; loginReason = nil
-        PushNotifications.shared.pendingCardID = nil
-        PushNotifications.shared.pendingAdminAlertID = nil
+        PushNotifications.shared.pendingDestination = nil
         sessionGeneration = UUID()
         APIClient.shared.clearSession()
     }
@@ -202,8 +207,7 @@ final class AuthSession {
             _ = try await APIClient.shared.request(path: "api/v1/users/me", method: "DELETE")
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
-            PushNotifications.shared.pendingCardID = nil
-            PushNotifications.shared.pendingAdminAlertID = nil
+            PushNotifications.shared.pendingDestination = nil
             expireSession()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -220,8 +224,7 @@ final class AuthSession {
                 _ = try await APIClient.shared.request(path: "api/v1/device-tokens", method: "DELETE", body: JSONEncoder().encode(Body(token: token)))
             }
             try await APIClient.shared.logout()
-            PushNotifications.shared.pendingCardID = nil
-            PushNotifications.shared.pendingAdminAlertID = nil
+            PushNotifications.shared.pendingDestination = nil
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
             expireSession()
