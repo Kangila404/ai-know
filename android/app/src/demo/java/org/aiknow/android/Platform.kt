@@ -45,6 +45,15 @@ class DemoGateway(context:Context):Gateway {
             "api/v1/profile"->return JsonArray(listOf(user.obj()["profile"]!!))
             "api/v1/notices","api/v1/admin/notices"->{if(method=="POST"){val n=changed(b,"id" to notices.size+1);notices=notices+n;return n};return page(if(path=="api/v1/notices")notices.filter{it.flag("published")}else notices,query)}
             "api/v1/admin/news-submissions"->return page(submissions.filter{it.text("status")==query["status"]},query)
+            "api/v1/admin/alerts"->{
+                val alerts=listOf(
+                    payload("id" to 3,"type" to "DRAFT_READY","title" to "새 초안이 도착했어요","body" to "AI 이론 초안의 내용과 이미지 출처를 검수해 주세요.","submissionId" to submissions.first().number("id"),"createdAt" to "2026-11-03T01:00:00Z"),
+                    payload("id" to 2,"type" to "DELIVERY_CANDIDATE","title" to "내일의 발송 후보가 준비됐어요","body" to "실제 선정 결과는 발송 시점에 결정됩니다.","cardNewsId" to cards.first().number("id"),"deliveryDate" to "2026-11-04","createdAt" to "2026-11-03T00:00:00Z"),
+                    payload("id" to 1,"type" to "AUTOMATION_FAILED","title" to "자동화 실행을 확인해 주세요","body" to "이 알림은 화면 검증용 데모입니다.","createdAt" to "2026-11-02T00:00:00Z")
+                )
+                val page=query["page"]?.toIntOrNull()?:0
+                return payload("content" to JsonArray(alerts.drop(page*2).take(2)),"last" to (page>=1))
+            }
             "api/v1/admin/card-news"->return page(cards.map{article(it)}.filter{query["status"].isNullOrEmpty()||it.text("publicationStatus")==query["status"]},query)
             "api/v1/admin/users"->return page(listOf(payload("id" to 2,"version" to 0,"userId" to "demo-reader","nickname" to "새로운 독자","role" to "USER","suspended" to false)),query)
             "api/v1/admin/analytics/summary"->return payload("users" to 12,"suspendedUsers" to 0,"publishedCards" to cards.size,"readyCards" to 0,"totalViews" to 128,"uniqueViewers" to 9)

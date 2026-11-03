@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -22,6 +24,7 @@ import androidx.navigation.compose.*
 import org.aiknow.android.*
 import org.aiknow.android.R
 import org.aiknow.android.data.*
+import org.aiknow.android.notifications.PushDestination
 
 @Composable fun AiKnowApp(model: AppModel) {
     val context=LocalContext.current
@@ -51,12 +54,13 @@ import org.aiknow.android.data.*
 }
 @Composable private fun LoginScreen(model: AppModel, allowGuest:Boolean=true, replayIntro:()->Unit) {
     val activity=requireNotNull(LocalActivity.current)
-    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.Center) {
+    Box(Modifier.fillMaxSize().safeDrawingPadding(),contentAlignment=Alignment.Center) {
+    Column(Modifier.widthIn(max=408.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=24.dp,vertical=32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
         Image(painterResource(R.drawable.brand_logo),"AI Know",Modifier.size(82.dp))
         Spacer(Modifier.height(24.dp))
         Text("AI KNOW",style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Bold)
-        Text("AI를 더 쉽게,\n매일 한 장씩",style=MaterialTheme.typography.headlineMedium,modifier=Modifier.padding(vertical=20.dp))
-        Text("복잡한 AI 이야기를 핵심만 담아 전해드려요.",color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("AI를 더 쉽게,\n매일 한 장씩",style=MaterialTheme.typography.headlineMedium,textAlign=TextAlign.Center,modifier=Modifier.padding(vertical=20.dp))
+        Text("복잡한 AI 이야기를 핵심만 담아 전해드려요.",textAlign=TextAlign.Center,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(48.dp))
         if(Platform.demo) {
             Text("디자인 확인용 데모 · 운영 계정 및 서버와 분리",style=MaterialTheme.typography.labelMedium)
@@ -64,10 +68,8 @@ import org.aiknow.android.data.*
         } else {
             model.providers.forEach { provider ->
                 val configured=if(provider=="GOOGLE") BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank() else BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank()
-                OutlinedButton(onClick={model.signIn(activity,provider)},enabled=configured&&!model.busy,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {
-                    if(provider=="GOOGLE"){Image(painterResource(R.drawable.google_symbol),null,Modifier.size(20.dp));Spacer(Modifier.width(12.dp))}
-                    Text(if(provider=="GOOGLE") "Google로 계속하기" else "카카오로 계속하기")
-                }
+                SocialLoginButton(provider,configured&&!model.busy) { model.signIn(activity,provider) }
+                Spacer(Modifier.height(12.dp))
                 if(!configured) Text("${if(provider=="GOOGLE") "Google" else "카카오"} 로그인 연결 준비 중",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(bottom=12.dp))
             }
             if(model.providers.isEmpty()) EmptyState("로그인을 준비 중이에요","연결 상태를 확인하고 다시 시도해 주세요.")
@@ -78,7 +80,19 @@ import org.aiknow.android.data.*
             OutlinedButton(onClick={model.browseAsGuest()},enabled=!model.busy,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)){Text("로그인 없이 둘러보기")}
             TextButton(onClick=replayIntro,enabled=!model.busy){Text("소개 다시 보기")}
         }
-        Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=18.dp))
+        Text("계속하면 서비스 이용약관 및 개인정보 처리방침에 동의하게 됩니다.",textAlign=TextAlign.Center,style=MaterialTheme.typography.bodySmall,modifier=Modifier.padding(top=18.dp))
+    }
+    }
+}
+@Composable internal fun SocialLoginButton(provider:String,enabled:Boolean,onClick:()->Unit) {
+    val kakao=provider=="KAKAO"
+    OutlinedButton(onClick=onClick,enabled=enabled,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp),shape=MaterialTheme.shapes.medium,
+        contentPadding=PaddingValues(horizontal=18.dp,vertical=14.dp),
+        colors=ButtonDefaults.outlinedButtonColors(containerColor=if(kakao)Color(0xFFFEE500) else MaterialTheme.colorScheme.surface,contentColor=if(kakao)Color(0xFF191919) else MaterialTheme.colorScheme.onSurface)) {
+        Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center) {
+            Image(painterResource(if(kakao)R.drawable.kakao_symbol else R.drawable.google_symbol),null,Modifier.align(Alignment.CenterStart).size(20.dp))
+            Text(if(kakao)"카카오로 계속하기" else "Google로 계속하기",Modifier.padding(horizontal=30.dp),textAlign=TextAlign.Center,style=MaterialTheme.typography.titleMedium)
+        }
     }
 }
 @Composable private fun SignedInApp(model: AppModel) {
@@ -86,13 +100,18 @@ import org.aiknow.android.data.*
     val entry by nav.currentBackStackEntryAsState()
     val route=entry?.destination?.route ?: "today"
     val roots=listOf("today","archive","me","admin")
-    LaunchedEffect(model.admin) { if(!model.admin && route.startsWith("admin")) nav.navigate("me") { popUpTo("today");launchSingleTop=true } }
-    LaunchedEffect(model.pendingCard) { model.pendingCard?.let { nav.navigate("card/$it"); model.pendingCard=null } }
-    LaunchedEffect(model.pendingAdminAlert) {
-        if(model.pendingAdminAlert != null) {
-            if(model.admin) nav.navigate("admin/alerts") { launchSingleTop=true }
-            model.pendingAdminAlert=null
-        }
+    LaunchedEffect(model.admin,route) { if(!model.admin && route.startsWith("admin")) nav.navigate(if(model.user==null) "today" else "me") { popUpTo("today");launchSingleTop=true } }
+    LaunchedEffect(model.pendingPush) {
+        val pending=model.pendingPush ?: return@LaunchedEffect
+        val session=model.sessionGeneration
+        try {
+            when(val destination=pending.destination) {
+                is PushDestination.Card -> nav.navigate("card/${destination.id}") { launchSingleTop=true }
+                is PushDestination.AdminAlert -> if(model.authorizeAdminPush() && model.sessionGeneration==session && model.pendingPush==pending) {
+                    nav.navigate("admin/alerts") { launchSingleTop=true }
+                }
+            }
+        } finally { model.consumePush(pending) }
     }
     Scaffold(topBar={if(model.user==null && route in roots) Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
         Text("둘러보는 중",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
@@ -112,7 +131,11 @@ import org.aiknow.android.data.*
             composable("notifications") { if(model.user!=null)NotificationScreen(model){nav.popBackStack()} }
             composable("notices") { NoticeScreen(model){nav.popBackStack()} }
             composable("admin") { if(model.admin) AdminHome {nav.navigate(it)} }
-            composable("admin/{kind}") { e -> if(model.admin) AdminList(model,e.arguments!!.getString("kind")!!,{nav.popBackStack()}) {kind,id->nav.navigate("admin/$kind/$id")} }
+            composable("admin/{kind}") { e -> if(model.admin) {
+                val kind=e.arguments!!.getString("kind")!!
+                if(kind=="alerts") AdminAlertsScreen(model,{nav.popBackStack()}) { target,id->nav.navigate("admin/$target/$id") }
+                else AdminList(model,kind,{nav.popBackStack()}) {target,id->nav.navigate("admin/$target/$id")}
+            } }
             composable("admin/{kind}/{id}") { e -> if(model.admin) AdminDetail(model,e.arguments!!.getString("kind")!!,e.arguments!!.getString("id")!!.toLong(),back={nav.popBackStack()},openArticle={nav.navigate("admin/articles/$it")}) }
         }
     }

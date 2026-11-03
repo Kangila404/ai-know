@@ -16,8 +16,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); accept(intent) }
     override fun onResume() { super.onResume(); model.refreshAccount() }
     private fun accept(intent: Intent) {
-        val admin = intent.getStringExtra("adminAlertId")?.toLongOrNull()?.takeIf { it > 0 }
-        if (admin != null) model.pendingAdminAlert = admin
-        else intent.getStringExtra("cardNewsId")?.toLongOrNull()?.takeIf { it > 0 }?.let { model.pendingCard=it }
+        model.acceptPush(intent.getStringExtra("adminAlertId"), intent.getStringExtra("cardNewsId"))
     }
 }

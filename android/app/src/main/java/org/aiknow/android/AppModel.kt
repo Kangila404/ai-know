@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.*
 import org.aiknow.android.auth.SocialLogin
 import org.aiknow.android.data.*
+import org.aiknow.android.notifications.*
 
 class AppModel(application: Application) : AndroidViewModel(application) {
     val app = application as AiKnowApplication
@@ -20,8 +21,12 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var error by mutableStateOf<String?>(null)
     var pushError by mutableStateOf<String?>(null); private set
     var providers by mutableStateOf<List<String>>(emptyList()); private set
-    var pendingCard by mutableStateOf<Long?>(null)
-    var pendingAdminAlert by mutableStateOf<Long?>(null)
+    var pendingPush by mutableStateOf<PendingPush?>(null); private set
+    private var pushSequence = 0L
+    fun acceptPush(adminAlertId: String?, cardNewsId: String?) {
+        PushDestination.parse(adminAlertId, cardNewsId)?.let { pendingPush=PendingPush(it, ++pushSequence) }
+    }
+    fun consumePush(push: PendingPush) { if(pendingPush == push) pendingPush=null }
     var contentRevision by mutableIntStateOf(0); private set
     fun contentChanged() { contentRevision++ }
     val admin get() = user?.text("userRole") == "ADMIN"
@@ -29,9 +34,10 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var showLogin by mutableStateOf(false)
     var loginReason by mutableStateOf<String?>(null)
     var sessionGeneration by mutableIntStateOf(0); private set
+    private val userRefreshLock=kotlinx.coroutines.sync.Mutex()
     fun browseAsGuest() {
         if(user != null || busy) return
-        api.clearSession(); pendingCard=null; pendingAdminAlert=null; error=null
+        api.clearSession(); pendingPush=null; error=null
         browsingAsGuest=true; showLogin=false; loginReason=null; sessionGeneration++
     }
     fun requireLogin(reason:String):Boolean {
@@ -40,7 +46,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         return false
     }
     private fun clearAccount() {
-        api.clearSession(); user=null; pendingCard=null; pendingAdminAlert=null
+        api.clearSession(); user=null; pendingPush=null
         browsingAsGuest=false; showLogin=false; loginReason=null; sessionGeneration++
     }
     init {
@@ -69,11 +75,34 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         }
         syncPush()
     }
-    suspend fun refreshUser() { user=api.request("api/v1/users") }
+    suspend fun refreshUser(): Boolean {
+        val generation=sessionGeneration
+        val account=user?.text("userId") ?: return false
+        return userRefreshLock.withLock {
+            if(generation != sessionGeneration || user?.text("userId") != account) return@withLock false
+            val refreshed=api.request("api/v1/users")
+            if(generation != sessionGeneration || user?.text("userId") != account) return@withLock false
+            user=refreshed
+            true
+        }
+    }
+    suspend fun authorizeAdminPush(): Boolean {
+        if(user == null) return false
+        val generation=sessionGeneration
+        return try {
+            val current=refreshUser()
+            if(current && !admin) error="관리자 계정으로만 볼 수 있는 알림입니다."
+            current && admin
+        } catch(e: CancellationException) { throw e }
+        catch(_: Exception) {
+            if(generation==sessionGeneration && user != null) error="관리자 권한을 확인하지 못했습니다. 연결 상태를 확인하고 다시 시도해 주세요."
+            false
+        }
+    }
     fun refreshAccount() {
         if(user == null || busy) return
         viewModelScope.launch { app.accountLock.withLock {
-            if(user != null) try { refreshUser() } catch(_: Exception) { }
+            if(user != null) try { refreshUser() } catch(e: CancellationException) { throw e } catch(_: Exception) { }
         } }
     }
     fun onboarding(time:String, notifications:Boolean) = action {

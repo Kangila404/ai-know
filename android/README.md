@@ -85,3 +85,13 @@ Apple 로그인은 iOS 네이티브 인증 전용입니다. Android에서 Apple 
 인트로는 화면의 이전 버튼을 제거하고 응답 버튼의 폭·색상을 유지합니다. 눌림 스프링과 문구 전환 애니메이션을 적용했고 시스템 애니메이션 비활성화를 따릅니다. Android 시스템 뒤로 가기는 유지합니다.
 
 검증: 서버 테스트 88개 중 81개 통과, 환경/옵트인 조건으로 7개 건너뜀. Android 단위 테스트 14개와 API 36의 UI 테스트 3개 통과, liveDebug 빌드 및 lint 오류 0개. `GuestJourneyTest`는 공개 읽기·로그인 취소 후 위치 유지·로그인 전환·개인 API 요청이 없는 것을 검사합니다. 이 기록은 로컬 검증이며 운영 배포를 의미하지 않습니다.
+
+## PR #33 iOS 동작 맞춤 (2026-11-03)
+
+- `assembleLiveDebug`, demoDebug APK 빌드, `testLiveDebugUnitTest` 20개, `lintLiveDebug` 오류 0개 통과. lint 권고 경고는 34개입니다.
+- D드라이브 Android Studio와 `AiKnow_API_36` 에뮬레이터를 실행했습니다. 기존 UI 회귀 3개와 신규 관리자 테스트 3개가 먼저 통과했고, 지연 응답·로그인 배치 테스트를 추가한 뒤 변경 관련 5개를 다시 통과했습니다. 전체 고유 UI 테스트는 8개입니다.
+- `AdminParityTest`: 관리자 권한 재조회, 강등/네트워크 실패 시 진입 차단, 로그아웃 후 지연 응답 무시, 대상 날짜·관련 상세 이동, 복귀 시 페이지 보존을 검증합니다.
+- `SocialLoginLayoutTest`: Google/카카오 버튼의 높이·좌우 정렬·텍스트 중심을 라이트/다크 양쪽에서 검사하고 캡처합니다. 실제 OAuth 요청은 보내지 않습니다.
+- `AdminAlertsModelTest`는 페이지 중복 제거, 새로고침 실패 후 첫 페이지 재시도, 늦은 응답 무시 및 403 발생 시 목록 제거를 검사합니다. `PushDestinationTest`는 양수 ID·관리자 목적지 우선·잘못된 관리자 payload 차단을 검사합니다.
+- 명령: `gradlew.bat :app:assembleLiveDebug :app:testLiveDebugUnitTest :app:lintLiveDebug :app:connectedDemoDebugAndroidTest`. 변경 테스트만 실행할 때는 `-Pandroid.testInstrumentationRunnerArguments.class=org.aiknow.android.AdminParityTest,org.aiknow.android.SocialLoginLayoutTest`를 추가합니다.
+- 로컬 증거는 `.local/android-ios-parity-*.log`, `.local/android-parity-visual/`입니다(Git 제외). Windows 화면 제어 도구 초기화 실패로 화면 검증은 Android instrumentation 캡처를 사용했습니다. 운영 계정/콘텐츠·FCM 설정은 변경하지 않았습니다.
