@@ -68,7 +68,7 @@ export function importPayload(source, current) {
       .map(type => [type, previous.credentials[type]]));
     // New media nodes may reuse the target instance's existing ingestion token,
     // but only for the exact API paths on that same backend.
-    const suffix = { 'aiknow-image-upload': '/internal/v1/images', 'aiknow-storage-check': '/internal/v1/images/storage',
+    const suffix = { 'aiknow-automation-event': '/internal/v1/automation/events', 'aiknow-image-upload': '/internal/v1/images', 'aiknow-storage-check': '/internal/v1/images/storage',
       'aiknow-generation-existing': '/internal/v1/generation/existing', 'aiknow-generation-claim': '/internal/v1/generation/claim',
       'aiknow-selection-context': '/internal/v1/generation/selection-context',
       'aiknow-generation-save': '/internal/v1/generation/response',
@@ -161,6 +161,13 @@ export function main(args = process.argv.slice(2), runtime = {}) {
     let payload = importPayload(outcome === 'import' ? source : current, current);
     if (credential) {
       payload = bindIngestionCredential(payload, env.AIKNOW_SERVER_BASE_URL, credential);
+    }
+    // Validate parent bindings before changing either workflow. Deploy its error
+    // handler first so a published parent never references a missing handler.
+    if (source.settings?.errorWorkflow === 'aiknow-automation-errors') {
+      main([action, 'ai-know-automation-errors.json', ...flags.filter(f => f !== '--token-stdin')], { ...runtime, env });
+    }
+    if (credential) {
       syncIngestionCredential(credential, current, tempDirectory, cli);
       console.log('Ingestion credential synchronized from the server environment.');
     }

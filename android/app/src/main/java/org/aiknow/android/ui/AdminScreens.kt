@@ -21,14 +21,14 @@ import org.aiknow.android.AppModel
 import org.aiknow.android.Platform
 import org.aiknow.android.data.*
 
-private val titles=mapOf("submissions" to "콘텐츠 검수","articles" to "카드뉴스 관리","users" to "유저 관리","notices" to "공지 관리","profiles" to "프로필 이미지 관리","generations" to "생성 복구")
+private val titles=mapOf("alerts" to "자동화·발송 알림","submissions" to "콘텐츠 검수","articles" to "카드뉴스 관리","users" to "유저 관리","notices" to "공지 관리","profiles" to "프로필 이미지 관리","generations" to "생성 복구")
 private fun endpoint(kind:String)=when(kind){"submissions"->"api/v1/admin/news-submissions";"articles"->"api/v1/admin/card-news";"profiles"->"api/v1/profile";else->"api/v1/admin/$kind"}
 fun JsonElement.changed(key:String,value:JsonElement):JsonObject=JsonObject(obj()+ (key to value))
 @Composable fun AdminHome(navigate:(String)->Unit) {
     Page("관리자") { padding->LazyColumn(Modifier.padding(padding),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item{Text("콘텐츠와 서비스를 관리하세요",style=MaterialTheme.typography.headlineSmall)}
         item{Text("이론은 승인 즉시 아카이브에 공개됩니다. 뉴스는 발송이 시작되면 공개됩니다.",style=MaterialTheme.typography.bodyMedium)}
-        listOf("콘텐츠 운영" to listOf("submissions","articles"),"서비스 관리" to listOf("notices","users","profiles"),"문제 해결" to listOf("generations")).forEach { (group,kinds) ->
+        listOf("콘텐츠 운영" to listOf("alerts","submissions","articles"),"서비스 관리" to listOf("notices","users","profiles"),"문제 해결" to listOf("generations")).forEach { (group,kinds) ->
             item{SectionTitle(group)}
             items(kinds){kind->ElevatedCard(onClick={navigate("admin/$kind")},modifier=Modifier.fillMaxWidth()){ListItem(headlineContent={Text(titles.getValue(kind))},supportingContent={Text(when(kind){"submissions"->"뉴스·AI 이론의 접수 및 승인";"articles"->"게시 중 · 발송 대기 · 숨김 · 조회수";"generations"->"저장된 생성 응답 복구 · 새 유료 생성 없음";else->"서비스 정보 관리"})},trailingContent={Icon(Icons.Default.ChevronRight,null)})}}
         }
@@ -45,7 +45,7 @@ fun JsonElement.changed(key:String,value:JsonElement):JsonObject=JsonObject(obj(
     Page(titles[kind]?:"관리",back,actions={Refresh{revision++};if(kind in listOf("notices","profiles"))IconButton(onClick={open(kind,0)}){Icon(Icons.Default.Add,"추가")}}) { padding->
         Column(Modifier.padding(padding)) {
             if(filters.isNotEmpty())Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){filters.forEach{f->FilterChip(filter==f,{filter=f;page=0},label={Text(if(f.isEmpty())"전체" else statusLabel(f))})}}
-            if(kind in listOf("submissions","articles"))Text(when {kind=="submissions"->"뉴스와 AI 이론 모두 이곳에서 검수합니다. 승인할 때 게시·발송 유형을 선택합니다.";filter=="READY"->"첫 유효 발송 시작 시 게시됩니다. 다음 날 발송이 보장되지는 않습니다.";filter=="HIDDEN"->"아카이브에 노출되지 않으며 발송되지 않습니다.";else->"아카이브에 공개된 카드입니다. AI 이론은 승인 즉시 게시됩니다."},Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.bodySmall)
+            if(kind in listOf("alerts","submissions","articles"))Text(when {kind=="submissions"->"뉴스와 AI 이론 모두 이곳에서 검수합니다. 승인할 때 게시·발송 유형을 선택합니다.";filter=="READY"->"첫 유효 발송 시작 시 게시됩니다. 다음 날 발송이 보장되지는 않습니다.";filter=="HIDDEN"->"아카이브에 노출되지 않으며 발송되지 않습니다.";else->"아카이브에 공개된 카드입니다. AI 이론은 승인 즉시 게시됩니다."},Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.bodySmall)
             if(kind=="users") {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("" to "전체 권한","ADMIN" to "관리자","USER" to "일반 사용자").forEach{(v,t)->FilterChip(role==v,{role=v;page=0},label={Text(t)})}}
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("" to "전체 상태","false" to "정상","true" to "이용 정지").forEach{(v,t)->FilterChip(suspended==v,{suspended=v;page=0},label={Text(t)})}}
@@ -62,10 +62,11 @@ fun JsonElement.changed(key:String,value:JsonElement):JsonObject=JsonObject(obj(
                     items(data.rows()){row->
                         val article=if(kind=="articles")row.obj()["news"]?:row else row
                         val id=article.number("id")
-                        ElevatedCard(onClick={open(kind,id)},modifier=Modifier.fillMaxWidth()){
+                        ElevatedCard(onClick={if(kind!="alerts") open(kind,id) else if(row.number("submissionId")>0) open("submissions",row.number("submissionId")) else if(row.number("cardNewsId")>0) open("articles",row.number("cardNewsId"))},modifier=Modifier.fillMaxWidth()){
                             Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                                 Text(article.text("title",article.text("nickname",article.text("name",article.text("task","기록 #$id")))) ,style=MaterialTheme.typography.titleMedium)
-                                if(kind=="users")Text("${statusLabel(row.text("role"))} · ${if(row.flag("suspended"))"이용 정지" else "정상"}")
+                                if(kind=="alerts") { Text(row.text("body")); Text(adminDate(row.text("createdAt")),style=MaterialTheme.typography.bodySmall) }
+                                else if(kind=="users")Text("${statusLabel(row.text("role"))} · ${if(row.flag("suspended"))"이용 정지" else "정상"}")
                                 else Text(statusLabel(row.text("status",row.text("publicationStatus"))),style=MaterialTheme.typography.labelMedium)
                                 if(kind=="articles")LoadPane("counts:$id:$revision",{articleWithStatistics(model.api,row)}){stats,_->Text(stats.viewCounts(),style=MaterialTheme.typography.bodySmall)}
                                 if(kind=="articles")Text("${statusLabel(article.text("contentType"))} · ${if(article.text("publicationDate").isNotBlank())"게시 ${adminDate(article.text("publicationDate"))}" else "승인 ${adminDate(row.text("approvedAt"))}"}",style=MaterialTheme.typography.bodySmall)

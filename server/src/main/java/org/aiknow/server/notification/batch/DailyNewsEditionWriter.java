@@ -13,6 +13,7 @@ public class DailyNewsEditionWriter {
     private final DailyNewsEditionRepository editions;
     private final CardNewsRepository news;
     private final NewsDeliveryProperties properties;
+    private final org.aiknow.server.notification.admin.AdminAlertService alerts;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public DailyNewsEdition select(LocalDate date, Instant now) {
@@ -23,6 +24,8 @@ public class DailyNewsEditionWriter {
         var candidates = news.findUnusedNews(cutoff, PageRequest.of(0, 1));
         if (candidates.isEmpty()) candidates = news.findTheoryForDelivery(cutoff, PageRequest.of(0, 1));
         Long articleId = candidates.isEmpty() ? null : candidates.getFirst().getId();
-        return editions.saveAndFlush(DailyNewsEdition.select(date, articleId, now, cutoff));
+        var edition = editions.saveAndFlush(DailyNewsEdition.select(date, articleId, now, cutoff));
+        alerts.editionSelected(date, articleId);
+        return edition;
     }
 }

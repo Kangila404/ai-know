@@ -16,6 +16,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     org.springframework.data.domain.Page<User> search(String query, org.aiknow.server.user.domain.UserRole role, Boolean suspended, org.springframework.data.domain.Pageable pageable);
 
     long countBySuspended(boolean suspended);
+    java.util.List<User> findByUserRoleAndSuspendedFalse(org.aiknow.server.user.domain.UserRole role);
     boolean existsByIdAndSuspendedFalse(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

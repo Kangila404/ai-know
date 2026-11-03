@@ -20,20 +20,25 @@ function harness(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiknow-credential-test-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   fs.copyFileSync(sourceFile, path.join(dir, filename));
-  const db = { workflow: null, credentials: new Map(), calls: [], tempFiles: [] };
+  fs.copyFileSync(new URL('./workflows/ai-know-automation-errors.json', import.meta.url), path.join(dir, 'ai-know-automation-errors.json'));
+  const workflows = new Map();
+  const mainId = JSON.parse(fs.readFileSync(sourceFile, 'utf8')).id;
+  const db = { get workflow() { return workflows.get(mainId); }, set workflow(value) { workflows.set(mainId, value); }, workflows, credentials: new Map(), calls: [], tempFiles: [] };
   const cli = args => {
     db.calls.push(args);
     const option = name => args.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
     if (args[0] === 'export:workflow') {
-      fs.writeFileSync(option('output'), JSON.stringify(db.workflow ? [db.workflow] : []));
+      fs.writeFileSync(option('output'), JSON.stringify([...workflows.values()]));
     } else if (args[0] === 'import:workflow') {
-      [db.workflow] = JSON.parse(fs.readFileSync(option('input'), 'utf8'));
-      db.workflow.versionId = 'imported-version-' + db.calls.length;
-      db.workflow.shared = [{ role: 'workflow:owner', projectId: 'owner-project' }];
+      const [saved] = JSON.parse(fs.readFileSync(option('input'), 'utf8'));
+      workflows.set(saved.id, saved);
+      saved.versionId = 'imported-version-' + db.calls.length;
+      saved.shared = [{ role: 'workflow:owner', projectId: 'owner-project' }];
     } else if (args[0] === 'publish:workflow') {
-      assert.equal(option('id'), db.workflow.id);
-      db.workflow.active = true;
-      db.workflow.activeVersionId = db.workflow.versionId;
+      const saved = workflows.get(option('id'));
+      assert.ok(saved);
+      saved.active = true;
+      saved.activeVersionId = saved.versionId;
     } else if (args[0] === 'import:credentials') {
       const [credential] = JSON.parse(fs.readFileSync(option('input'), 'utf8'));
       db.credentials.set(credential.id, credential);
@@ -53,11 +58,11 @@ function harness(t) {
 test('first deployment provisions one credential and binds every internal API without embedding the token', t => {
   const { db, dir, apply } = harness(t);
   apply();
-  assert.equal(db.credentials.size, 1);
+  assert.equal(db.credentials.size, 2);
   const internal = db.workflow.nodes.filter(n => typeof n.parameters?.url === 'string'
     && n.parameters.url.startsWith('http://server:8080/internal/'));
-  assert.equal(internal.length, 9);
-  const [credential] = db.credentials.values();
+  assert.equal(internal.length, 10);
+  const credential = db.credentials.get(ingestionCredential(db.workflow.id, token).id);
   for (const node of internal) assert.equal(node.credentials.httpHeaderAuth.id, credential.id);
   for (const node of db.workflow.nodes.filter(n => !internal.includes(n))) {
     assert.notEqual(node.credentials?.httpHeaderAuth?.id, credential.id);
@@ -115,7 +120,7 @@ test('token rotation updates the same credential without importing or unpublishi
   runtime.env.N8N_INGEST_TOKEN = 'rotated-test-token-'.repeat(4);
   db.calls = [];
   apply();
-  assert.equal(db.credentials.size, 1);
+  assert.equal(db.credentials.size, 2);
   assert.equal([...db.credentials.values()][0].data.value, `Bearer ${runtime.env.N8N_INGEST_TOKEN}`);
   assert.deepEqual(db.workflow, before);
   assert.ok(!db.calls.some(args => args[0] === 'import:workflow'));

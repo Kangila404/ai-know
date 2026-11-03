@@ -21,6 +21,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var pushError by mutableStateOf<String?>(null); private set
     var providers by mutableStateOf<List<String>>(emptyList()); private set
     var pendingCard by mutableStateOf<Long?>(null)
+    var pendingAdminAlert by mutableStateOf<Long?>(null)
     var contentRevision by mutableIntStateOf(0); private set
     fun contentChanged() { contentRevision++ }
     val admin get() = user?.text("userRole") == "ADMIN"
@@ -30,7 +31,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
     var sessionGeneration by mutableIntStateOf(0); private set
     fun browseAsGuest() {
         if(user != null || busy) return
-        api.clearSession(); pendingCard=null; error=null
+        api.clearSession(); pendingCard=null; pendingAdminAlert=null; error=null
         browsingAsGuest=true; showLogin=false; loginReason=null; sessionGeneration++
     }
     fun requireLogin(reason:String):Boolean {
@@ -39,7 +40,7 @@ class AppModel(application: Application) : AndroidViewModel(application) {
         return false
     }
     private fun clearAccount() {
-        api.clearSession(); user=null; pendingCard=null
+        api.clearSession(); user=null; pendingCard=null; pendingAdminAlert=null
         browsingAsGuest=false; showLogin=false; loginReason=null; sessionGeneration++
     }
     init {

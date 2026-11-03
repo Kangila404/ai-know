@@ -88,6 +88,12 @@ import org.aiknow.android.data.*
     val roots=listOf("today","archive","me","admin")
     LaunchedEffect(model.admin) { if(!model.admin && route.startsWith("admin")) nav.navigate("me") { popUpTo("today");launchSingleTop=true } }
     LaunchedEffect(model.pendingCard) { model.pendingCard?.let { nav.navigate("card/$it"); model.pendingCard=null } }
+    LaunchedEffect(model.pendingAdminAlert) {
+        if(model.pendingAdminAlert != null) {
+            if(model.admin) nav.navigate("admin/alerts") { launchSingleTop=true }
+            model.pendingAdminAlert=null
+        }
+    }
     Scaffold(topBar={if(model.user==null && route in roots) Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
         Text("둘러보는 중",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
         TextButton(onClick={nav.navigate("notices")}){Text("공지사항")}

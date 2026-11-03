@@ -41,6 +41,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         Task { @MainActor in
             PushNotifications.shared.lastNotificationTitle = response.notification.request.content.title
+            if let raw = response.notification.request.content.userInfo["adminAlertId"],
+               let id = Int64(String(describing: raw)), id > 0 {
+                PushNotifications.shared.pendingAdminAlertID = id
+                completionHandler()
+                return
+            }
             let raw = response.notification.request.content.userInfo["cardNewsId"]
             if let raw, let id = Int64(String(describing: raw)), id > 0 {
                 PushNotifications.shared.pendingCardID = id
@@ -59,6 +65,7 @@ final class PushNotifications {
     var status = "알림 권한을 허용해 주세요."
     var lastNotificationTitle: String?
     var pendingCardID: Int64?
+    var pendingAdminAlertID: Int64?
     private var syncing = false
     private var syncWaiters: [CheckedContinuation<Void, Never>] = []
 

@@ -4,6 +4,7 @@ struct RootTabView: View {
     @State private var store = StoryStore()
     @State private var login = AuthSession.shared
     @State private var pushed: PushDestination?
+    @State private var showAdminAlerts = false
     private struct PushDestination: Identifiable { let id: Int64 }
 
     var body: some View {
@@ -41,7 +42,22 @@ struct RootTabView: View {
         .environment(store)
         .modifier(GuestAccessPresentation(enabled: pushed == nil))
         .onChange(of: AuthSession.shared.isAdmin) { _, isAdmin in
+            if !isAdmin { showAdminAlerts = false }
             if !isAdmin && store.selectedTab == .admin { store.selectedTab = .profile }
+        }
+        .task(id: PushNotifications.shared.pendingAdminAlertID) {
+            guard PushNotifications.shared.pendingAdminAlertID != nil else { return }
+            defer { PushNotifications.shared.pendingAdminAlertID = nil }
+            guard login.isAdmin else { return }
+            store.selectedTab = .admin
+            pushed = nil
+            showAdminAlerts = true
+        }
+        .sheet(isPresented: $showAdminAlerts) {
+            NavigationStack {
+                AdminAlertsView()
+                    .toolbar { ToolbarItem(placement: .topBarLeading) { Button("닫기") { showAdminAlerts = false } } }
+            }
         }
         .task(id: PushNotifications.shared.pendingCardID) {
             if let id = PushNotifications.shared.pendingCardID {

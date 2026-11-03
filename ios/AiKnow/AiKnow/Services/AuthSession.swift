@@ -23,6 +23,7 @@ final class AuthSession {
         guard user == nil, !busy else { return }
         APIClient.shared.clearSession()
         PushNotifications.shared.pendingCardID = nil
+        PushNotifications.shared.pendingAdminAlertID = nil
         browsingAsGuest = true; showLogin = false; loginReason = nil; errorMessage = nil
         sessionGeneration = UUID()
     }
@@ -187,6 +188,7 @@ final class AuthSession {
         user = nil
         browsingAsGuest = false; showLogin = false; loginReason = nil
         PushNotifications.shared.pendingCardID = nil
+        PushNotifications.shared.pendingAdminAlertID = nil
         sessionGeneration = UUID()
         APIClient.shared.clearSession()
     }
@@ -201,6 +203,7 @@ final class AuthSession {
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
             PushNotifications.shared.pendingCardID = nil
+            PushNotifications.shared.pendingAdminAlertID = nil
             expireSession()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -218,6 +221,7 @@ final class AuthSession {
             }
             try await APIClient.shared.logout()
             PushNotifications.shared.pendingCardID = nil
+            PushNotifications.shared.pendingAdminAlertID = nil
             GIDSignIn.sharedInstance.signOut()
             TokenManager.manager.deleteToken()
             expireSession()

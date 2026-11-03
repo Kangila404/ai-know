@@ -12,15 +12,14 @@ public class FirebasePushSender implements PushSender {
     public Result send(PushSender.Message request) {
         var message = com.google.firebase.messaging.Message.builder()
             .setToken(request.token())
-            .setNotification(Notification.builder().setTitle("오늘의 AI 뉴스").setBody(request.title()).build())
-            .putData("cardNewsId", request.cardNewsId().toString())
-            .putData("notificationId", request.deliveryId().toString())
+            .setNotification(Notification.builder().setTitle(request.notificationTitle()).setBody(request.title()).build())
+            .putAllData(request.data())
             .setAndroidConfig(AndroidConfig.builder().setTtl(3600000)
-                .setNotification(AndroidNotification.builder().setChannelId("ai_news")
-                    .setTag("news-" + request.deliveryId()).build()).build())
+                .setNotification(AndroidNotification.builder().setChannelId(request.channelId())
+                    .setTag(request.collapseKey()).build()).build())
             .setApnsConfig(ApnsConfig.builder().putHeader("apns-push-type", "alert")
                 .putHeader("apns-priority", "10")
-                .putHeader("apns-collapse-id", "news-" + request.deliveryId())
+                .putHeader("apns-collapse-id", request.collapseKey())
                 .setAps(Aps.builder().setSound("default").build()).build())
             .build();
         var future = messaging.sendAsync(message);

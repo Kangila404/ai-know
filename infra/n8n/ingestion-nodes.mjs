@@ -27,14 +27,12 @@ export function toImportRequest(draft, media = {}) {
     const localUrl = origin === 'GENERATED' && localPrefix && value.url.startsWith(localPrefix)
       && /^[a-f0-9]{64}\.png$/.test(value.url.slice(localPrefix.length));
     let url = localUrl ? value.url : https(value.url, 'image');
-    const parsed = new URL(url);
     // Openverse adds tracking parameters to Commons originals. Those parameters
     // prevent mobile clients from selecting the smaller Commons thumbnail URL.
-    if (parsed.hostname === 'upload.wikimedia.org' && !parsed.hash
-        && /^\/wikipedia\/commons\/[a-f0-9]\/[a-f0-9]{2}\/[^/]+\.(png|jpe?g|webp)$/i.test(parsed.pathname)
-        && [...parsed.searchParams.keys()].every(key => /^utm_(source|medium|campaign|term|content)$/.test(key))) {
-      parsed.search = ''; url = parsed.href;
-    }
+    // n8n's Code task runner does not expose the Node/browser URL global.
+    // Match only the known public CDN shape; leave all other URLs untouched.
+    const commons = /^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/[a-f0-9]\/[a-f0-9]{2}\/[^/?#]+\.(?:png|jpe?g|webp))\?([^#]+)$/i.exec(url);
+    if (commons && commons[2].split('&').every(pair => /^utm_(source|medium|campaign|term|content)=[^#]*$/.test(pair))) url = commons[1];
     return { url, origin, sourceUrl, credit };
   };
   const date = Date.parse(draft.publishedAt);

@@ -382,3 +382,10 @@ Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니�
 빌드 6 배포 결과: 2026-10-23 16:14 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했고 전송 메타데이터의 빌드 번호 6을 확인했습니다. 앱 코드 기준은 `efbc734`이며 최신 main `de1868b`(PR #29)를 포함합니다. Debug/Release 빌드, App Store IPA 서명과 Production APNs/Sign in with Apple, 운영 HTTPS 주소 검증을 통과했습니다. 시뮬레이터도 운영 API를 사용하는 빌드 6으로 복원했습니다.
 
 아카이브·서명 검증·업로드 로그는 로컬 `.local/testflight/2026-10-23-build-6/`에 보관합니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치와 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 확인하지 않았습니다. 빌드 5 구현 커밋 `32cda6d`의 GitHub Server CI/iOS build도 통과했으며, 후속 커밋의 자동 검사는 별도로 실행됩니다.
+# 2026-11-03 운영 알림과 Apple 로그인
+
+관리자 탭의 **자동화·발송 알림**에서 초안 접수, 승인/발송 후보, 실제 일일 선정, 자동화 실패 내역을 확인합니다. `adminAlertId` 푸시는 이 목록으로 이동합니다. 일반 카드 알림의 `cardNewsId` 이동은 유지합니다. 로그아웃·탈퇴 시 예약된 관리자 알림 이동을 지웁니다.
+
+Apple 네이티브 로그인은 기존 ASAuthorizationAppleIDProvider와 서버의 일회성 nonce·Apple JWKS 검증을 사용합니다. Apple Developer에서 `org.aiknow.AiKnow` App ID의 Sign in with Apple capability 및 최신 계약을 확인한 뒤 Mac에서 새로 서명/빌드해야 합니다. 서버는 `APPLE_LOGIN_ENABLED=true`, `APPLE_CLIENT_IDS=org.aiknow.AiKnow`를 사용합니다.
+
+이번 Windows 작업에서는 iOS Xcode 빌드·TestFlight 업로드·실기기 Apple 로그인/푸시 수신을 검증하지 못했습니다. Mac에서 신규 관리자 목록, 로그인 후 푸시 이동, 권한 강등 후 접근 차단, 일반 카드 푸시 회귀를 확인해야 합니다. Firebase 서버 서비스 계정 및 iOS APNs 인증이 준비되어야 실제 푸시가 발송됩니다.

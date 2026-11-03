@@ -28,6 +28,9 @@ class AiKnowApplication : Application(), SingletonImageLoader.Factory {
             NotificationChannel("daily_news", "오늘의 AI 카드뉴스", NotificationManager.IMPORTANCE_DEFAULT)
         )
         api = Platform.gateway(this)
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel("admin_operations", "관리자 자동화·발송 알림", NotificationManager.IMPORTANCE_DEFAULT)
+        )
         if(!Platform.demo) {
             if(BuildConfig.KAKAO_NATIVE_APP_KEY.isNotBlank()) KakaoSdk.init(this,BuildConfig.KAKAO_NATIVE_APP_KEY)
             FirebaseApp.initializeApp(this)
