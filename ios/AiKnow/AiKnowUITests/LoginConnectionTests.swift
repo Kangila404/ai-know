@@ -579,8 +579,7 @@ final class LoginBrandingTests: XCTestCase {
         XCTAssertEqual(app.buttons["login.apple"].label, "Apple로 로그인")
         XCTAssertEqual(app.buttons["login.guest"].label, "비회원 사용")
         let screenshot = app.screenshot()
-        // The SVG previously disappeared in dark mode despite a hittable button.
-        // Verify the rendered dark glyph inside the yellow Kakao button as well.
+        // Check the rendered official glyph, not only a hittable button frame.
         let kakao = app.buttons["login.kakao"].frame
         let rendered = try XCTUnwrap(screenshot.image.cgImage)
         let scale = CGFloat(rendered.width) / screen.width
