@@ -117,7 +117,8 @@ test('deployed workflow helpers accept translated quantities and still reject fa
     assert.equal(validate(illustrated, state).assets[0].searchQuery, 'startup team', node.name);
     illustrated.slides[1].visual = { ...illustrated.slides[0].visual, description: '같은 그림을 다른 설명과 함께 재사용' };
     const reused = validate(structuredClone(illustrated), state);
-    assert.equal(reused.assets.length, 1, node.name);
+    assert.equal(reused.assets.length, 3, node.name);
+    assert.equal(new Set(reused.assets.map(a=>a.key)).size, 3, node.name);
     assert.equal(reused.assets[0].description, illustrated.slides[0].visual.description, node.name);
     assert.equal(reused.draft.slides[1].visual.description, illustrated.slides[1].visual.description, node.name);
     illustrated.slides[1].visual.generationPrompt = 'A completely different scene';

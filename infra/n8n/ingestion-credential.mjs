@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const paths = {
+  'aiknow-automation-event': '/internal/v1/automation/events',
   'aiknow-server-import': '/internal/v1/card-news/import',
   'aiknow-image-upload': '/internal/v1/images',
   'aiknow-storage-check': '/internal/v1/images/storage',
@@ -44,7 +45,7 @@ export function bindIngestionCredential(workflow, baseUrl, credential) {
       || node.parameters.options?.redirect?.redirect?.followRedirects !== false) {
       throw new Error('Internal API node settings differ from the configured backend. Review the workflow before provisioning credentials.');
     }
-    if (node.id === 'aiknow-server-import') found = true;
+    if (node.id === 'aiknow-server-import' || (workflow.id === 'aiknow-automation-errors' && node.id === 'aiknow-automation-event')) found = true;
     node.credentials = { ...node.credentials, httpHeaderAuth: { id: credential.id, name: credential.name } };
   }
   if (!found) throw new Error('Missing internal ingestion node.');

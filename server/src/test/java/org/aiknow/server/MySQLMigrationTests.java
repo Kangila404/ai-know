@@ -12,6 +12,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 /** Only creates and removes randomly named test schemas; never touches the application schema. */
 @EnabledIfEnvironmentVariable(named = "AIKNOW_MYSQL_TEST_URL", matches = ".+")
 class MySQLMigrationTests {
+    private static final int LATEST_MIGRATION = 10;
     private String database, url;
     private final String root = System.getenv("AIKNOW_MYSQL_TEST_URL");
     private final String user = System.getenv("AIKNOW_MYSQL_TEST_USER");
@@ -37,7 +38,7 @@ class MySQLMigrationTests {
             .baselineOnMigrate(false).cleanDisabled(true);
     }
     @Test void newDatabaseMigratesOnceAndHibernateValidatesAllEntities() {
-        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(9);
+        var flyway = config().load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION);
         assertThat(flyway.migrate().migrationsExecuted).isZero(); flyway.validate();
         try (var context = new SpringApplicationBuilder(ServerApplication.class).profiles("test").run(
             "--server.port=0", "--spring.datasource.url=" + url, "--spring.datasource.username=" + user,
@@ -55,7 +56,7 @@ class MySQLMigrationTests {
         }
         assertThatThrownBy(() -> config().load().migrate()).isInstanceOf(FlywayException.class);
         var adopted = config().baselineVersion("1").load(); adopted.baseline();
-        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(8);
+        assertThat(adopted.migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION - 1);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement();
              var rs = s.executeQuery("SELECT nickname FROM users WHERE user_id='migration-fixture'")) {
             assertThat(rs.next()).isTrue(); assertThat(rs.getString(1)).isEqualTo("preserved");
@@ -66,7 +67,7 @@ class MySQLMigrationTests {
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement()) {
             s.execute("INSERT INTO news_generation_record(attempt_key,source_url,task,request_hash,request_json,response_json,created_at,version) VALUES(REPEAT('a',64),'https://example.test/legacy','image_selection',REPEAT('b',64),'{}','{\"original\":true}',NOW(),0)");
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(5);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION - 4);
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
              var r=s.executeQuery("SELECT request_json,response_json,context_json FROM news_generation_record")) {
             assertThat(r.next()).isTrue(); assertThat(r.getString(1)).isEqualTo("{}");
@@ -89,6 +90,10 @@ class MySQLMigrationTests {
         var approved = service.approve(received.id(), request, reviewer.getUserId());
         assertThat(approved.status()).isEqualTo(org.aiknow.server.cardNews.domain.InspectionStatus.APPROVED);
         assertThat(service.approve(received.id(), request, reviewer.getUserId()).cardNewsId()).isEqualTo(approved.cardNewsId());
+        var alerts = context.getBean(org.aiknow.server.notification.admin.AdminAlertRepository.class);
+        assertThat(alerts.findByEventKey("submission:" + received.id())).isPresent();
+        assertThat(alerts.findByEventKey("approved:" + approved.cardNewsId())).isPresent();
+        assertThat(alerts.count()).isEqualTo(2); // Replay must not add duplicate operational events.
         var repository = context.getBean(org.aiknow.server.cardNews.repository.CardNewsRepository.class);
         var article = repository.findById(approved.cardNewsId()).orElseThrow();
         assertThat(article.getPublicationDate()).isNull();
@@ -108,7 +113,7 @@ class MySQLMigrationTests {
             s.execute(insert.formatted("'2026-10-22'"));
             assertThatThrownBy(() -> s.execute(insert.formatted("NULL"))).isInstanceOf(SQLException.class);
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION - 5);
         try (var c = DriverManager.getConnection(url, user, password); var s = c.createStatement()) {
             s.execute(insert.formatted("NULL"));
             try (var rs = s.executeQuery("SELECT publication_date FROM card_news ORDER BY id")) {
@@ -129,7 +134,7 @@ class MySQLMigrationTests {
                 s.executeUpdate();
             }
         }
-        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION - 7);
         assertThat(config().load().migrate().migrationsExecuted).isZero();
         try (var c=DriverManager.getConnection(url,user,password); var s=c.createStatement();
              var r=s.executeQuery("SELECT title,publication_status,publication_date,version,first_used_at,last_used_at FROM card_news ORDER BY id")) {
@@ -147,7 +152,7 @@ class MySQLMigrationTests {
         try (var c = DriverManager.getConnection(url, user, password); var stmt = c.createStatement()) {
             stmt.execute("INSERT INTO profile_img(name,img_url,created_at,updated_at) VALUES('existing','/avatars/lumi-v1.png',NOW(),NOW())");
         }
-        assertThat(config().load().migrate().migrationsExecuted).isOne();
+        assertThat(config().load().migrate().migrationsExecuted).isEqualTo(LATEST_MIGRATION - 8);
         try (var c = DriverManager.getConnection(url, user, password); var stmt = c.createStatement();
              var rows = stmt.executeQuery("SELECT name,img_url FROM profile_img ORDER BY id")) {
             int count = 0;

@@ -19,8 +19,8 @@ export function readWorkflowEnvironment(env) {
     if (!['true', 'false'].includes(env[key])) throw new Error(`${key} must be true or false`);
     return env[key] === 'true';
   };
-  if (!/^[0-3]$/.test(env.AIKNOW_MAX_IMAGE_GENERATIONS ?? ''))
-    throw new Error('AIKNOW_MAX_IMAGE_GENERATIONS must be 0-3');
+  if (!/^[0-5]$/.test(env.AIKNOW_MAX_IMAGE_GENERATIONS ?? ''))
+    throw new Error('AIKNOW_MAX_IMAGE_GENERATIONS must be 0-5');
   const automation = env.AIKNOW_AUTOMATION_ENABLED ?? 'false';
   if (!['true', 'false'].includes(automation)) throw new Error('AIKNOW_AUTOMATION_ENABLED must be true or false');
   if (automation === 'true' && env.AIKNOW_DRY_RUN !== 'false') throw new Error('Automation requires AIKNOW_DRY_RUN=false');
@@ -38,6 +38,12 @@ export function configureWorkflow(source, env) {
   const settings = readWorkflowEnvironment(env);
   if (!settings) return source;
   const wf = structuredClone(source);
+  if (wf.id === 'aiknow-automation-errors') {
+    const request = wf.nodes.find(n => n.id === 'aiknow-automation-event');
+    if (!request || request.type !== 'n8n-nodes-base.httpRequest') throw new Error('Missing automation error callback');
+    request.parameters.url = settings.serverBaseUrl + '/internal/v1/automation/events';
+    return wf;
+  }
   const schedule = wf.nodes.find(n => n.id === '659c223d-51ad-44ed-a722-1d2cc0e2ac41');
   if (schedule?.type !== 'n8n-nodes-base.scheduleTrigger') throw new Error('Missing daily schedule trigger');
   schedule.disabled = !settings.automationEnabled;
@@ -49,6 +55,7 @@ export function configureWorkflow(source, env) {
     config.parameters.jsCode = config.parameters.jsCode.replace(pattern, `$1${settings[field]}`);
   }
   const paths = {
+    'aiknow-automation-event': '/internal/v1/automation/events',
     'aiknow-server-import': '/internal/v1/card-news/import',
     'aiknow-image-upload': '/internal/v1/images', 'aiknow-storage-check': '/internal/v1/images/storage',
     'aiknow-generation-existing': '/internal/v1/generation/existing',

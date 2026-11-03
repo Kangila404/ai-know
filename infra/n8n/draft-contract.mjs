@@ -1,6 +1,6 @@
 // These limits are shared by the model schema and runtime validator.
 export function draftLimits() {
-  return {evidence:200, minSlides:3, maxSlides:7, maxAssets:5,
+  return {evidence:200, minSlides:3, maxSlides:5, maxAssets:5,
     title:200, summary:5000, slideTitle:120, slideContent:1200, description:500, plan:1000};
 }
 

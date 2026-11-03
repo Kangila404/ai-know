@@ -16,7 +16,7 @@ struct LibraryView: View {
                         .padding(13).background(AppPalette.surface, in: RoundedRectangle(cornerRadius: 14))
                         .onChange(of: store.query) { _, value in if value.count > 200 { store.query = String(value.prefix(200)) } }
                     HStack {
-                        Button { store.likesOnly.toggle() } label: {
+                        Button { if AuthSession.shared.requireLogin("좋아요한 카드 모아보기는 로그인 후 이용할 수 있어요.") { store.likesOnly.toggle() } } label: {
                             Label("좋아요", systemImage: store.likesOnly ? "heart.fill" : "heart")
                         }.tint(.pink).buttonStyle(.bordered)
                         ScrollView(.horizontal) {

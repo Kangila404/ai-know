@@ -31,6 +31,7 @@ public class NewsSubmissionService {
     private final org.aiknow.server.notification.batch.NewsDeliveryProperties deliveryProperties;
     private final org.aiknow.server.storage.ImageStorage imageStorage;
     private final org.aiknow.server.editorial.EditorialAuditService editorialAudit;
+    private final org.aiknow.server.notification.admin.AdminAlertService alerts;
 
     public record Receipt(Long id, InspectionStatus status, Long cardNewsId, String title, java.time.LocalDateTime createdAt) {}
     private Receipt receipt(NewsSubmission s) {
@@ -102,6 +103,7 @@ public class NewsSubmissionService {
             article.publishTheoryForArchive(clock.instant().atZone(deliveryProperties.zone()).toLocalDate());
         news.saveAndFlush(article);
         submission.approve(article.getId(), reviewerId(reviewer), clock.instant());
+        alerts.approved(article);
         editorialAudit.record("SUBMISSION", id, "APPROVE", reviewer, "관리자 승인", null, receipt(submission));
         return receipt(submission);
     }

@@ -1,0 +1,4 @@
+# Public client identifiers only. Never put OAuth secrets or server/internal API keys here.
+API_BASE_URL=https://aiknow.kro.kr/
+GOOGLE_WEB_CLIENT_ID=
+KAKAO_NATIVE_APP_KEY=

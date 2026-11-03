@@ -25,7 +25,7 @@ test('local env is applied without editing source, credentials, schedules or unr
 test('prod env rejects HTTP media and malformed flags before deployment, routes all backend nodes consistently', () => {
   assert.throws(() => readWorkflowEnvironment({ ...env, AIKNOW_ENV: 'prod' }), /HTTPS/);
   assert.throws(() => readWorkflowEnvironment({ ...env, AIKNOW_ALLOW_IMAGE_GENERATION: 'yes' }), /true or false/);
-  assert.throws(() => readWorkflowEnvironment({ ...env, AIKNOW_MAX_IMAGE_GENERATIONS: '100' }), /0-3/);
+  assert.throws(() => readWorkflowEnvironment({ ...env, AIKNOW_MAX_IMAGE_GENERATIONS: '100' }), /0-5/);
   const prod = configureWorkflow(source(), { ...env, AIKNOW_ENV: 'prod', AIKNOW_SERVER_BASE_URL: 'http://server:8080',
     AIKNOW_MEDIA_PUBLIC_BASE_URL: 'https://api.example.test/media/generated', AIKNOW_DRY_RUN: 'true', AIKNOW_ALLOW_IMAGE_GENERATION: 'false' });
   for (const node of prod.nodes.filter(n => n.parameters?.url?.includes('/internal/v1/')))

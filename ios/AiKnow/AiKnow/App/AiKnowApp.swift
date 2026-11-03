@@ -18,6 +18,9 @@ struct AiKnowApp: App {
         WindowGroup {
             AppFlowView()
                 .onOpenURL { url in
+                    #if DEBUG
+                    if PushNotifications.handleUITestNotification(url) { return }
+                    #endif
                     if AuthApi.isKakaoTalkLoginUrl(url) {
                         _ = AuthController.handleOpenUrl(url: url)
                     } else {

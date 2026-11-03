@@ -1,0 +1,434 @@
+{
+  "cards": [
+    {
+      "id": 1,
+      "title": "[AI 이론] AI는 하나의 기술 이름이 아니다",
+      "summary": "AI는 학습·인식·문제 해결 같은 기능을 컴퓨터로 구현하는 넓은 분야입니다. 머신러닝과 생성형 AI의 관계를 알면 제품 설명을 더 정확히 읽을 수 있습니다.",
+      "sourceTitle": "IBM — What is artificial intelligence (AI)?",
+      "sourceUrl": "https://www.ibm.com/think/topics/artificial-intelligence",
+      "sourcePublishedAt": "2026-10-25T00:00:00Z",
+      "titleImgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_1",
+      "titleImageOrigin": "SOURCE",
+      "titleImageSourceUrl": "https://commons.wikimedia.org/wiki/File:Intersection_over_Union_-_object_detection_bounding_boxes.jpg",
+      "titleImageCredit": "Adrian Rosebrock / CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0) / Wikimedia Commons, PNG 변환 또는 미리보기 / 정지 표지판의 물체 탐지 예시. 두 상자는 정답 위치와 예측 위치입니다.",
+      "contentType": "AI_THEORY",
+      "publicationDate": "2026-10-25",
+      "categories": [
+        {
+          "id": 1,
+          "name": "AI ??"
+        }
+      ],
+      "liked": false,
+      "read": false,
+      "keyPoints": [
+        "익숙한 서비스에도 AI가 있다",
+        "AI라는 큰 범주",
+        "머신러닝은 그 안의 한 분야"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "[AI 이론] 머신러닝은 정답을 외우는 것일까?",
+      "summary": "머신러닝의 목표는 학습 데이터에서 얻은 패턴을 새로운 데이터에도 적용하는 것입니다. 학습 성적과 실제 사용 성능은 따로 확인해야 합니다.",
+      "sourceTitle": "IBM — What is machine learning?",
+      "sourceUrl": "https://www.ibm.com/think/topics/machine-learning",
+      "sourcePublishedAt": "2026-10-25T00:00:00Z",
+      "titleImgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_2",
+      "titleImageOrigin": "SOURCE",
+      "titleImageSourceUrl": "https://commons.wikimedia.org/wiki/File:Linear_regression.svg",
+      "titleImageCredit": "Sewaqu / Public domain (https://commons.wikimedia.org/wiki/Commons:Public_domain) / Wikimedia Commons, PNG 변환 또는 미리보기 / 표본 점의 관계를 직선으로 근사한 선형회귀 예시.",
+      "contentType": "AI_THEORY",
+      "publicationDate": "2026-10-25",
+      "categories": [
+        {
+          "id": 1,
+          "name": "AI ??"
+        }
+      ],
+      "liked": false,
+      "read": false,
+      "keyPoints": [
+        "규칙 대신 사례에서 배우기",
+        "학습은 모델을 조정하는 과정",
+        "새 데이터에 적용하는 추론"
+      ]
+    },
+    {
+      "id": 3,
+      "title": "[AI 이론] 딥러닝의 ‘깊다’는 무슨 뜻일까?",
+      "summary": "딥러닝은 여러 층으로 연결된 신경망을 학습하는 머신러닝 방식입니다. 층별 계산과 연결 강도의 조정을 통해 복잡한 데이터의 패턴을 다룹니다.",
+      "sourceTitle": "IBM — What is deep learning?",
+      "sourceUrl": "https://www.ibm.com/think/topics/deep-learning",
+      "sourcePublishedAt": "2026-10-25T00:00:00Z",
+      "titleImgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_3",
+      "titleImageOrigin": "SOURCE",
+      "titleImageSourceUrl": "https://commons.wikimedia.org/wiki/File:Neural_Network.svg",
+      "titleImageCredit": "QuantuMechaniX8 / CC0 (https://creativecommons.org/publicdomain/zero/1.0/deed.en) / Wikimedia Commons, PNG 변환 또는 미리보기 / 여러 층으로 연결된 신경망의 구조 예시.",
+      "contentType": "AI_THEORY",
+      "publicationDate": "2026-10-25",
+      "categories": [
+        {
+          "id": 1,
+          "name": "AI ??"
+        }
+      ],
+      "liked": false,
+      "read": false,
+      "keyPoints": [
+        "신경망을 여러 층으로",
+        "층마다 계산을 거친다",
+        "학습에서 바뀌는 것"
+      ]
+    }
+  ],
+  "slides": {
+    "1": [
+      {
+        "id": 10,
+        "sequence": 1,
+        "title": "익숙한 서비스에도 AI가 있다",
+        "content": "사진 속 대상을 구분하거나 사용자에게 콘텐츠를 추천하는 기능도 AI의 활용 사례입니다. 대화형 챗봇만 AI인 것은 아닙니다.",
+        "imgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_1",
+        "imageOrigin": "SOURCE",
+        "imageCredit": "Adrian Rosebrock / CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0) / Wikimedia Commons, PNG 변환 또는 미리보기 / 정지 표지판의 물체 탐지 예시. 두 상자는 정답 위치와 예측 위치입니다.",
+        "imageSourceUrl": "https://commons.wikimedia.org/wiki/File:Intersection_over_Union_-_object_detection_bounding_boxes.jpg"
+      },
+      {
+        "id": 11,
+        "sequence": 2,
+        "title": "AI라는 큰 범주",
+        "content": "AI는 학습, 언어 처리, 문제 해결, 의사결정 등과 관련된 컴퓨터 기술을 아우릅니다. 서로 다른 방식으로 만들어진 시스템이 이 범주에 들어갑니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 12,
+        "sequence": 3,
+        "title": "머신러닝은 그 안의 한 분야",
+        "content": "머신러닝은 데이터에서 패턴을 학습해 새로운 입력을 예측하거나 분류합니다. 사람이 모든 상황의 규칙을 직접 적는 방식과 구분됩니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 13,
+        "sequence": 4,
+        "title": "생성형 AI가 하는 일",
+        "content": "생성형 AI는 학습한 패턴을 바탕으로 글이나 이미지 같은 콘텐츠를 만듭니다. 예측·분류 중심의 AI와는 사용 목적이 다를 수 있습니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 14,
+        "sequence": 5,
+        "title": "제품 설명을 읽는 질문",
+        "content": "‘AI를 썼다’는 말 다음에는 무엇을 입력받고 어떤 결과를 내는지 살펴보세요. 인식, 추천, 생성 중 어떤 역할인지 구분하면 기능을 이해하기 쉽습니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      }
+    ],
+    "2": [
+      {
+        "id": 20,
+        "sequence": 1,
+        "title": "규칙 대신 사례에서 배우기",
+        "content": "머신러닝은 데이터의 패턴을 이용해 예측이나 분류에 필요한 모델을 만듭니다. 모든 경우의 처리 방법을 사람이 직접 지정하지 않아도 됩니다.",
+        "imgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_2",
+        "imageOrigin": "SOURCE",
+        "imageCredit": "Sewaqu / Public domain (https://commons.wikimedia.org/wiki/Commons:Public_domain) / Wikimedia Commons, PNG 변환 또는 미리보기 / 표본 점의 관계를 직선으로 근사한 선형회귀 예시.",
+        "imageSourceUrl": "https://commons.wikimedia.org/wiki/File:Linear_regression.svg"
+      },
+      {
+        "id": 21,
+        "sequence": 2,
+        "title": "학습은 모델을 조정하는 과정",
+        "content": "학습 데이터에서 원하는 결과에 가까워지도록 모델을 조정합니다. 어떤 데이터를 제공하는지가 모델이 배우는 패턴에 영향을 줍니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 22,
+        "sequence": 3,
+        "title": "새 데이터에 적용하는 추론",
+        "content": "학습한 모델에 새로운 입력을 넣어 결과를 얻는 과정을 추론이라고 합니다. 학습과 실제 서비스에서의 사용은 구분되는 단계입니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 23,
+        "sequence": 4,
+        "title": "핵심은 일반화",
+        "content": "학습한 사례에서 잘 맞히는 것만으로 충분하지 않습니다. 처음 보는 데이터에서도 유용한 결과를 내는 능력을 일반화라고 합니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 24,
+        "sequence": 5,
+        "title": "실제와 닮은 평가가 필요하다",
+        "content": "서비스에서 만날 문제와 동떨어진 데이터로만 평가하면 실제 성능을 오해할 수 있습니다. 모델을 사용할 상황과 평가 조건을 함께 살펴보세요.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      }
+    ],
+    "3": [
+      {
+        "id": 30,
+        "sequence": 1,
+        "title": "신경망을 여러 층으로",
+        "content": "딥러닝의 ‘깊이’는 여러 계산 층이 이어지는 구조와 관련됩니다. 사람처럼 깊이 생각한다는 뜻으로 이해하면 정확하지 않습니다.",
+        "imgUrl": "android.resource://org.aiknow.android.demo/drawable/demo_card_3",
+        "imageOrigin": "SOURCE",
+        "imageCredit": "QuantuMechaniX8 / CC0 (https://creativecommons.org/publicdomain/zero/1.0/deed.en) / Wikimedia Commons, PNG 변환 또는 미리보기 / 여러 층으로 연결된 신경망의 구조 예시.",
+        "imageSourceUrl": "https://commons.wikimedia.org/wiki/File:Neural_Network.svg"
+      },
+      {
+        "id": 31,
+        "sequence": 2,
+        "title": "층마다 계산을 거친다",
+        "content": "입력은 연결된 층들을 지나며 변환됩니다. 신경망의 각 노드는 수학적 연산을 하고, 그 결과가 다음 층으로 전달됩니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 32,
+        "sequence": 3,
+        "title": "학습에서 바뀌는 것",
+        "content": "모델은 학습 과정에서 가중치와 편향 같은 값을 조정합니다. 연결 강도를 바꾸면서 목표 출력에 더 가까운 결과를 내도록 학습합니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 33,
+        "sequence": 4,
+        "title": "이미지와 언어에도 활용",
+        "content": "딥러닝은 이미지 인식과 생성형 AI 등 다양한 분야에 사용됩니다. 같은 큰 원리를 활용해도 데이터와 목표에 따라 모델 구조는 달라집니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      },
+      {
+        "id": 34,
+        "sequence": 5,
+        "title": "성능에는 자원이 필요하다",
+        "content": "큰 신경망의 학습에는 데이터와 계산 자원이 많이 필요할 수 있습니다. ‘딥러닝 사용’이라는 설명과 실제 작업 성능은 구분해 확인해야 합니다.",
+        "imgUrl": null,
+        "imageOrigin": null,
+        "imageCredit": null,
+        "imageSourceUrl": null
+      }
+    ]
+  },
+  "submissions": [
+    {
+      "id": 1,
+      "version": 0,
+      "title": "[AI 이론] AI는 하나의 기술 이름이 아니다",
+      "status": "PENDING",
+      "createdAt": "2026-10-25T09:00:00",
+      "contentType": "AI_THEORY",
+      "draft": {
+        "sourceTitle": "IBM — What is artificial intelligence (AI)?",
+        "sourceUrl": "https://www.ibm.com/think/topics/artificial-intelligence",
+        "publishedAt": "2026-10-25T00:00:00Z",
+        "title": "[AI 이론] AI는 하나의 기술 이름이 아니다",
+        "summary": "AI는 학습·인식·문제 해결 같은 기능을 컴퓨터로 구현하는 넓은 분야입니다. 머신러닝과 생성형 AI의 관계를 알면 제품 설명을 더 정확히 읽을 수 있습니다.",
+        "keyPoints": [
+          "익숙한 서비스에도 AI가 있다",
+          "AI라는 큰 범주",
+          "머신러닝은 그 안의 한 분야"
+        ],
+        "titleImage": {
+          "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_1",
+          "origin": "SOURCE",
+          "sourceUrl": "https://commons.wikimedia.org/wiki/File:Intersection_over_Union_-_object_detection_bounding_boxes.jpg",
+          "credit": "Adrian Rosebrock / CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0) / Wikimedia Commons, PNG 변환 또는 미리보기 / 정지 표지판의 물체 탐지 예시. 두 상자는 정답 위치와 예측 위치입니다."
+        },
+        "slides": [
+          {
+            "sequence": 1,
+            "title": "익숙한 서비스에도 AI가 있다",
+            "content": "사진 속 대상을 구분하거나 사용자에게 콘텐츠를 추천하는 기능도 AI의 활용 사례입니다. 대화형 챗봇만 AI인 것은 아닙니다.",
+            "image": {
+              "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_1",
+              "origin": "SOURCE",
+              "sourceUrl": "https://commons.wikimedia.org/wiki/File:Intersection_over_Union_-_object_detection_bounding_boxes.jpg",
+              "credit": "Adrian Rosebrock / CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0) / Wikimedia Commons, PNG 변환 또는 미리보기 / 정지 표지판의 물체 탐지 예시. 두 상자는 정답 위치와 예측 위치입니다."
+            }
+          },
+          {
+            "sequence": 2,
+            "title": "AI라는 큰 범주",
+            "content": "AI는 학습, 언어 처리, 문제 해결, 의사결정 등과 관련된 컴퓨터 기술을 아우릅니다. 서로 다른 방식으로 만들어진 시스템이 이 범주에 들어갑니다.",
+            "image": null
+          },
+          {
+            "sequence": 3,
+            "title": "머신러닝은 그 안의 한 분야",
+            "content": "머신러닝은 데이터에서 패턴을 학습해 새로운 입력을 예측하거나 분류합니다. 사람이 모든 상황의 규칙을 직접 적는 방식과 구분됩니다.",
+            "image": null
+          },
+          {
+            "sequence": 4,
+            "title": "생성형 AI가 하는 일",
+            "content": "생성형 AI는 학습한 패턴을 바탕으로 글이나 이미지 같은 콘텐츠를 만듭니다. 예측·분류 중심의 AI와는 사용 목적이 다를 수 있습니다.",
+            "image": null
+          },
+          {
+            "sequence": 5,
+            "title": "제품 설명을 읽는 질문",
+            "content": "‘AI를 썼다’는 말 다음에는 무엇을 입력받고 어떤 결과를 내는지 살펴보세요. 인식, 추천, 생성 중 어떤 역할인지 구분하면 기능을 이해하기 쉽습니다.",
+            "image": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "version": 0,
+      "title": "[AI 이론] 머신러닝은 정답을 외우는 것일까?",
+      "status": "PENDING",
+      "createdAt": "2026-10-25T09:00:00",
+      "contentType": "AI_THEORY",
+      "draft": {
+        "sourceTitle": "IBM — What is machine learning?",
+        "sourceUrl": "https://www.ibm.com/think/topics/machine-learning",
+        "publishedAt": "2026-10-25T00:00:00Z",
+        "title": "[AI 이론] 머신러닝은 정답을 외우는 것일까?",
+        "summary": "머신러닝의 목표는 학습 데이터에서 얻은 패턴을 새로운 데이터에도 적용하는 것입니다. 학습 성적과 실제 사용 성능은 따로 확인해야 합니다.",
+        "keyPoints": [
+          "규칙 대신 사례에서 배우기",
+          "학습은 모델을 조정하는 과정",
+          "새 데이터에 적용하는 추론"
+        ],
+        "titleImage": {
+          "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_2",
+          "origin": "SOURCE",
+          "sourceUrl": "https://commons.wikimedia.org/wiki/File:Linear_regression.svg",
+          "credit": "Sewaqu / Public domain (https://commons.wikimedia.org/wiki/Commons:Public_domain) / Wikimedia Commons, PNG 변환 또는 미리보기 / 표본 점의 관계를 직선으로 근사한 선형회귀 예시."
+        },
+        "slides": [
+          {
+            "sequence": 1,
+            "title": "규칙 대신 사례에서 배우기",
+            "content": "머신러닝은 데이터의 패턴을 이용해 예측이나 분류에 필요한 모델을 만듭니다. 모든 경우의 처리 방법을 사람이 직접 지정하지 않아도 됩니다.",
+            "image": {
+              "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_2",
+              "origin": "SOURCE",
+              "sourceUrl": "https://commons.wikimedia.org/wiki/File:Linear_regression.svg",
+              "credit": "Sewaqu / Public domain (https://commons.wikimedia.org/wiki/Commons:Public_domain) / Wikimedia Commons, PNG 변환 또는 미리보기 / 표본 점의 관계를 직선으로 근사한 선형회귀 예시."
+            }
+          },
+          {
+            "sequence": 2,
+            "title": "학습은 모델을 조정하는 과정",
+            "content": "학습 데이터에서 원하는 결과에 가까워지도록 모델을 조정합니다. 어떤 데이터를 제공하는지가 모델이 배우는 패턴에 영향을 줍니다.",
+            "image": null
+          },
+          {
+            "sequence": 3,
+            "title": "새 데이터에 적용하는 추론",
+            "content": "학습한 모델에 새로운 입력을 넣어 결과를 얻는 과정을 추론이라고 합니다. 학습과 실제 서비스에서의 사용은 구분되는 단계입니다.",
+            "image": null
+          },
+          {
+            "sequence": 4,
+            "title": "핵심은 일반화",
+            "content": "학습한 사례에서 잘 맞히는 것만으로 충분하지 않습니다. 처음 보는 데이터에서도 유용한 결과를 내는 능력을 일반화라고 합니다.",
+            "image": null
+          },
+          {
+            "sequence": 5,
+            "title": "실제와 닮은 평가가 필요하다",
+            "content": "서비스에서 만날 문제와 동떨어진 데이터로만 평가하면 실제 성능을 오해할 수 있습니다. 모델을 사용할 상황과 평가 조건을 함께 살펴보세요.",
+            "image": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "version": 0,
+      "title": "[AI 이론] 딥러닝의 ‘깊다’는 무슨 뜻일까?",
+      "status": "PENDING",
+      "createdAt": "2026-10-25T09:00:00",
+      "contentType": "AI_THEORY",
+      "draft": {
+        "sourceTitle": "IBM — What is deep learning?",
+        "sourceUrl": "https://www.ibm.com/think/topics/deep-learning",
+        "publishedAt": "2026-10-25T00:00:00Z",
+        "title": "[AI 이론] 딥러닝의 ‘깊다’는 무슨 뜻일까?",
+        "summary": "딥러닝은 여러 층으로 연결된 신경망을 학습하는 머신러닝 방식입니다. 층별 계산과 연결 강도의 조정을 통해 복잡한 데이터의 패턴을 다룹니다.",
+        "keyPoints": [
+          "신경망을 여러 층으로",
+          "층마다 계산을 거친다",
+          "학습에서 바뀌는 것"
+        ],
+        "titleImage": {
+          "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_3",
+          "origin": "SOURCE",
+          "sourceUrl": "https://commons.wikimedia.org/wiki/File:Neural_Network.svg",
+          "credit": "QuantuMechaniX8 / CC0 (https://creativecommons.org/publicdomain/zero/1.0/deed.en) / Wikimedia Commons, PNG 변환 또는 미리보기 / 여러 층으로 연결된 신경망의 구조 예시."
+        },
+        "slides": [
+          {
+            "sequence": 1,
+            "title": "신경망을 여러 층으로",
+            "content": "딥러닝의 ‘깊이’는 여러 계산 층이 이어지는 구조와 관련됩니다. 사람처럼 깊이 생각한다는 뜻으로 이해하면 정확하지 않습니다.",
+            "image": {
+              "url": "android.resource://org.aiknow.android.demo/drawable/demo_card_3",
+              "origin": "SOURCE",
+              "sourceUrl": "https://commons.wikimedia.org/wiki/File:Neural_Network.svg",
+              "credit": "QuantuMechaniX8 / CC0 (https://creativecommons.org/publicdomain/zero/1.0/deed.en) / Wikimedia Commons, PNG 변환 또는 미리보기 / 여러 층으로 연결된 신경망의 구조 예시."
+            }
+          },
+          {
+            "sequence": 2,
+            "title": "층마다 계산을 거친다",
+            "content": "입력은 연결된 층들을 지나며 변환됩니다. 신경망의 각 노드는 수학적 연산을 하고, 그 결과가 다음 층으로 전달됩니다.",
+            "image": null
+          },
+          {
+            "sequence": 3,
+            "title": "학습에서 바뀌는 것",
+            "content": "모델은 학습 과정에서 가중치와 편향 같은 값을 조정합니다. 연결 강도를 바꾸면서 목표 출력에 더 가까운 결과를 내도록 학습합니다.",
+            "image": null
+          },
+          {
+            "sequence": 4,
+            "title": "이미지와 언어에도 활용",
+            "content": "딥러닝은 이미지 인식과 생성형 AI 등 다양한 분야에 사용됩니다. 같은 큰 원리를 활용해도 데이터와 목표에 따라 모델 구조는 달라집니다.",
+            "image": null
+          },
+          {
+            "sequence": 5,
+            "title": "성능에는 자원이 필요하다",
+            "content": "큰 신경망의 학습에는 데이터와 계산 자원이 많이 필요할 수 있습니다. ‘딥러닝 사용’이라는 설명과 실제 작업 성능은 구분해 확인해야 합니다.",
+            "image": null
+          }
+        ]
+      }
+    }
+  ]
+}

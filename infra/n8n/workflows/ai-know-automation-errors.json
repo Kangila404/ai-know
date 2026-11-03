@@ -1,0 +1,95 @@
+{
+  "id": "aiknow-automation-errors",
+  "name": "AI_KNOW — 자동화 오류 알림",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Seoul"
+  },
+  "nodes": [
+    {
+      "id": "aiknow-error-trigger",
+      "name": "자동화 오류",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "aiknow-error-event",
+      "name": "오류 알림 준비",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const input=$input.first().json;\nconst workflowId=String(input.workflow?.id||'');\nconst executionId=String(input.execution?.id||('trigger-'+$execution.id));\nif(!/^[A-Za-z0-9_-]{1,64}$/.test(workflowId)||!/^[A-Za-z0-9_-]{1,64}$/.test(executionId)) throw new Error('Invalid automation event IDs');\nreturn [{json:{alertEvent:{workflowId,executionId,status:'FAILED',stage:String(input.execution?.lastNodeExecuted||'자동 실행 시작').slice(0,80)}}}];"
+      }
+    },
+    {
+      "id": "aiknow-automation-event",
+      "name": "관리자 오류 알림 저장",
+      "position": [
+        480,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8080/internal/v1/automation/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.alertEvent) }}",
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aiknow-local-ingest",
+          "name": "AI_KNOW Ingestion"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "자동화 오류": {
+      "main": [
+        [
+          {
+            "node": "오류 알림 준비",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "오류 알림 준비": {
+      "main": [
+        [
+          {
+            "node": "관리자 오류 알림 저장",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

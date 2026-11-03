@@ -50,7 +50,7 @@ struct ProfileView: View {
     }
 }
 
-private struct NoticeListView: View {
+struct NoticeListView: View {
     @State private var notices: [Notice] = []
     @State private var page = 0
     @State private var hasMore = true

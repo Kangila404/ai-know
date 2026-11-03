@@ -1,0 +1,9 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+app-config.properties
+**/google-services.json
+*.jks
+*.keystore
+captures/

@@ -51,7 +51,7 @@ struct CardNewsDetailView: View {
             .task(id: cardID) { await load() }
             .task(id: "\(slides.map(\.id)):\(currentSlide)") { await preloadNextSlide() }
             .task(id: "read:\(slides.count):\(currentSlide)") {
-                guard !loading, !slides.isEmpty, currentSlide == slides.count - 1, let card, !store.current(card).read else { return }
+                guard AuthSession.shared.user != nil, !loading, !slides.isEmpty, currentSlide == slides.count - 1, let card, !store.current(card).read else { return }
                 do {
                     try await Task.sleep(for: .seconds(2))
                     try Task.checkCancellation()

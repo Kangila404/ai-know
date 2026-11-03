@@ -1,5 +1,13 @@
 # AiKnow iOS
 
+## 비회원 기능 변경 (2026-10-26, 로컬 구현)
+
+`로그인 없이 둘러보기`로 오늘의 게시 카드, 아카이브·검색·카테고리, 카드 슬라이드·이미지·출처와 게시 공지를 읽을 수 있습니다. 좋아요/좋아요 목록, 마이, 알림 설정을 누르면 로그인 안내가 뜨고 취소하면 원래 화면을 유지합니다. 읽음 자동 저장이나 푸시 등록은 비회원에게 실행하지 않습니다. 회원 전환 시 화면 상태를 새로 만들며, 새 회원의 닉네임·알림 온보딩과 기존 ADMIN 확인은 유지합니다. Ethica `AppSession.swift`의 게스트 접근 방식을 참고했습니다.
+
+서버의 공개 GET 변경을 먼저 배포해야 합니다. READY/HIDDEN/미검수 카드와 미게시 공지는 상세 ID로도 조회할 수 없으며, 좋아요·회원 설정·관리자 API는 여전히 인증/권한 검사가 필요합니다. 비회원 조회는 회원 조회수·고유 조회자·읽음 이력에 포함하지 않습니다. 운영 서버 배포나 TestFlight 업로드는 이 로컬 변경에 포함되지 않았습니다.
+
+Mac 검증: `python3 ios/tests/test_guest_ui.py --device <시뮬레이터 UDID>`로 공개 열람, 좋아요/마이 로그인 안내, 취소 후 상세 유지, 개인 API 호출이 없는지 검사합니다. 이어서 기존 `test_content_ui.py`, `test_login_ui.py`, `test_admin_ui.py`를 실행합니다. 테스트는 격리된 HTTP fixture를 사용합니다. **Windows에서는 Xcode 빌드/UI 테스트를 실행하지 못했으며 Mac 검증이 남아 있습니다.** 테스트 후 일반 빌드로 API 주소를 운영 HTTPS로 되돌리고 TestFlight를 준비합니다.
+
 SwiftUI 앱입니다. Google·Apple·Kakao 로그인은 ID token을 서버 세션으로 교환하며, 푸시 수신은 Firebase Messaging SDK로 연결되어 있습니다. 오늘의 카드·아카이브·상세·좋아요·읽음·공지·프로필·알림 설정은 서버 API를 사용합니다. 온보딩 안내 문구는 앱에 포함하며 완료 상태는 서버에 저장합니다.
 
 **현재 Debug/Release 모두 실제 로그인을 사용합니다. 개발 미리보기와 가짜 ADMIN 계정은 제거했으며 서버가 ADMIN으로 응답하는 계정에만 관리자 탭이 표시됩니다.**
@@ -301,11 +309,11 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 관리자 API UI 검증은 `python3 ios/tests/test_admin_ui.py --device <UDID>`로 실행합니다. 별도 HTTP 서버에서 세션 쿠키·CSRF·ADMIN 역할·버전·변경 사유·요청 본문을 검사하며 검수, 카드 공개 상태, 공지/프로필 CRUD, 생성 복구와 탭 권한 갱신을 조작합니다. 실제 운영 계정·콘텐츠는 변경하지 않습니다. `--only <test method>`로 특정 시나리오만 재실행할 수 있습니다. 기존 일반 사용자 흐름은 `test_content_ui.py`로 검증합니다. 테스트 후 일반 Xcode 빌드로 테스트용 API 주소를 복원해야 합니다.
 
 
-소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Google/카카오는 ‘Google 로그인 / 카카오 로그인’ 문구, 54pt 높이, 16pt Medium 글꼴, 20pt 심볼, 12pt 간격을 공유합니다. Google은 라이트/다크 색상을 전환합니다.
+소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Apple/Google/카카오는 하나의 버튼 컴포넌트로 54pt 높이, 16pt Medium 글꼴, 중앙 문구와 고정된 왼쪽 아이콘 열을 공유합니다. 화면 너비를 기준으로 콘텐츠를 중앙 배치하며 좌우 여백은 최소 24pt입니다. Google은 라이트/다크 색상을 전환합니다.
 
-- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 두 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
+- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 세 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
 - 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)에서 말풍선 심볼 path를 분리했습니다. 심볼의 형태·비율·색상은 유지합니다.
-- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)의 로그인 타입을 사용합니다. 버튼 높이는 54pt이며 문구/서체는 Apple이 제공합니다. 한국어 지원 언어를 선언해 한국어 기기에서 시스템 로그인 문구도 현지화됩니다. 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
+- Apple: [Apple Design Resources](https://developer.apple.com/design/resources/)의 [공식 로고](https://devimages-cdn.apple.com/design/resources/download/Logo-Sign-in-with-Apple.dmg)에서 Left-aligned Small 흑/백 SVG 원본을 사용합니다. 내장 여백과 비율을 유지해 버튼 높이에 맞추고, 잘라내거나 세로 여백을 추가하지 않습니다. [커스텀 버튼 가이드](https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple/)에 따라 공식 한국어 문구 ‘Apple로 로그인’과 흑백 색상을 유지하며 서체만 공통 스타일로 맞춥니다. 라이선스는 `Legal/Sign-in-with-Apple-Artwork-License.txt`에 보관합니다. 동작은 기존 `AuthSession.signInApple()`의 challenge → nonce → 인증 → 세션 처리를 그대로 사용합니다.
 
 `python3 ios/tests/test_login_ui.py --device <UDID>`는 세 제공자를 반환하는 별도 HTTP fixture에서 밝은/어두운 로그인 화면을 캡처하고 각 버튼이 해당 제공자의 challenge API와 CSRF 처리로 연결되는지 검사합니다. 실제 Google·카카오·Apple 계정 로그인 성공을 대신하는 검증은 아닙니다. 운영 로그인 버튼 노출은 서버의 `/api/v1/auth/social/providers` 응답을 따릅니다.
 
@@ -374,3 +382,66 @@ Debug/Release 모두 실제 로그인과 서버의 ADMIN 권한을 사용합니�
 빌드 6 배포 결과: 2026-10-23 16:14 KST에 Xcode가 `Upload succeeded`와 `Uploaded package is processing`을 반환했고 전송 메타데이터의 빌드 번호 6을 확인했습니다. 앱 코드 기준은 `efbc734`이며 최신 main `de1868b`(PR #29)를 포함합니다. Debug/Release 빌드, App Store IPA 서명과 Production APNs/Sign in with Apple, 운영 HTTPS 주소 검증을 통과했습니다. 시뮬레이터도 운영 API를 사용하는 빌드 6으로 복원했습니다.
 
 아카이브·서명 검증·업로드 로그는 로컬 `.local/testflight/2026-10-23-build-6/`에 보관합니다. Apple 처리 완료·테스트 그룹 배정·테스터 설치와 이번 빌드의 실기기 소셜 로그인·푸시 수신은 아직 확인하지 않았습니다. 빌드 5 구현 커밋 `32cda6d`의 GitHub Server CI/iOS build도 통과했으며, 후속 커밋의 자동 검사는 별도로 실행됩니다.
+# 2026-11-03 운영 알림과 Apple 로그인
+
+관리자 탭의 **자동화·발송 알림**에서 초안 접수, 승인/발송 후보, 실제 일일 선정, 자동화 실패 내역을 확인합니다. `adminAlertId` 푸시는 이 목록으로 이동합니다. 일반 카드 알림의 `cardNewsId` 이동은 유지합니다. 로그아웃·탈퇴 시 예약된 관리자 알림 이동을 지웁니다.
+
+Apple 네이티브 로그인은 기존 ASAuthorizationAppleIDProvider와 서버의 일회성 nonce·Apple JWKS 검증을 사용합니다. Apple Developer에서 `org.aiknow.AiKnow` App ID의 Sign in with Apple capability 및 최신 계약을 확인한 뒤 Mac에서 새로 서명/빌드해야 합니다. 서버는 `APPLE_LOGIN_ENABLED=true`, `APPLE_CLIENT_IDS=org.aiknow.AiKnow`를 사용합니다.
+
+이번 Windows 작업에서는 iOS Xcode 빌드·TestFlight 업로드·실기기 Apple 로그인/푸시 수신을 검증하지 못했습니다. Mac에서 신규 관리자 목록, 로그인 후 푸시 이동, 권한 강등 후 접근 차단, 일반 카드 푸시 회귀를 확인해야 합니다. Firebase 서버 서비스 계정 및 iOS APNs 인증이 준비되어야 실제 푸시가 발송됩니다.
+
+
+### 2026-11-03 Mac iOS 보완 — PR #33
+
+`feat/android-native`의 API 계약을 기준으로 기존 SwiftUI 앱을 보완했습니다. Apple/Google/Kakao 네이티브 로그인과 서버 세션·CSRF 흐름을 유지합니다.
+
+- 비회원은 공개 콘텐츠를 읽으며, 좋아요·프로필은 로그인 안내를 취소하면 읽던 화면으로 돌아갑니다.
+- 첫 가입 시 소개 화면 다음에 닉네임·알림 권한·한국 시간 기준 수신 시각을 설정합니다. 저장을 마친 뒤 온보딩 완료를 기록하며, 나중에 설정하거나 기존 회원이면 반복하지 않습니다.
+- 관리자 운영 알림은 서버 제목/본문·생성 시각·대상 날짜를 표시합니다. 발송 후보와 선정 결과를 구분하며 검수/카드 관리로 이동합니다. 상세에서 돌아오면 읽던 목록과 페이지를 유지합니다.
+- 알림 탭은 하나의 목적지로 처리합니다. `adminAlertId`가 있으면 관리자 권한을 다시 확인한 뒤 운영 알림을 열며, `cardNewsId`는 공개 카드 상세를 엽니다. 권한 강등/로그아웃 이후 관리자 화면과 오래된 요청 응답을 차단합니다.
+
+재현 명령 (켜진 시뮬레이터의 UDID 사용):
+
+```sh
+python3 ios/tests/test_guest_ui.py --device <UDID>
+python3 ios/tests/test_onboarding_ui.py --device <UDID>
+python3 ios/tests/test_content_ui.py --device <UDID>
+python3 ios/tests/test_admin_ui.py --device <UDID>
+python3 ios/tests/test_login_ui.py --device <UDID>
+```
+
+테스트는 격리된 HTTP fixture를 사용합니다. 운영 콘텐츠나 사용자 계정을 수정하지 않습니다. 관리자 알림 이동 입력은 Debug + 명시적 UI 테스트 실행 인자 + localhost:18082에서만 작동하며 로그인/역할을 우회하지 않습니다. Release에는 이 입력 경로가 포함되지 않습니다. 실제 FCM 수신 테스트와 구분합니다.
+
+테스트 후 일반 Debug 앱을 `AIKNOW_API_BASE_URL=https://aiknow.kro.kr`로 다시 빌드/설치해야 합니다. 서버 `FCM_ENABLED`와 `NEWS_BATCH_ENABLED`, Android 설정 및 n8n은 이번 Mac 작업에서 변경하지 않았습니다.
+
+
+Mac 검증 기록 (2026-11-03):
+
+- 비회원 UI: 공개 콘텐츠·공지 열람, 좋아요/마이 로그인 안내와 취소, 개인 API 요청 0건 확인.
+- 관리자 UI: 검수/게시, 공지/프로필 CRUD, 생성 복구, 역할 변경, 사용자 관리, 조회 통계, 발송 대기 카드, 운영 알림의 오류/재시도·페이지·빈 상태·새로고침·관련 상세 이동 확인. 운영 알림의 상세 복귀 시 페이지 초기화 문제를 수정했습니다.
+- 알림 이동: cold start 관리자 입력, 실행 중 일반 카드로 화면 교체, 서버 역할 강등 시 관리자 탭 제거, 비회원 관리자 접근 차단과 공개 카드 로그인 안내 취소 확인. FCM 실제 수신 검증은 아닙니다.
+- 첫 가입 UI: 닉네임 변경, 알림 활성화, 서버 한국 시각 유지, 설정 저장 후 완료 처리, 재실행 시 온보딩 생략 확인.
+- 콘텐츠 UI: 이미지 다운로드/확대, 좌우 스와이프, 긴 본문 끝까지 스크롤, 출처 펼침, 검색/카테고리/좋아요/읽음, 공지, 닉네임과 아바타 개별 변경, 알림 자동 저장 확인.
+- 운영 서버 읽기 확인: health/public cards/providers 200, GOOGLE/KAKAO/APPLE 노출, 비로그인 관리자 알림 401.
+
+로컬 증거: `.local/ios-pr33/`와 Xcode DerivedData의 `Logs/Test/*.xcresult`. UI 테스트는 실제 OAuth 자격 증명/실서버 사용자 데이터로 수행한 검증과 구분합니다.
+
+- 라이트/다크 로그인 UI: 세 제공자 버튼의 CSRF 포함 challenge 요청 및 예전 미리보기 인자로 로그인 우회 불가 확인. 실제 OAuth 자격 증명을 입력한 테스트는 아닙니다.
+- 시스템 다크 모드에서 콘텐츠/프로필/알림 UI 회귀도 동일하게 통과했습니다.
+
+
+버전 1.0 (8)의 Release 아카이브와 App Store 배포용 IPA를 생성했습니다. 서명 및 프로비저닝에서 `org.aiknow.AiKnow` / `SS32PHC392`, Production APNs, Sign in with Apple, 디버깅 비활성화를 확인했습니다. 번들 API는 운영 HTTPS이며 Firebase 설정은 현재 Mac의 운영 파일과 일치하고 CI fixture가 아닙니다. Release 실행 파일에는 개발 미리보기와 Debug 전용 알림 테스트 입력이 없습니다.
+
+일반 Debug 앱도 운영 HTTPS / 1.0 (8)로 다시 빌드·설치했습니다. 배포 아카이브·IPA·검증 로그는 `.local/testflight/2026-11-03-build-8/`에 보관합니다. TestFlight의 최종 업로드/처리 상태는 [PR #33](https://github.com/Kangila404/ai-know/pull/33)의 TestFlight 항목에 기록합니다.
+
+이번 Mac의 실기기는 연결 불가 상태여서 새 빌드의 실제 소셜 로그인·실제 FCM/APNs 수신은 검증하지 못했습니다. 기존 1.0 (7)의 Apple 로그인 성공은 11월 3일 사용자 확인 이력이며 새 빌드의 실기기 검증으로 간주하지 않습니다. 새 빌드 설치 후 비회원 읽기, 실제 로그인, 첫 가입 설정/기존 회원 생략, ADMIN 우측 탭을 확인합니다. 실제 푸시 발송은 보류 정책을 유지합니다.
+
+
+### 2026-11-03 로그인 화면 정렬 보완 — 1.0 (9)
+
+스크롤 콘텐츠가 고유 너비만 차지해 로그인 화면이 왼쪽으로 치우치던 문제를 화면 너비 기준 중앙 배치로 수정했습니다. 세 소셜 버튼은 동일한 글꼴·굵기·크기·높이·텍스트 중심·아이콘 열을 공유합니다. Apple은 공식 로고와 한국어 로그인 문구를 유지한 커스텀 버튼이며 인증 요청은 기존 네이티브 흐름을 사용합니다.
+
+비회원 진입 문구는 ‘비회원 사용’이며 배경·테두리 없는 텍스트 버튼입니다. 최소 44pt 터치 높이와 로그인 우회 없는 공개 열람 흐름을 유지합니다. 로그인 UI 테스트는 각 버튼·제목·비회원 버튼의 화면 중심, 좌우 끝선·54pt 높이, 카카오 아이콘의 실제 픽셀 표시, 세 제공자의 CSRF/challenge 연결을 확인합니다. 배포 결과는 PR #33의 TestFlight 항목에 기록합니다.
+
+
+최종 iPhone 16 Pro / iOS 26.3 시뮬레이터에서 `python3 ios/tests/test_login_ui.py --device 7747EDBE-9A77-4EAE-B2C0-72B92CC628CA`를 실행해 라이트/다크 정렬·아이콘 표시·비회원 문구·세 제공자 challenge 연결과 기존 미리보기 인자 우회 방지를 확인했습니다. 화면 캡처는 `.local/ios-login-alignment/16pro-{light,dark}.png`에 보관합니다. 새 빌드의 실제 계정 인증 및 실기기 표시 여부는 별도 확인 항목입니다.

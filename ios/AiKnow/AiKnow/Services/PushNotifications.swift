@@ -9,6 +9,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
+        #if DEBUG
+        if let raw = ProcessInfo.processInfo.environment["AIKNOW_UI_TEST_NOTIFICATION"], let url = URL(string: raw) {
+            Task { @MainActor in _ = PushNotifications.handleUITestNotification(url) }
+        }
+        #endif
         return true
     }
 
@@ -41,10 +46,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         Task { @MainActor in
             PushNotifications.shared.lastNotificationTitle = response.notification.request.content.title
-            let raw = response.notification.request.content.userInfo["cardNewsId"]
-            if let raw, let id = Int64(String(describing: raw)), id > 0 {
-                PushNotifications.shared.pendingCardID = id
-            }
+            PushNotifications.shared.openNotification(response.notification.request.content.userInfo)
             completionHandler()
         }
     }
@@ -58,7 +60,39 @@ final class PushNotifications {
     private(set) var token: String?
     var status = "알림 권한을 허용해 주세요."
     var lastNotificationTitle: String?
-    var pendingCardID: Int64?
+    enum Destination: Hashable, Identifiable {
+        case card(Int64), adminAlert(Int64)
+        var id: String {
+            switch self { case .card(let id): return "card-\(id)"; case .adminAlert(let id): return "admin-\(id)" }
+        }
+    }
+    var pendingDestination: Destination?
+
+    func openNotification(_ payload: [AnyHashable: Any]) {
+        // One destination per tap. An admin payload never falls through to a public card.
+        if let raw = payload["adminAlertId"] {
+            guard let id = Int64(String(describing: raw)), id > 0 else { return }
+            pendingDestination = .adminAlert(id)
+        } else if let raw = payload["cardNewsId"], let id = Int64(String(describing: raw)), id > 0 {
+            pendingDestination = .card(id)
+        }
+    }
+
+    #if DEBUG
+    // Test payloads use the real routing path, but only in an explicitly launched
+    // localhost HTTP fixture. This never authenticates a user or changes a role.
+    static func handleUITestNotification(_ url: URL) -> Bool {
+        guard ProcessInfo.processInfo.arguments.contains("--ui-test-notifications"),
+              let configured = Bundle.main.object(forInfoDictionaryKey: "AIKnowAPIBaseURL") as? String,
+              let api = URL(string: configured), api.host == "localhost", api.port == 18082,
+              url.host == "aiknow-ui-test" else { return false }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        var payload: [AnyHashable: Any] = [:]
+        for item in items where ["adminAlertId", "cardNewsId"].contains(item.name) { payload[item.name] = item.value }
+        shared.openNotification(payload)
+        return true
+    }
+    #endif
     private var syncing = false
     private var syncWaiters: [CheckedContinuation<Void, Never>] = []
 

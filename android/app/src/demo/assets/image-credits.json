@@ -1,0 +1,26 @@
+[
+  {
+    "file": "demo_card_1.png",
+    "credit": "Adrian Rosebrock / CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0) / Wikimedia Commons, PNG 변환 또는 미리보기 / 정지 표지판의 물체 탐지 예시. 두 상자는 정답 위치와 예측 위치입니다.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Intersection_over_Union_-_object_detection_bounding_boxes.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "origin": "SOURCE"
+  },
+  {
+    "file": "demo_card_2.png",
+    "credit": "Sewaqu / Public domain (https://commons.wikimedia.org/wiki/Commons:Public_domain) / Wikimedia Commons, PNG 변환 또는 미리보기 / 표본 점의 관계를 직선으로 근사한 선형회귀 예시.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Linear_regression.svg",
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/Commons:Public_domain",
+    "origin": "SOURCE"
+  },
+  {
+    "file": "demo_card_3.png",
+    "credit": "QuantuMechaniX8 / CC0 (https://creativecommons.org/publicdomain/zero/1.0/deed.en) / Wikimedia Commons, PNG 변환 또는 미리보기 / 여러 층으로 연결된 신경망의 구조 예시.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Neural_Network.svg",
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "origin": "SOURCE"
+  }
+]

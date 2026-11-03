@@ -219,7 +219,26 @@ AI 응답 이후 검증이나 저장이 실패해도 이미 완료한 AI 호출 
 공식 문서: [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna),
 [GPT-6.1 Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 
-### 이미지 미확보 시 초안 보존
+### 모든 슬라이드의 이미지 확보 (2026-10-26)
+
+현재 흐름은 3~5장 각각에 서로 다른 이미지를 요구합니다. 라이선스·관련성 검사를 통과한 검색 이미지를 먼저 사용하고,
+검색 실패나 적합한 후보 부재 시 장별 제목·본문을 포함한 프롬프트로 AI 이미지를 생성합니다.
+`AIKNOW_ALLOW_IMAGE_GENERATION=true`, `AIKNOW_MAX_IMAGE_GENERATIONS=5`를 적용합니다.
+생성이 꺼졌거나 한도/업로드 오류가 발생하면 빈 이미지로 검수 초안을 저장하지 않습니다.
+이미 저장된 생성 이미지는 예약·캐시를 통해 복구하며 유료 요청을 무작정 반복하지 않습니다.
+본문 이미지 URL/출처의 중복도 최종 단계에서 차단합니다. 표지와 첫 슬라이드의 동일 이미지 사용은 허용합니다.
+
+헬퍼 재생성 시 `sync-draft-validation.mjs`, `sync-image-fallback.mjs`, `connect-ingestion.mjs` 등 이후
+**마지막으로 `node infra/n8n/sync-required-images.mjs`를 실행**하고 `node --test infra/n8n/*.test.mjs`로 검증합니다.
+확인된 영구 이미지 URL을 받은 뒤에는 해당 Binary만 다음 루프에서 제외해 메모리 전달량을 줄입니다.
+기존 실행의 복구 데이터와 아직 저장하지 않은 Binary는 유지합니다.
+
+서버 전송 직전 `card-text.mjs`가 요약·본문을 문장별 줄바꿈으로 정리합니다. 기존 문단,
+숫자의 소수점·버전·URL은 유지하며 내용은 바꾸지 않습니다. iOS/Android 본문은 저장된 줄바꿈을 표시합니다.
+Commons 원본의 추적 전용 `utm_*` 매개변수만 제거해 앱이 작은 썸네일을 선택할 수 있게 합니다.
+저작자·라이선스·출처 링크와 서명 등 다른 쿼리가 있는 URL은 유지합니다.
+
+### 과거 이미지 미확보 시 초안 보존 동작
 
 `image-fallback.mjs`의 규칙을 수정한 뒤 `node infra/n8n/sync-image-fallback.mjs`로 워크플로에 반영합니다.
 전송 노드의 변환 결과는 `{request, reviewWarnings}`이며 HTTP 노드는 `request`만 서버에 보냅니다.
@@ -233,3 +252,10 @@ AI 응답 이후 검증이나 저장이 실패해도 이미 완료한 AI 호출 
 ## 중복 예약된 초안 처리
 
 같은 기사의 초안 생성이 이미 예약되어 `BLOCKED`를 반환하면 해당 기록은 유지하고 다음 기사 후보로 이동합니다. 후보 수와 유료 호출 상한은 그대로 적용됩니다. 남은 후보가 없거나 이미지 선택·생성 기록의 복구가 필요한 경우에는 중단하며, 기존 요청을 삭제하거나 다시 과금하지 않습니다.
+# 관리자 자동화 알림
+
+`node infra/n8n/admin-alerts.mjs`는 주 워크플로에 미생성 종료 알림을 추가하고 `ai-know-automation-errors.json`을 생성합니다. 이미지 코드 재생성 후에는 기존과 같이 `sync-required-images.mjs`를 마지막에 실행합니다.
+
+배포 도구가 주 워크플로에 연결된 오류 워크플로를 먼저 배포합니다. 각각 ingestion credential을 서버 환경에서 안전하게 바인딩하며, 자동화 게시 설정은 그대로 적용합니다. 서버의 V10 마이그레이션과 `/internal/v1/automation/events` 배포가 선행되어야 합니다.
+
+새 초안 저장 성공은 서버가 관리자 알림을 기록합니다. 미생성·fallback 종료는 주 워크플로가 `NO_CONTENT`를 보내며 preview는 제외합니다. 자동 실행에서 발생한 예외는 별도 Error Trigger가 `FAILED`를 보냅니다. n8n의 수동 실행 예외는 Error Trigger 대상이 아니므로 편집기의 실행 오류를 직접 확인합니다. n8n 프로세스 자체가 중지되면 이 경로도 실행될 수 없으므로 컨테이너 감시는 별도입니다.
