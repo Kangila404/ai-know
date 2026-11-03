@@ -425,3 +425,13 @@ Mac 검증 기록 (2026-11-03):
 - 운영 서버 읽기 확인: health/public cards/providers 200, GOOGLE/KAKAO/APPLE 노출, 비로그인 관리자 알림 401.
 
 로컬 증거: `.local/ios-pr33/`와 Xcode DerivedData의 `Logs/Test/*.xcresult`. UI 테스트는 실제 OAuth 자격 증명/실서버 사용자 데이터로 수행한 검증과 구분합니다.
+
+- 라이트/다크 로그인 UI: 세 제공자 버튼의 CSRF 포함 challenge 요청 및 예전 미리보기 인자로 로그인 우회 불가 확인. 실제 OAuth 자격 증명을 입력한 테스트는 아닙니다.
+- 시스템 다크 모드에서 콘텐츠/프로필/알림 UI 회귀도 동일하게 통과했습니다.
+
+
+버전 1.0 (8)의 Release 아카이브와 App Store 배포용 IPA를 생성했습니다. 서명 및 프로비저닝에서 `org.aiknow.AiKnow` / `SS32PHC392`, Production APNs, Sign in with Apple, 디버깅 비활성화를 확인했습니다. 번들 API는 운영 HTTPS이며 Firebase 설정은 현재 Mac의 운영 파일과 일치하고 CI fixture가 아닙니다. Release 실행 파일에는 개발 미리보기와 Debug 전용 알림 테스트 입력이 없습니다.
+
+일반 Debug 앱도 운영 HTTPS / 1.0 (8)로 다시 빌드·설치했습니다. 배포 아카이브·IPA·검증 로그는 `.local/testflight/2026-11-03-build-8/`에 보관합니다. TestFlight의 최종 업로드/처리 상태는 [PR #33](https://github.com/Kangila404/ai-know/pull/33)의 TestFlight 항목에 기록합니다.
+
+이번 Mac의 실기기는 연결 불가 상태여서 새 빌드의 실제 소셜 로그인·실제 FCM/APNs 수신은 검증하지 못했습니다. 기존 1.0 (7)의 Apple 로그인 성공은 11월 3일 사용자 확인 이력이며 새 빌드의 실기기 검증으로 간주하지 않습니다. 새 빌드 설치 후 비회원 읽기, 실제 로그인, 첫 가입 설정/기존 회원 생략, ADMIN 우측 탭을 확인합니다. 실제 푸시 발송은 보류 정책을 유지합니다.
