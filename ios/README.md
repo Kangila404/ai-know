@@ -309,11 +309,11 @@ API 주소는 `https://aiknow.kro.kr`입니다. 현재 운영 서버와 HTTPS가
 관리자 API UI 검증은 `python3 ios/tests/test_admin_ui.py --device <UDID>`로 실행합니다. 별도 HTTP 서버에서 세션 쿠키·CSRF·ADMIN 역할·버전·변경 사유·요청 본문을 검사하며 검수, 카드 공개 상태, 공지/프로필 CRUD, 생성 복구와 탭 권한 갱신을 조작합니다. 실제 운영 계정·콘텐츠는 변경하지 않습니다. `--only <test method>`로 특정 시나리오만 재실행할 수 있습니다. 기존 일반 사용자 흐름은 `test_content_ui.py`로 검증합니다. 테스트 후 일반 Xcode 빌드로 테스트용 API 주소를 복원해야 합니다.
 
 
-소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Google/카카오는 ‘Google 로그인 / 카카오 로그인’ 문구, 54pt 높이, 16pt Medium 글꼴, 20pt 심볼, 12pt 간격을 공유합니다. Google은 라이트/다크 색상을 전환합니다.
+소셜 로그인은 공식 심볼과 네이티브 텍스트를 조합합니다. Apple/Google/카카오는 하나의 버튼 컴포넌트로 54pt 높이, 16pt Medium 글꼴, 중앙 문구와 고정된 왼쪽 아이콘 열을 공유합니다. 화면 너비를 기준으로 콘텐츠를 중앙 배치하며 좌우 여백은 최소 24pt입니다. Google은 라이트/다크 색상을 전환합니다.
 
-- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 두 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
-- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)에서 말풍선 심볼 path를 분리했습니다. 심볼의 형태·비율·색상은 유지합니다.
-- Apple: [ASAuthorizationAppleIDButton](https://developer.apple.com/documentation/authenticationservices/asauthorizationappleidbutton)의 로그인 타입을 사용합니다. 버튼 높이는 54pt이며 문구/서체는 Apple이 제공합니다. 한국어 지원 언어를 선언해 한국어 기기에서 시스템 로그인 문구도 현지화됩니다. 동작은 기존 `AuthSession.signInApple()`의 서버 challenge → nonce → 인증 → 세션 처리에 연결됩니다.
+- Google: [브랜딩 가이드](https://developers.google.com/identity/branding-guidelines)의 [공식 G 심볼 PNG](https://developers.google.com/static/identity/images/g-logo.png)를 변경 없이 사용합니다. [Google Fonts의 Google Sans](https://github.com/google/fonts/tree/main/ofl/googlesans)를 세 버튼에 공통으로 적용하며 한국어는 시스템 글꼴로 대체됩니다. SIL Open Font License를 앱 번들에 함께 포함합니다.
+- 카카오: [공식 디자인 리소스](https://developers.kakao.com/tool/resource/login)의 [한국어 완성형 SVG](https://developers.kakao.com/tool/images/resource/preview/login-complete-ko.svg)에서 말풍선 심볼 path를 분리했습니다. 심볼의 형태·비율·색상은 유지합니다. 원본 SVG는 `DesignResources/kakao-symbol.svg`에 보관하고, iOS SVG 렌더링 누락을 피하도록 같은 도형을 60×60 투명 PNG(@3x)로 변환해 사용합니다.
+- Apple: [Apple Design Resources](https://developer.apple.com/design/resources/)의 [공식 로고](https://devimages-cdn.apple.com/design/resources/download/Logo-Sign-in-with-Apple.dmg)에서 Left-aligned Small 흑/백 SVG 원본을 사용합니다. 내장 여백과 비율을 유지해 버튼 높이에 맞추고, 잘라내거나 세로 여백을 추가하지 않습니다. [커스텀 버튼 가이드](https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple/)에 따라 공식 한국어 문구 ‘Apple로 로그인’과 흑백 색상을 유지하며 서체만 공통 스타일로 맞춥니다. 라이선스는 `Legal/Sign-in-with-Apple-Artwork-License.txt`에 보관합니다. 동작은 기존 `AuthSession.signInApple()`의 challenge → nonce → 인증 → 세션 처리를 그대로 사용합니다.
 
 `python3 ios/tests/test_login_ui.py --device <UDID>`는 세 제공자를 반환하는 별도 HTTP fixture에서 밝은/어두운 로그인 화면을 캡처하고 각 버튼이 해당 제공자의 challenge API와 CSRF 처리로 연결되는지 검사합니다. 실제 Google·카카오·Apple 계정 로그인 성공을 대신하는 검증은 아닙니다. 운영 로그인 버튼 노출은 서버의 `/api/v1/auth/social/providers` 응답을 따릅니다.
 
@@ -435,3 +435,13 @@ Mac 검증 기록 (2026-11-03):
 일반 Debug 앱도 운영 HTTPS / 1.0 (8)로 다시 빌드·설치했습니다. 배포 아카이브·IPA·검증 로그는 `.local/testflight/2026-11-03-build-8/`에 보관합니다. TestFlight의 최종 업로드/처리 상태는 [PR #33](https://github.com/Kangila404/ai-know/pull/33)의 TestFlight 항목에 기록합니다.
 
 이번 Mac의 실기기는 연결 불가 상태여서 새 빌드의 실제 소셜 로그인·실제 FCM/APNs 수신은 검증하지 못했습니다. 기존 1.0 (7)의 Apple 로그인 성공은 11월 3일 사용자 확인 이력이며 새 빌드의 실기기 검증으로 간주하지 않습니다. 새 빌드 설치 후 비회원 읽기, 실제 로그인, 첫 가입 설정/기존 회원 생략, ADMIN 우측 탭을 확인합니다. 실제 푸시 발송은 보류 정책을 유지합니다.
+
+
+### 2026-11-03 로그인 화면 정렬 보완 — 1.0 (9)
+
+스크롤 콘텐츠가 고유 너비만 차지해 로그인 화면이 왼쪽으로 치우치던 문제를 화면 너비 기준 중앙 배치로 수정했습니다. 세 소셜 버튼은 동일한 글꼴·굵기·크기·높이·텍스트 중심·아이콘 열을 공유합니다. Apple은 공식 로고와 한국어 로그인 문구를 유지한 커스텀 버튼이며 인증 요청은 기존 네이티브 흐름을 사용합니다. 카카오 심볼은 동일 도형의 PNG를 사용해 다크 모드의 SVG 렌더링 누락을 방지합니다.
+
+비회원 진입 문구는 ‘비회원 사용’이며 배경·테두리 없는 텍스트 버튼입니다. 최소 44pt 터치 높이와 로그인 우회 없는 공개 열람 흐름을 유지합니다. 로그인 UI 테스트는 각 버튼·제목·비회원 버튼의 화면 중심, 좌우 끝선·54pt 높이, 카카오 아이콘의 실제 픽셀 표시, 세 제공자의 CSRF/challenge 연결을 확인합니다. 배포 결과는 PR #33의 TestFlight 항목에 기록합니다.
+
+
+최종 iPhone 16 Pro / iOS 26.3 시뮬레이터에서 `python3 ios/tests/test_login_ui.py --device 7747EDBE-9A77-4EAE-B2C0-72B92CC628CA`를 실행해 라이트/다크 정렬·아이콘 표시·비회원 문구·세 제공자 challenge 연결과 기존 미리보기 인자 우회 방지를 확인했습니다. 화면 캡처는 `.local/ios-login-alignment/16pro-{light,dark}.png`에 보관합니다. 새 빌드의 실제 계정 인증 및 실기기 표시 여부는 별도 확인 항목입니다.

@@ -534,7 +534,7 @@ final class AdminAPIConnectionTests: XCTestCase {
     }
 }
 
-// Official assets and native Apple control, using an isolated all-provider fixture.
+// Official assets and shared button layout, using an isolated all-provider fixture.
 final class LoginBrandingTests: XCTestCase {
     @MainActor func testLight() throws { try verify("light") }
     @MainActor func testDark() throws { try verify("dark") }
@@ -565,7 +565,38 @@ final class LoginBrandingTests: XCTestCase {
             XCTAssertTrue(app.buttons[label].waitForExistence(timeout: 20))
             XCTAssertTrue(app.buttons[label].isHittable)
         }
-        let image = XCTAttachment(screenshot: app.screenshot())
+        let screen = app.windows.firstMatch.frame
+        let google = app.buttons["login.google"].frame
+        for id in ["login.apple", "login.kakao", "login.google"] {
+            let frame = app.buttons[id].frame
+            XCTAssertEqual(frame.midX, screen.midX, accuracy: 1, "Login content must be centered in the viewport")
+            XCTAssertEqual(frame.minX, google.minX, accuracy: 1)
+            XCTAssertEqual(frame.maxX, google.maxX, accuracy: 1)
+            XCTAssertEqual(frame.height, 54, accuracy: 1)
+        }
+        XCTAssertEqual(app.staticTexts["login.headline"].frame.midX, screen.midX, accuracy: 1)
+        XCTAssertEqual(app.buttons["login.guest"].frame.midX, screen.midX, accuracy: 1)
+        XCTAssertEqual(app.buttons["login.apple"].label, "Apple로 로그인")
+        XCTAssertEqual(app.buttons["login.guest"].label, "비회원 사용")
+        let screenshot = app.screenshot()
+        // The SVG previously disappeared in dark mode despite a hittable button.
+        // Verify the rendered dark glyph inside the yellow Kakao button as well.
+        let kakao = app.buttons["login.kakao"].frame
+        let rendered = try XCTUnwrap(screenshot.image.cgImage)
+        let scale = CGFloat(rendered.width) / screen.width
+        let region = CGRect(x: (kakao.minX + 20) * scale, y: (kakao.midY - 10) * scale, width: 20 * scale, height: 20 * scale)
+        let cg = try XCTUnwrap(rendered.cropping(to: region))
+        let w = cg.width, h = cg.height
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let dark = pixels.withUnsafeMutableBytes { buffer -> Int in
+            let context = CGContext(data: buffer.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            let bytes = buffer.bindMemory(to: UInt8.self)
+            return stride(from: 0, to: bytes.count, by: 4).filter { bytes[$0] < 100 && bytes[$0 + 1] < 100 && bytes[$0 + 2] < 100 }.count
+        }
+        XCTAssertGreaterThan(dark, w * h / 10, "Kakao's official symbol must be visible in both appearances")
+        let image = XCTAttachment(screenshot: screenshot)
         image.name = "Official login buttons — \(mode)"
         image.lifetime = .keepAlways
         add(image)
